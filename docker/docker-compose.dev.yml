@@ -8,7 +8,7 @@
 # To make a JVM app debuggable via IntelliJ, go to its env file and add JVM debug flags, and then add the JVM debug
 # port to this file.
 ---
-version: '3.8'
+version: '3.7'
 services:
   # Pre-creates the search indices using local mapping/settings.json
   elasticsearch-setup:
