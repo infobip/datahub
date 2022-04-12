@@ -1,5 +1,5 @@
 # Service definitions for standalone Kafka consumer containers.
-version: '3.7'
+version: '3.8'
 services:
   datahub-gms:
     environment:

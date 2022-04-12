@@ -4,7 +4,7 @@
 
 # NOTE: This file does not build! No dockerfiles are set. See the README.md in this directory.
 ---
-version: '3.7'
+version: '3.8'
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:5.4.0
