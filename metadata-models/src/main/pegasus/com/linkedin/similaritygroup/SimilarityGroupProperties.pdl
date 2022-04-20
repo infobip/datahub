@@ -1,0 +1,28 @@
+namespace com.linkedin.similaritygroup
+
+import com.linkedin.common.Uri
+import com.linkedin.common.CustomProperties
+
+/**
+ * Properties associated with a Dataset
+ */
+@Aspect = {
+  "name": "similarityGroupProperties"
+}
+record SimilarityGroupProperties includes CustomProperties {
+
+  /**
+   * Documentation of the similarity group
+   */
+  @Searchable = {
+    "fieldType": "TEXT",
+    "hasValuesFieldName": "hasDescription"
+  }
+  description: optional string
+
+  /**
+   * The abstracted URI such as hdfs:///data/tracking/PageViewEvent, file:///dir/file_name. Uri should not include any environment specific properties. Some datasets might not have a standardized uri, which makes this field optional (i.e. kafka topic).
+   */
+  uri: optional Uri
+
+}

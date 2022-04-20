@@ -38,6 +38,25 @@ query getBrowseResults($input: BrowseInput!) {
                     ...entityDomain
                 }
             }
+            ... on SimilarityGroup {
+                urn
+                name
+                origin
+                description
+                properties {
+                    description
+                    customProperties {
+                        key
+                        value
+                    }
+                }
+                platform {
+                    ...platformFields
+                }
+                ownership {
+                    ...ownershipFields
+                }
+            }
             ... on Dashboard {
                 urn
                 type

@@ -62,6 +62,25 @@ fragment searchResultFields on Entity {
             ...entityContainer
         }
     }
+    ... on SimilarityGroup {
+        urn
+        name
+        origin
+        description
+        properties {
+            description
+            customProperties {
+                key
+                value
+            }
+        }
+        platform {
+            ...platformFields
+        }
+        ownership {
+            ...ownershipFields
+        }
+    }
     ... on CorpUser {
         username
         properties {

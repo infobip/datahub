@@ -15,6 +15,7 @@ import com.linkedin.metadata.key.MLFeatureTableKey;
 import com.linkedin.metadata.key.MLModelDeploymentKey;
 import com.linkedin.metadata.key.MLModelGroupKey;
 import com.linkedin.metadata.key.MLModelKey;
+import com.linkedin.metadata.key.SimilarityGroupKey;
 import java.net.URISyntaxException;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,8 @@ public class DataPlatformInstanceUtils {
     switch (entityType) {
       case "dataset":
         return ((DatasetKey) keyAspect).getPlatform();
+      case "similarityGroup":
+        return ((SimilarityGroupKey) keyAspect).getPlatform();
       case "chart":
         return getPlatformUrn(((ChartKey) keyAspect).getDashboardTool());
       case "dashboard":

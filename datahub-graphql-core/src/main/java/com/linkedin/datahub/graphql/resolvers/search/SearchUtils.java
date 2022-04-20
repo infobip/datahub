@@ -15,6 +15,7 @@ public class SearchUtils {
   public static final List<EntityType> SEARCHABLE_ENTITY_TYPES =
       ImmutableList.of(
           EntityType.DATASET,
+          EntityType.SIMILARITY_GROUP,
           EntityType.DASHBOARD,
           EntityType.CHART,
           EntityType.MLMODEL,
@@ -36,6 +37,7 @@ public class SearchUtils {
       ImmutableList.of(
           EntityType.DATASET,
           EntityType.DASHBOARD,
+          EntityType.SIMILARITY_GROUP,
           EntityType.CHART,
           EntityType.MLMODEL,
           EntityType.MLMODEL_GROUP,

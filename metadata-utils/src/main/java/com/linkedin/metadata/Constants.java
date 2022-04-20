@@ -21,6 +21,7 @@ public class Constants {
   public static final String CORP_USER_ENTITY_NAME = "corpuser";
   public static final String CORP_GROUP_ENTITY_NAME = "corpGroup";
   public static final String DATASET_ENTITY_NAME = "dataset";
+  public static final String SIMILARITY_GROUP_ENTITY_NAME = "similarityGroup";
   public static final String CHART_ENTITY_NAME = "chart";
   public static final String DASHBOARD_ENTITY_NAME = "dashboard";
   public static final String DATA_FLOW_ENTITY_NAME = "dataFlow";
@@ -55,6 +56,7 @@ public class Constants {
   public static final String STATUS_ASPECT_NAME = "status";
   public static final String SUB_TYPES_ASPECT_NAME = "subTypes";
   public static final String DEPRECATION_ASPECT_NAME = "deprecation";
+  public static final String SIMILARITY_GROUP_MEMBER_ASPECT_NAME = "similarityGroupMember";
 
   // User
   public static final String CORP_USER_KEY_ASPECT_NAME = "corpUserKey";
@@ -79,6 +81,10 @@ public class Constants {
   public static final String SCHEMA_METADATA_ASPECT_NAME = "schemaMetadata";
   public static final String EDITABLE_SCHEMA_METADATA_ASPECT_NAME = "editableSchemaMetadata";
   public static final String VIEW_PROPERTIES_ASPECT_NAME = "viewProperties";
+
+  // Similarity group
+  public static final String SIMILARITY_GROUP_KEY_ASPECT_NAME = "similarityGroupKey";
+  public static final String SIMILARITY_GROUP_PROPERTIES_ASPECT_NAME = "similarityGroupProperties";
 
   // Chart
   public static final String CHART_KEY_ASPECT_NAME = "chartKey";

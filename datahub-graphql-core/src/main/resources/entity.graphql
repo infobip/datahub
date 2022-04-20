@@ -30,6 +30,11 @@ type Query {
     dataset(urn: String!): Dataset
 
     """
+    Fetch a Similarity group by primary key (urn)
+    """
+    similarityGroup(urn: String!): SimilarityGroup
+
+    """
     Fetch a Dashboard by primary key (urn)
     """
     dashboard(urn: String!): Dashboard
@@ -331,6 +336,11 @@ enum EntityType {
     The Dataset Entity
     """
     DATASET
+
+    """
+    The Similarity group Entity
+    """
+    SIMILARITY_GROUP
 
     """
     The CorpUser Entity
@@ -827,6 +837,69 @@ type Dataset implements EntityWithRelationships & Entity {
     aspects(input: AspectParams): [RawAspect!]
 }
 
+"""
+A Similarity group entity
+"""
+type SimilarityGroup implements EntityWithRelationships & Entity {
+    """
+    The primary key of the Similarity group
+    """
+    urn: String!
+
+    """
+    The standard Entity Type
+    """
+    type: EntityType!
+
+    """
+    Deprecated,se the properties field instead
+    Environment in which the dataset belongs to or where it was generated
+    Note that this field will soon be deprecated in favor of a more standardized concept of Environment
+    """
+    origin: FabricType! @deprecated
+
+    """
+    Standardized platform urn where the similarity group is defined
+    """
+    platform: DataPlatform!
+
+    """
+    The similarity group display name
+    """
+    name: String!
+
+    """
+    Deprecated, use the properties field instead
+    Read only technical description for dataset
+    """
+    description: String @deprecated
+
+    """
+    An additional set of read only properties
+    """
+    properties: SimilarityGroupProperties
+
+    """
+    Ownership metadata of the similarity group
+    """
+    ownership: Ownership
+
+    """
+    Experimental API.
+    For fetching extra entities that do not have custom UI code yet
+    """
+    aspects(input: AspectParams): [RawAspect!]
+
+    """
+    Edges extending from this entity
+    """
+    relationships(input: RelationshipsInput!): EntityRelationshipsResult
+
+    """
+    Edges extending from this entity grouped by direction in the lineage graph
+    """
+    lineage(input: LineageInput!): EntityLineageResult
+}
 
 """
 Params to configure what list of aspects should be fetched by the aspects property
@@ -916,6 +989,37 @@ type DatasetProperties {
     externalUrl: String
 }
 
+"""
+Additional read only properties about a similarity group
+"""
+type SimilarityGroupProperties {
+
+    """
+    The name of the similarity group used in display
+    """
+    name: String
+
+    """
+    Environment in which the similarity group belongs to or where it was generated
+    Note that this field will soon be deprecated in favor of a more standardized concept of Environment
+    """
+    origin: FabricType!
+
+    """
+    Read only technical description for similarity group
+    """
+    description: String
+
+    """
+    Custom properties of the similarity group
+    """
+    customProperties: [StringMapEntry!]
+
+    """
+    External URL associated with the similarity group
+    """
+    externalUrl: String
+}
 
 """
 A Glossary Term, or a node in a Business Glossary representing a standardized domain

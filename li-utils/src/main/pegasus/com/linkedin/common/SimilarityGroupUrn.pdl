@@ -1,0 +1,32 @@
+namespace com.linkedin.common
+
+/**
+ * Standardized dataset identifier.
+ */
+@java.class = "com.linkedin.common.urn.SimilarityGroupUrn"
+@validate.`com.linkedin.common.validator.TypedUrnValidator` = {
+  "accessible" : true,
+  "owningTeam" : "urn:li:internalTeam:datahub",
+  "entityType" : "similarityGroup",
+  "constructable" : true,
+  "namespace" : "li",
+  "name" : "SimilarityGroup",
+  "doc" : "Standardized similarity group identifier.",
+  "owners" : [ "urn:li:corpuser:fbar", "urn:li:corpuser:bfoo" ],
+  "fields" : [ {
+    "type" : "com.linkedin.common.urn.DataPlatformUrn",
+    "name" : "platform",
+    "doc" : "Standardized platform urn where similarity group is defined."
+  }, {
+    "name" : "similarityGroupName",
+    "doc" : "Similarity group native name",
+    "type" : "string",
+    "maxLength" : 210
+  }, {
+    "type" : "com.linkedin.common.FabricType",
+    "name" : "origin",
+    "doc" : "Fabric type where dataset belongs to or where it was generated."
+  } ],
+  "maxLength" : 284
+}
+typeref SimilarityGroupUrn = string

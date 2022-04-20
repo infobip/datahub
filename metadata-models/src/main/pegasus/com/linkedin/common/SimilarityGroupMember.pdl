@@ -1,0 +1,20 @@
+namespace com.linkedin.common
+
+/**
+ * Member of similarity group
+ */
+@Aspect = {
+  "name": "similarityGroupMember"
+}
+record SimilarityGroupMember {
+
+  /**
+   * Members urns
+   */
+  @Relationship = {
+    "name": "IsMemberOfGroup",
+    "entityTypes": [ "similarityGroup" ],
+    "isLineage": true
+  }
+  group: SimilarityGroupUrn
+}

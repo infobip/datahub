@@ -1,0 +1,18 @@
+namespace com.linkedin.metadata.aspect
+
+import com.linkedin.metadata.key.SimilarityGroupKey
+import com.linkedin.similaritygroup.SimilarityGroupProperties
+import com.linkedin.common.BrowsePaths
+import com.linkedin.common.Ownership
+import com.linkedin.common.DataPlatformInstance
+
+/**
+ * A union of all supported metadata aspects for a Similarity group
+ */
+typeref SimilarityGroupAspect = union[
+  SimilarityGroupKey,
+  SimilarityGroupProperties,
+  Ownership,
+  BrowsePaths,
+  DataPlatformInstance
+]

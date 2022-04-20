@@ -10,10 +10,12 @@ import { EntityType } from '../../../types.generated';
 import { EntityAndType } from '../types';
 import { useGetMlModelLazyQuery } from '../../../graphql/mlModel.generated';
 import { useGetMlModelGroupLazyQuery } from '../../../graphql/mlModelGroup.generated';
+import { useGetSimilarityGroupLazyQuery } from '../../../graphql/similaritygroup.generated';
 
 export default function useLazyGetEntityQuery() {
     const [fetchedEntityType, setFetchedEntityType] = useState<EntityType | undefined>(undefined);
     const [getAsyncDataset, { data: asyncDatasetData }] = useGetDatasetLazyQuery();
+    const [getAsyncSimilarityGroup, { data: asyncSimilarityGroupData }] = useGetSimilarityGroupLazyQuery();
     const [getAsyncChart, { data: asyncChartData }] = useGetChartLazyQuery();
     const [getAsyncDashboard, { data: asyncDashboardData }] = useGetDashboardLazyQuery();
     const [getAsyncDataJob, { data: asyncDataJobData }] = useGetDataJobLazyQuery();
@@ -28,6 +30,10 @@ export default function useLazyGetEntityQuery() {
             if (type === EntityType.Dataset) {
                 setFetchedEntityType(type);
                 getAsyncDataset({ variables: { urn } });
+            }
+            if (type === EntityType.SimilarityGroup) {
+                setFetchedEntityType(type);
+                getAsyncSimilarityGroup({ variables: { urn } });
             }
             if (type === EntityType.Chart) {
                 setFetchedEntityType(type);
@@ -66,6 +72,7 @@ export default function useLazyGetEntityQuery() {
             setFetchedEntityType,
             getAsyncChart,
             getAsyncDataset,
+            getAsyncSimilarityGroup,
             getAsyncDashboard,
             getAsyncDataJob,
             getAsyncMLFeatureTable,
@@ -85,6 +92,15 @@ export default function useLazyGetEntityQuery() {
                     return {
                         entity: returnData,
                         type: EntityType.Dataset,
+                    } as EntityAndType;
+                }
+                break;
+            case EntityType.SimilarityGroup:
+                returnData = asyncSimilarityGroupData?.similarityGroup;
+                if (returnData) {
+                    return {
+                        entity: returnData,
+                        type: EntityType.SimilarityGroup,
                     } as EntityAndType;
                 }
                 break;
@@ -166,6 +182,7 @@ export default function useLazyGetEntityQuery() {
         return undefined;
     }, [
         asyncDatasetData,
+        asyncSimilarityGroupData,
         asyncChartData,
         asyncDashboardData,
         asyncDataJobData,

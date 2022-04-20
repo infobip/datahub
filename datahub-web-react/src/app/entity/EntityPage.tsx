@@ -39,6 +39,7 @@ export const EntityPage = ({ entityType }: Props) => {
     // show new page for datasets
     if (
         entityType === EntityType.Dataset ||
+        entityType === EntityType.SimilarityGroup ||
         entityType === EntityType.Dashboard ||
         entityType === EntityType.Chart ||
         entityType === EntityType.DataFlow ||
