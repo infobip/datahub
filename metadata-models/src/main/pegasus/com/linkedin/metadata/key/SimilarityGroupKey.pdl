@@ -1,0 +1,38 @@
+namespace com.linkedin.metadata.key
+
+import com.linkedin.common.Urn
+import com.linkedin.common.FabricType
+
+/**
+ * Key for a Similarity group
+ */
+@Aspect = {
+  "name": "similarityGroupKey"
+}
+record SimilarityGroupKey {
+  /**
+  * Data platform urn associated with the similarity group
+  */
+  platform: Urn
+
+  /**
+  * Similarity group native name
+  */
+  @Searchable = {
+    "fieldType": "TEXT_PARTIAL",
+    "enableAutocomplete": true,
+    "boostScore": 10.0
+  }
+  name: string
+
+  /**
+  * Fabric type where similarity group belongs to or where it was generated.
+  */
+  @Searchable = {
+    "fieldType": "TEXT_PARTIAL",
+    "addToFilters": true,
+    "filterNameOverride": "Environment",
+    "queryByDefault": false
+  }
+  origin: FabricType
+}

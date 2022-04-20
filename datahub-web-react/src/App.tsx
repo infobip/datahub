@@ -30,6 +30,7 @@ import { MLModelEntity } from './app/entity/mlModel/MLModelEntity';
 import { MLModelGroupEntity } from './app/entity/mlModelGroup/MLModelGroupEntity';
 import { DomainEntity } from './app/entity/domain/DomainEntity';
 import { ContainerEntity } from './app/entity/container/ContainerEntity';
+import { SimilarityGroupEntity } from './app/entity/similarityGroup/SimilarityGroupEntity';
 
 /*
     Construct Apollo Client
@@ -82,6 +83,7 @@ const App: React.VFC = () => {
     const entityRegistry = useMemo(() => {
         const register = new EntityRegistry();
         register.register(new DatasetEntity());
+        register.register(new SimilarityGroupEntity());
         register.register(new DashboardEntity());
         register.register(new ChartEntity());
         register.register(new UserEntity());

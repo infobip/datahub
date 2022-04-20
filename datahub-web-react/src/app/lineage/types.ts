@@ -11,6 +11,7 @@ import {
     MlModelGroup,
     Maybe,
     Status,
+    SimilarityGroup,
 } from '../../types.generated';
 
 export type EntitySelectParams = {
@@ -92,6 +93,10 @@ export type EntityAndType =
     | {
           type: EntityType.Dataset;
           entity: Dataset;
+      }
+    | {
+          type: EntityType.SimilarityGroup;
+          entity: SimilarityGroup;
       }
     | {
           type: EntityType.Chart;

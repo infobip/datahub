@@ -189,6 +189,13 @@ public class PoliciesConfig {
           .collect(Collectors.toList())
   );
 
+  public static final ResourcePrivileges SIMILARITY_GROUP_PRIVILEGES = ResourcePrivileges.of(
+          "similarityGroup",
+          "Similarity groups",
+          "Similarity groups indexed by DataHub",
+          COMMON_ENTITY_PRIVILEGES
+  );
+
   // Charts Privileges
   public static final ResourcePrivileges CHART_PRIVILEGES = ResourcePrivileges.of(
       "chart",
@@ -284,6 +291,7 @@ public class PoliciesConfig {
 
   public static final List<ResourcePrivileges> RESOURCE_PRIVILEGES = ImmutableList.of(
       DATASET_PRIVILEGES,
+      SIMILARITY_GROUP_PRIVILEGES,
       DASHBOARD_PRIVILEGES,
       CHART_PRIVILEGES,
       DATA_FLOW_PRIVILEGES,

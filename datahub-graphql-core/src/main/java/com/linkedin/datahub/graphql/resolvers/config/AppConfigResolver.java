@@ -109,6 +109,8 @@ public class AppConfigResolver implements DataFetcher<CompletableFuture<AppConfi
     // TODO: Is there a better way to instruct the UI to present a searchable resource?
     if (com.linkedin.metadata.authorization.PoliciesConfig.DATASET_PRIVILEGES.getResourceType().equals(resourceType)) {
       return EntityType.DATASET;
+    } else if (com.linkedin.metadata.authorization.PoliciesConfig.SIMILARITY_GROUP_PRIVILEGES.getResourceType().equals(resourceType)) {
+      return EntityType.SIMILARITY_GROUP;
     } else if (com.linkedin.metadata.authorization.PoliciesConfig.DASHBOARD_PRIVILEGES.getResourceType().equals(resourceType)) {
       return EntityType.DASHBOARD;
     } else if (com.linkedin.metadata.authorization.PoliciesConfig.CHART_PRIVILEGES.getResourceType().equals(resourceType)) {

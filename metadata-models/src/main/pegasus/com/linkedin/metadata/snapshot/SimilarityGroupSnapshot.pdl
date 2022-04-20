@@ -1,0 +1,24 @@
+namespace com.linkedin.metadata.snapshot
+
+import com.linkedin.common.SimilarityGroupUrn
+import com.linkedin.metadata.aspect.SimilarityGroupAspect
+
+/**
+ * A metadata snapshot for a specific Similarity group entity.
+ */
+@Entity = {
+  "name": "similarityGroup",
+  "keyAspect": "similarityGroupKey"
+}
+record SimilarityGroupSnapshot {
+
+  /**
+   * URN for the entity the metadata snapshot is associated with.
+   */
+  urn: SimilarityGroupUrn
+
+  /**
+   * The list of metadata aspects associated with the similarity group. Depending on the use case, this can either be all, or a selection, of supported aspects.
+   */
+  aspects: array[SimilarityGroupAspect]
+}

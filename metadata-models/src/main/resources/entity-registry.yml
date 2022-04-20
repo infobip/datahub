@@ -152,6 +152,11 @@ entities:
     aspects:
       - assertionInfo
       - dataPlatformInstance
+  - name: similarityGroup
+    doc: Similarity group doc
+    keyAspect: similarityGroupKey
+    aspects:
+      - deprecation
       - assertionRunEvent
   - name: dataHubRetention
     category: internal

@@ -11,6 +11,7 @@ import com.linkedin.metadata.key.DataJobKey;
 import com.linkedin.metadata.key.DataPlatformKey;
 import com.linkedin.metadata.key.DatasetKey;
 import com.linkedin.metadata.key.GlossaryTermKey;
+import com.linkedin.metadata.key.SimilarityGroupKey;
 import com.linkedin.metadata.models.AspectSpec;
 import com.linkedin.metadata.models.EntitySpec;
 import com.linkedin.metadata.models.registry.EntityRegistry;
@@ -44,6 +45,15 @@ public class BrowsePathUtils {
                 entityRegistry));
         return ("/" + dsKey.getOrigin() + "/" + dpKey.getPlatformName() + "/"
             + dsKey.getName()).replace('.', '/').toLowerCase();
+      case "similarityGroup":
+        SimilarityGroupKey similarityGroupKey = (SimilarityGroupKey) EntityKeyUtils.convertUrnToEntityKey(
+                urn, getKeySchema(urn.getEntityType(), entityRegistry));
+        DataPlatformKey dataPlatformKey = (DataPlatformKey) EntityKeyUtils.convertUrnToEntityKey(
+                similarityGroupKey.getPlatform(),
+                getKeySchema(similarityGroupKey.getPlatform().getEntityType(),
+                        entityRegistry));
+        return ("/" + similarityGroupKey.getOrigin() + "/" + dataPlatformKey.getPlatformName() + "/"
+                + similarityGroupKey.getName()).replace('.', '/').toLowerCase();
       case "chart":
         ChartKey chartKey = (ChartKey) EntityKeyUtils.convertUrnToEntityKey(urn, getKeySchema(urn.getEntityType(), entityRegistry));
         return ("/" + chartKey.getDashboardTool() + "/"  + chartKey.getChartId()).toLowerCase();

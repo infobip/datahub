@@ -10,12 +10,17 @@ import { EntityType } from '../../../types.generated';
 import { EntityAndType } from '../types';
 import { useGetMlModelQuery } from '../../../graphql/mlModel.generated';
 import { useGetMlModelGroupQuery } from '../../../graphql/mlModelGroup.generated';
+import { useGetSimilarityGroupQuery } from '../../../graphql/similaritygroup.generated';
 
 export default function useGetEntityQuery(urn: string, entityType?: EntityType) {
     const allResults = {
         [EntityType.Dataset]: useGetDatasetQuery({
             variables: { urn },
             skip: entityType !== EntityType.Dataset,
+        }),
+        [EntityType.SimilarityGroup]: useGetSimilarityGroupQuery({
+            variables: { urn },
+            skip: entityType !== EntityType.SimilarityGroup,
         }),
         [EntityType.Chart]: useGetChartQuery({
             variables: { urn },
@@ -60,6 +65,15 @@ export default function useGetEntityQuery(urn: string, entityType?: EntityType) 
                     return {
                         entity: returnData,
                         type: EntityType.Dataset,
+                    } as EntityAndType;
+                }
+                break;
+            case EntityType.SimilarityGroup:
+                returnData = allResults[EntityType.SimilarityGroup].data?.similarityGroup;
+                if (returnData) {
+                    return {
+                        entity: returnData,
+                        type: EntityType.SimilarityGroup,
                     } as EntityAndType;
                 }
                 break;
@@ -146,6 +160,8 @@ export default function useGetEntityQuery(urn: string, entityType?: EntityType) 
         // eslint-disable-next-line react-hooks/exhaustive-deps
         allResults[EntityType.Dataset],
         // eslint-disable-next-line react-hooks/exhaustive-deps
+        allResults[EntityType.SimilarityGroup],
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         allResults[EntityType.Chart],
         // eslint-disable-next-line react-hooks/exhaustive-deps
         allResults[EntityType.Dashboard],
@@ -180,6 +196,8 @@ export default function useGetEntityQuery(urn: string, entityType?: EntityType) 
         returnEntityAndType,
         // eslint-disable-next-line react-hooks/exhaustive-deps
         allResults[EntityType.Dataset],
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        allResults[EntityType.SimilarityGroup],
         // eslint-disable-next-line react-hooks/exhaustive-deps
         allResults[EntityType.Chart],
         // eslint-disable-next-line react-hooks/exhaustive-deps

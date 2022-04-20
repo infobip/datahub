@@ -70,6 +70,7 @@ public final class GetHighlightsResolver implements DataFetcher<List<Highlight>>
 
     // Entity metdata statistics
     getEntityMetadataStats("Datasets", EntityType.DATASET).ifPresent(highlights::add);
+    getEntityMetadataStats("Similarity groups", EntityType.SIMILARITY_GROUP).ifPresent(highlights::add);
     getEntityMetadataStats("Dashboards", EntityType.DASHBOARD).ifPresent(highlights::add);
     getEntityMetadataStats("Charts", EntityType.CHART).ifPresent(highlights::add);
     getEntityMetadataStats("Pipelines", EntityType.DATA_FLOW).ifPresent(highlights::add);

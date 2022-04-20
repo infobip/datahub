@@ -47,6 +47,7 @@ import com.linkedin.datahub.graphql.generated.Owner;
 import com.linkedin.datahub.graphql.generated.RecommendationContent;
 import com.linkedin.datahub.graphql.generated.SearchAcrossLineageResult;
 import com.linkedin.datahub.graphql.generated.SearchResult;
+import com.linkedin.datahub.graphql.generated.SimilarityGroup;
 import com.linkedin.datahub.graphql.generated.UsageQueryResult;
 import com.linkedin.datahub.graphql.generated.UserUsageCounts;
 import com.linkedin.datahub.graphql.resolvers.AuthenticatedResolver;
@@ -147,6 +148,7 @@ import com.linkedin.datahub.graphql.types.mlmodel.MLFeatureType;
 import com.linkedin.datahub.graphql.types.mlmodel.MLModelGroupType;
 import com.linkedin.datahub.graphql.types.mlmodel.MLModelType;
 import com.linkedin.datahub.graphql.types.mlmodel.MLPrimaryKeyType;
+import com.linkedin.datahub.graphql.types.similaritygroup.SimilarityGroupType;
 import com.linkedin.datahub.graphql.types.tag.TagType;
 import com.linkedin.datahub.graphql.types.usage.UsageType;
 import com.linkedin.entity.client.EntityClient;
@@ -212,6 +214,7 @@ public class GmsGraphQLEngine {
     private final IngestionConfiguration ingestionConfiguration;
 
     private final DatasetType datasetType;
+    private final SimilarityGroupType similarityGroupType;
     private final CorpUserType corpUserType;
     private final CorpGroupType corpGroupType;
     private final ChartType chartType;
@@ -309,6 +312,7 @@ public class GmsGraphQLEngine {
         this.ingestionConfiguration = Objects.requireNonNull(ingestionConfiguration);
 
         this.datasetType = new DatasetType(entityClient);
+        this.similarityGroupType = new SimilarityGroupType(entityClient);
         this.corpUserType = new CorpUserType(entityClient);
         this.corpGroupType = new CorpGroupType(entityClient);
         this.chartType = new ChartType(entityClient);
@@ -332,6 +336,7 @@ public class GmsGraphQLEngine {
         // Init Lists
         this.entityTypes = ImmutableList.of(
             datasetType,
+            similarityGroupType,
             corpUserType,
             corpGroupType,
             dataPlatformType,
@@ -464,6 +469,7 @@ public class GmsGraphQLEngine {
         configureMutationResolvers(builder);
         configureGenericEntityResolvers(builder);
         configureDatasetResolvers(builder);
+        configureSimilarityGroupResolvers(builder);
         configureCorpUserResolvers(builder);
         configureCorpGroupResolvers(builder);
         configureDashboardResolvers(builder);
@@ -556,6 +562,9 @@ public class GmsGraphQLEngine {
                     new BrowsePathsResolver(browsableTypes)))
             .dataFetcher("dataset", new AuthenticatedResolver<>(
                     new LoadableTypeResolver<>(datasetType,
+                            (env) -> env.getArgument(URN_FIELD_NAME))))
+            .dataFetcher("similarityGroup", new AuthenticatedResolver<>(
+                    new LoadableTypeResolver<>(similarityGroupType,
                             (env) -> env.getArgument(URN_FIELD_NAME))))
             .dataFetcher("corpUser", new AuthenticatedResolver<>(
                     new LoadableTypeResolver<>(corpUserType,
@@ -837,6 +846,24 @@ public class GmsGraphQLEngine {
                 )
             );
 
+    }
+
+    /**
+     * Configures resolvers responsible for resolving the {@link com.linkedin.datahub.graphql.generated.SimilarityGroup} type.
+     */
+    private void configureSimilarityGroupResolvers(final RuntimeWiring.Builder builder) {
+        builder.type("SimilarityGroup", typeWiring -> typeWiring
+                .dataFetcher("relationships", new AuthenticatedResolver<>(
+                        new EntityRelationshipsResultResolver(graphClient)
+                ))
+                .dataFetcher("lineage", new AuthenticatedResolver<>(
+                        new EntityLineageResultResolver(graphClient)
+                ))
+                .dataFetcher("platform", new AuthenticatedResolver<>(
+                        new LoadableTypeResolver<>(dataPlatformType,
+                                (env) -> ((SimilarityGroup) env.getSource()).getPlatform().getUrn()))
+                )
+        );
     }
 
     private void configureGlossaryTermResolvers(final RuntimeWiring.Builder builder) {

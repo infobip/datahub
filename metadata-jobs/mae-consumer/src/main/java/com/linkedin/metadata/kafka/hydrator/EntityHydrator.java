@@ -29,6 +29,7 @@ public class EntityHydrator {
   private final DataFlowHydrator _dataFlowHydrator = new DataFlowHydrator();
   private final DataJobHydrator _dataJobHydrator = new DataJobHydrator();
   private final DatasetHydrator _datasetHydrator = new DatasetHydrator();
+  private final SimilarityGroupHydrator _similarityGroupHydrator = new SimilarityGroupHydrator();
 
   public Optional<ObjectNode> getHydratedEntity(String entityTypeName, String urn) {
     final ObjectNode document = JsonNodeFactory.instance.objectNode();
@@ -73,6 +74,9 @@ public class EntityHydrator {
         break;
       case DATASET_ENTITY_NAME:
         _datasetHydrator.hydrateFromEntityResponse(document, entityResponse);
+        break;
+      case SIMILARITY_GROUP_ENTITY_NAME:
+        _similarityGroupHydrator.hydrateFromEntityResponse(document, entityResponse);
         break;
       default:
         log.error("Unable to find valid hydrator for entity type: {} urn: {}", entityResponse.getEntityName(), urn);
