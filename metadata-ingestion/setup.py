@@ -29,6 +29,7 @@ base_requirements = {
 
 framework_common = {
     "click>=7.1.2",
+    "pyorient @ git+https://github.com/OpenConjecture/pyorient.git",
     "click-default-group",
     "PyYAML",
     "toml>=0.10.0",
@@ -346,6 +347,7 @@ superset_common = {
 # Note: for all of these, framework_common will be added.
 plugins: Dict[str, Set[str]] = {
     # Sink plugins.
+    "pyorient": {"pyorient"},
     "datahub-kafka": kafka_common,
     "datahub-rest": rest_common,
     "sync-file-emitter": {"filelock"},
