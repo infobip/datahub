@@ -69,7 +69,7 @@ kafka_common = {
     # At the same time, we use Kafka's AvroSerializer, which internally relies on
     # fastavro for serialization. We do not use confluent_kafka[avro], since it
     # is incompatible with its own dep on avro-python3.
-    "confluent_kafka>=1.5.0",
+    "confluent_kafka>=1.5.0,<1.9.0",
     "fastavro>=1.2.0",
 }
 
@@ -323,7 +323,6 @@ base_dev_requirements = {
     "pytest-asyncio>=0.16.0",
     "pytest-cov>=2.8.1",
     "pytest-docker>=0.10.3,<0.12",
-    "tox",
     "deepdiff",
     "requests-mock",
     "freezegun",
@@ -450,6 +449,7 @@ if is_py37_or_newer:
 entry_points = {
     "console_scripts": ["datahub = datahub.entrypoints:main"],
     "datahub.ingestion.source.plugins": [
+        "csv-enricher = datahub.ingestion.source.csv_enricher:CSVEnricherSource",
         "file = datahub.ingestion.source.file:GenericFileSource",
         "data-catalog = datahub.ingestion.source.data_catalog:DataCatalogSource",
         "sqlalchemy = datahub.ingestion.source.sql.sql_generic:SQLAlchemyGenericSource",
