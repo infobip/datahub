@@ -1,4 +1,5 @@
 import math
+import json
 import sys
 from typing import Iterable, Union
 
@@ -45,6 +46,7 @@ class IBRedashLineagesSource(Source):
         self.report: SourceReport = SourceReport()
 
         self.config.connect_uri = self.config.connect_uri.strip("/")
+        print("self.config.connect_uri:", config.connect_uri)
         self.client = Redash(self.config.connect_uri, self.config.api_key)
         self.client.session.headers.update(
             {
@@ -76,12 +78,12 @@ class IBRedashLineagesSource(Source):
         return cls(config, ctx)
 
     def get_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
-        lineages_grouped = pd.read_json(self.get_lineages(self.config.lineage_query_id)) \
-            .groupby(["SrcType",
-                      "SrcLocationCode",
-                      "SrcDBName",
-                      "SrcSchemaName",
-                      "SrcTableName"], dronpna=False)
+        lineages_json = self.get_lineages(self.config.lineage_query_id)
+        lineages_grouped = pd.read_json(json.dumps(lineages_json)).groupby(["SrcType",
+                                                                            "SrcLocationCode",
+                                                                            "SrcDBName",
+                                                                            "SrcSchemaName",
+                                                                            "SrcTableName"])
 
         for key_tuple, lineages in lineages_grouped:
             src_dataset_urn = self.build_src_dataset_urn(lineages.iloc[0])
@@ -91,9 +93,10 @@ class IBRedashLineagesSource(Source):
             for index, row in lineages.iterrows():
                 dst_urns.append(self.build_dst_dataset_urn(row))
 
-            yield MetadataWorkUnit(src_dataset_urn, mce=builder.make_lineage_mce(dst_urns, src_dataset_urn, DatasetLineageTypeClass.COPY))
+            yield MetadataWorkUnit(src_dataset_urn, mce=builder.make_lineage_mce(dst_urns, src_dataset_urn,
+                                                                                 DatasetLineageTypeClass.COPY))
 
-    def get_lineages(self, query_id):
+    def get_lineages(self, query_id) -> str:
         url = f"//api/queries/{query_id}/results"
         return self.client._post(url).json()['query_result']['data']['rows']
 
@@ -101,19 +104,22 @@ class IBRedashLineagesSource(Source):
     @staticmethod
     def build_src_dataset_urn(df: pd.DataFrame) -> str:
         if df.SrcType.lower() == "kafka":
-            return builder.make_dataset_urn("kafka", f"{df.SrcLocationCode.lower()}.{df.SrcDBName}.{df.SrcTableName}", "prod")
+            return builder.make_dataset_urn("kafka", f"{df.SrcLocationCode.lower()}.{df.SrcDBName}.{df.SrcTableName}",
+                                            "PROD")
         else:
-            return builder.make_dataset_urn("mssql", f"{df.SrcLocationCode.lower()}.{df.SrcDBName}.{df.SrcSchemaName}.{df.SrcTableName}", "prod")
+            return builder.make_dataset_urn("mssql",
+                                            f"{df.SrcLocationCode.lower()}.{df.SrcDBName}.{df.SrcSchemaName}.{df.SrcTableName}",
+                                            "PROD")
 
     @staticmethod
     def build_dst_dataset_urn(df: pd.DataFrame) -> str:
         if df.DstType.lower() == "kafka":
-            return builder.make_dataset_urn("kafka", f"{df.DstLocationCode.lower()}.{df.DstDBName}.{df.DstTableName}", "prod")
+            return builder.make_dataset_urn("kafka", f"{df.DstLocationCode.lower()}.{df.DstDBName}.{df.DstTableName}",
+                                            "PROD")
         else:
-            return builder.make_dataset_urn("mssql", f"{df.DstLocationCode.lower()}.{df.DstDBName}.{df.DstSchemaName}.{df.DstTableName}", "prod")
+            return builder.make_dataset_urn("mssql",
+                                            f"{df.DstLocationCode.lower()}.{df.DstDBName}.{df.DstSchemaName}.{df.DstTableName}",
+                                            "PROD")
 
     def get_report(self):
         return self.report
-
-    def close(self):
-        self.client.close()
