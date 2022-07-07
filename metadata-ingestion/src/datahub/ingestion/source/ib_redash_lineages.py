@@ -79,47 +79,36 @@ class IBRedashLineagesSource(Source):
 
     def get_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
         lineages_json = self.get_lineages(self.config.lineage_query_id)
-        lineages_grouped = pd.read_json(json.dumps(lineages_json)).groupby(["SrcType",
-                                                                            "SrcLocationCode",
-                                                                            "SrcDBName",
-                                                                            "SrcSchemaName",
-                                                                            "SrcTableName"])
+        lineages_grouped = pd.read_json(json.dumps(lineages_json)).groupby(["DstType",
+                                                                            "DstLocationCode",
+                                                                            "DstDBName",
+                                                                            "DstSchemaName",
+                                                                            "DstTableName"])
 
         for key_tuple, lineages in lineages_grouped:
-            src_dataset_urn = self.build_src_dataset_urn(lineages.iloc[0])
+            first = lineages.iloc[0]
+            dst_dataset_urn = self.build_dataset_urn(first.DstType, first.DstLocationCode, first.DstDBName,
+                                                     first.DstSchemaName, first.DstTableName)
 
-            dst_urns = []
+            src_urns = []
             # TODO for to map()/transform()
             for index, row in lineages.iterrows():
-                dst_urns.append(self.build_dst_dataset_urn(row))
+                src_urns.append(self.build_dataset_urn(row.SrcType, row.SrcLocationCode, row.SrcDBName,
+                                                       row.SrcSchemaName, row.SrcTableName))
 
-            yield MetadataWorkUnit(src_dataset_urn, mce=builder.make_lineage_mce(dst_urns, src_dataset_urn,
+            yield MetadataWorkUnit(dst_dataset_urn, mce=builder.make_lineage_mce(src_urns, dst_dataset_urn,
                                                                                  DatasetLineageTypeClass.COPY))
 
     def get_lineages(self, query_id) -> str:
         url = f"//api/queries/{query_id}/results"
         return self.client._post(url).json()['query_result']['data']['rows']
 
-    # TODO constants for platform names?
     @staticmethod
-    def build_src_dataset_urn(df: pd.DataFrame) -> str:
-        if df.SrcType.lower() == "kafka":
-            return builder.make_dataset_urn("kafka", f"{df.SrcLocationCode.lower()}.{df.SrcDBName}.{df.SrcTableName}",
-                                            "PROD")
+    def build_dataset_urn(dataset_type, location_code, db_name, schema_name, table_name) -> str:
+        if dataset_type.lower() == "kafka":
+            return builder.make_dataset_urn("kafka", f"{location_code.lower()}.{db_name}.{table_name}", "PROD")
         else:
-            return builder.make_dataset_urn("mssql",
-                                            f"{df.SrcLocationCode.lower()}.{df.SrcDBName}.{df.SrcSchemaName}.{df.SrcTableName}",
-                                            "PROD")
-
-    @staticmethod
-    def build_dst_dataset_urn(df: pd.DataFrame) -> str:
-        if df.DstType.lower() == "kafka":
-            return builder.make_dataset_urn("kafka", f"{df.DstLocationCode.lower()}.{df.DstDBName}.{df.DstTableName}",
-                                            "PROD")
-        else:
-            return builder.make_dataset_urn("mssql",
-                                            f"{df.DstLocationCode.lower()}.{df.DstDBName}.{df.DstSchemaName}.{df.DstTableName}",
-                                            "PROD")
+            return builder.make_dataset_urn("mssql", f"{location_code.lower()}.{db_name}.{schema_name}.{table_name}", "PROD")
 
     def get_report(self):
         return self.report
