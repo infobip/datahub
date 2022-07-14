@@ -79,11 +79,11 @@ class IBRedashLineagesSource(Source):
 
     def get_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
         lineages_json = self.get_lineages(self.config.lineage_query_id)
-        lineages_grouped = pd.read_json(json.dumps(lineages_json)).groupby(["DstType",
-                                                                            "DstLocationCode",
-                                                                            "DstDBName",
-                                                                            "DstSchemaName",
-                                                                            "DstTableName"])
+        lineages_grouped = pd.read_json(json.dumps(lineages_json)).groupby(by=["DstType",
+                                                                               "DstLocationCode",
+                                                                               "DstDBName",
+                                                                               "DstSchemaName",
+                                                                               "DstTableName"], dropna=False)
 
         for key_tuple, lineages in lineages_grouped:
             first = lineages.iloc[0]
@@ -108,7 +108,8 @@ class IBRedashLineagesSource(Source):
         if dataset_type.lower() == "kafka":
             return builder.make_dataset_urn("kafka", f"{location_code.lower()}.{db_name}.{table_name}", "PROD")
         else:
-            return builder.make_dataset_urn("mssql", f"{location_code.lower()}.{db_name}.{schema_name}.{table_name}", "PROD")
+            return builder.make_dataset_urn("mssql", f"{location_code.lower()}.{db_name}.{schema_name}.{table_name}",
+                                            "PROD")
 
     def get_report(self):
         return self.report
