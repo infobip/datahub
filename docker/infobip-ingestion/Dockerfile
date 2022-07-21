@@ -12,9 +12,7 @@ RUN python3 -m pip install --upgrade pip==19.3.1 wheel setuptools acryl-datahub
 COPY . /datahub-src
 RUN cd /datahub-src && ./gradlew :metadata-ingestion:installDev --stacktrace
 RUN pip install 'acryl-datahub[datahub-kafka]'
-RUN cd /datahub-src/metadata-ingestion/ && pip install -e '.[ldap]'
-RUN cd /datahub-src/metadata-ingestion/ && pip install -e '.[data-catalog]'
-RUN cd /datahub-src/metadata-ingestion/ && pip install -e '.[ib-redash-lineages]'
+RUN cd /datahub-src/metadata-ingestion/ && pip install -e '.[ldap]' '.[data-catalog]' '.[ib-redash-lineages]'
 
 ENTRYPOINT ["/datahub-src/metadata-ingestion/venv/bin/datahub","ingest","-c"]
 CMD ["--help"]
