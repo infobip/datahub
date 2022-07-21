@@ -1,0 +1,20 @@
+FROM centos/python-38-centos7
+
+USER root
+ARG version
+
+RUN yum history sync
+RUN yum -y update
+RUN yum -y install java-11-openjdk epel-release gcc python3-devel openldap-devel
+RUN yum -y install jq
+RUN python3 -m pip install --upgrade pip==19.3.1 wheel setuptools acryl-datahub
+
+COPY . /datahub-src
+RUN cd /datahub-src && ./gradlew :metadata-ingestion:installDev --stacktrace
+RUN pip install 'acryl-datahub[datahub-kafka]'
+RUN cd /datahub-src/metadata-ingestion/ && pip install -e '.[ldap]'
+RUN cd /datahub-src/metadata-ingestion/ && pip install -e '.[data-catalog]'
+RUN cd /datahub-src/metadata-ingestion/ && pip install -e '.[ib-redash-lineages]'
+
+ENTRYPOINT ["/datahub-src/metadata-ingestion/venv/bin/datahub","ingest","-c"]
+CMD ["--help"]
