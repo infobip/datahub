@@ -6,6 +6,7 @@ from typing import Dict, Iterable, Optional, Union
 import pyorient
 from pyorient import OrientRecord
 
+import datahub.emitter.mce_builder as builder
 from datahub.configuration.common import ConfigModel
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.source import Source, SourceReport
@@ -20,8 +21,14 @@ from datahub.metadata.schema_classes import (
     SchemaFieldClass,
     SchemaFieldDataTypeClass,
     SchemalessClass,
+    KafkaSchemaClass,
     SchemaMetadataClass,
     StringTypeClass,
+    BytesTypeClass,
+    DateTypeClass,
+    NullTypeClass,
+    OwnershipSourceTypeClass,
+    OwnershipTypeClass,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,6 +49,7 @@ def get_query(external_type: str, rid: Optional[str], limit: int) -> str:
             "SELECT *, "
             "inE('Has').outV().name[0] AS schema, "
             "inE('Has').outV().inE('Has').outV().name[0] AS db, "
+            "inE('Has').outV().inE('Has').outV().technicalOwnerName[0] AS dbTechnicalOwner,"
             "inE('Has').outV().inE('Has').outV().inE('Has').outV().code[0] AS location, "
             "outE('TableHasColumn').inV().toJson() as columns "
             "FROM Table "
@@ -63,12 +71,14 @@ def map_snapshot(table: OrientRecord) -> MetadataWorkUnit:
     external_type = table.oRecordData.get("externalType")
     if external_type == "kafka_topic":
         platform = "kafka"
+        platform_schema = KafkaSchemaClass.construct_with_defaults()
         parents = [
             table.oRecordData.get("location").lower(),
             table.oRecordData.get("db"),
         ]
     elif external_type == "mssql_table":
         platform = "mssql"
+        platform_schema = SchemalessClass()
         parents = [
             table.oRecordData.get("location").lower(),
             table.oRecordData.get("db"),
@@ -81,6 +91,7 @@ def map_snapshot(table: OrientRecord) -> MetadataWorkUnit:
         name=name,
         description=table.oRecordData.get("description"),
         customProperties=table.oRecordData.get("customFields"),
+        qualifiedName=f"{'.'.join(parents)}.{name}"
     )
 
     browse_paths = BrowsePathsClass([f"/prod/{platform}/{'/'.join(parents)}/{name}"])
@@ -91,13 +102,23 @@ def map_snapshot(table: OrientRecord) -> MetadataWorkUnit:
         version=1,
         hash="",
         platform=f"urn:li:dataPlatform:{platform}",
-        platformSchema=SchemalessClass(),
+        platformSchema=platform_schema,
         fields=[map_column(c) for c in columns],
     )
 
+    technical_owner_name = table.oRecordData.get("dbTechnicalOwner")
+    if technical_owner_name:
+        ownership = builder.make_ownership_aspect_from_urn_list([builder.make_group_urn(technical_owner_name)],
+                                                                OwnershipSourceTypeClass.SERVICE,
+                                                                OwnershipTypeClass.TECHNICAL_OWNER)
+        aspects = [properties, browse_paths, schema, ownership]
+
+    else:
+        aspects = [properties, browse_paths, schema]
+
     snapshot = DatasetSnapshot(
         urn=f"urn:li:dataset:(urn:li:dataPlatform:{platform},{'.'.join(parents)}.{name},PROD)",
-        aspects=[properties, browse_paths, schema],
+        aspects=aspects,
     )
 
     mce = MetadataChangeEvent(proposedSnapshot=snapshot)
@@ -111,15 +132,25 @@ def map_column(column: Dict[str, str]) -> SchemaFieldClass:
     else:
         data_type = "string"
 
-    type_class: Union["StringTypeClass", "BooleanTypeClass", "NumberTypeClass"]
-    if data_type == "string":
+    type_class: Union[
+        "StringTypeClass", "BooleanTypeClass", "NumberTypeClass", "BytesTypeClass", "DateTypeClass", "NullTypeClass"]
+    if data_type in ["string",
+                     "char", "nchar",
+                     "varchar", "varchar(n)", "varchar(max)",
+                     "nvarchar", "nvarchar(max)",
+                     "text"]:
         type_class = StringTypeClass()
-    elif data_type == "boolean":
+    elif data_type in ["bit", "boolean"]:
         type_class = BooleanTypeClass()
-    elif data_type == "integer":
+    elif data_type in ["integer", "int", "tinyint", "smallint", "bigint",
+                       "float", "real", "decimal", "numeric", "money"]:
         type_class = NumberTypeClass()
+    elif data_type in ["binary", "varbinary", "varbinary(max)"]:
+        type_class = BytesTypeClass()
+    elif data_type in ["date", "smalldatetime", "datetime", "datetime2", "timestamp"]:
+        type_class = DateTypeClass()
     else:
-        type_class = StringTypeClass()
+        type_class = NullTypeClass()
 
     return SchemaFieldClass(
         fieldPath=column["name"],
