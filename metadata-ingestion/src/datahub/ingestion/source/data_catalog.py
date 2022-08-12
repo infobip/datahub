@@ -127,7 +127,6 @@ def map_snapshot(table: OrientRecord) -> MetadataWorkUnit:
 
 def map_column(column: Dict[str, str]) -> SchemaFieldClass:
     data_type = column.get("dataType").lower()
-    print(f"Input data type:{data_type}")
 
     type_class: Union[
         "StringTypeClass", "BooleanTypeClass", "NumberTypeClass", "BytesTypeClass", "DateTypeClass", "NullTypeClass"]
@@ -148,8 +147,6 @@ def map_column(column: Dict[str, str]) -> SchemaFieldClass:
         type_class = DateTypeClass()
     else:
         type_class = NullTypeClass()
-
-    print(f"Selected type class:{type_class}")
 
     return SchemaFieldClass(
         fieldPath=column["name"],
