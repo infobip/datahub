@@ -470,6 +470,7 @@ entry_points = {
         "file = datahub.ingestion.source.file:GenericFileSource",
         "data-catalog = datahub.ingestion.source.data_catalog:DataCatalogSource",
         "ib-redash-lineages = datahub.ingestion.source.ib_redash_lineages:IBRedashLineagesSource",
+        "ib-technical-owners = datahub.ingestion.source.ib_technical_owners:IBTechnicalOwnersSource",
         "sqlalchemy = datahub.ingestion.source.sql.sql_generic:SQLAlchemyGenericSource",
         "athena = datahub.ingestion.source.sql.athena:AthenaSource",
         "azure-ad = datahub.ingestion.source.identity.azure_ad:AzureADSource",
