@@ -122,7 +122,7 @@ def map_snapshot(table: OrientRecord) -> MetadataWorkUnit:
     )
 
     mce = MetadataChangeEvent(proposedSnapshot=snapshot)
-    return MetadataWorkUnit(table.name, mce=mce)
+    return MetadataWorkUnit(properties.qualifiedName, mce=mce)
 
 
 def map_column(column: Dict[str, str]) -> SchemaFieldClass:
