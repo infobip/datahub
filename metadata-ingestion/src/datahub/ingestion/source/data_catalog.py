@@ -127,7 +127,7 @@ def map_snapshot(table: OrientRecord) -> MetadataWorkUnit:
 
 def map_column(column: Dict[str, str]) -> SchemaFieldClass:
     data_type = column.get("dataType")
-    data_type = data_type.lower() if data_type else "undefined"
+    data_type = data_type.lower() if data_type is not None else "undefined"
     type_class = get_type_class(data_type)
 
     return SchemaFieldClass(
