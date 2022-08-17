@@ -126,27 +126,9 @@ def map_snapshot(table: OrientRecord) -> MetadataWorkUnit:
 
 
 def map_column(column: Dict[str, str]) -> SchemaFieldClass:
-    data_type = column.get("dataType").lower()
-
-    type_class: Union[
-        "StringTypeClass", "BooleanTypeClass", "NumberTypeClass", "BytesTypeClass", "DateTypeClass", "NullTypeClass"]
-    if data_type in ["string",
-                     "char", "nchar",
-                     "varchar", "varchar(n)", "varchar(max)",
-                     "nvarchar", "nvarchar(max)",
-                     "text"]:
-        type_class = StringTypeClass()
-    elif data_type in ["bit", "boolean"]:
-        type_class = BooleanTypeClass()
-    elif data_type in ["integer", "int", "tinyint", "smallint", "bigint",
-                       "float", "real", "decimal", "numeric", "money"]:
-        type_class = NumberTypeClass()
-    elif data_type in ["binary", "varbinary", "varbinary(max)"]:
-        type_class = BytesTypeClass()
-    elif data_type in ["date", "smalldatetime", "datetime", "datetime2", "timestamp"]:
-        type_class = DateTypeClass()
-    else:
-        type_class = NullTypeClass()
+    data_type = column.get("dataType")
+    data_type = data_type.lower() if data_type else "undefined"
+    type_class = get_type_class(data_type)
 
     return SchemaFieldClass(
         fieldPath=column["name"],
@@ -154,6 +136,28 @@ def map_column(column: Dict[str, str]) -> SchemaFieldClass:
         type=SchemaFieldDataTypeClass(type=type_class),
         nativeDataType=data_type,
     )
+
+
+def get_type_class(type_str: str):
+    type_class: Union[
+        "StringTypeClass", "BooleanTypeClass", "NumberTypeClass", "BytesTypeClass", "DateTypeClass", "NullTypeClass"]
+    if type_str in ["string",
+                    "char", "nchar",
+                    "varchar", "varchar(n)", "varchar(max)",
+                    "nvarchar", "nvarchar(max)",
+                    "text"]:
+        return StringTypeClass()
+    elif type_str in ["bit", "boolean"]:
+        return BooleanTypeClass()
+    elif type_str in ["integer", "int", "tinyint", "smallint", "bigint",
+                      "float", "real", "decimal", "numeric", "money"]:
+        return NumberTypeClass()
+    elif type_str in ["binary", "varbinary", "varbinary(max)"]:
+        return BytesTypeClass()
+    elif type_str in ["date", "smalldatetime", "datetime", "datetime2", "timestamp"]:
+        return DateTypeClass()
+    else:
+        return NullTypeClass()
 
 
 class DataCatalogSourceConfig(ConfigModel):
