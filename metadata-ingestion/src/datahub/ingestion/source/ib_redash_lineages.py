@@ -48,7 +48,6 @@ class IBRedashLineagesSource(Source):
         self.report: SourceReport = SourceReport()
 
         self.config.connect_uri = self.config.connect_uri.strip("/")
-        print("self.config.connect_uri:", config.connect_uri)
         self.client = Redash(self.config.connect_uri, self.config.api_key)
         self.client.session.headers.update(
             {

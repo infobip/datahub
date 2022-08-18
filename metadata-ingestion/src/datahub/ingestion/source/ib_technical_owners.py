@@ -52,7 +52,6 @@ class IBTechnicalOwnersSource(Source):
         self.report: SourceReport = SourceReport()
 
         self.config.connect_uri = self.config.connect_uri.strip("/")
-        print("self.config.connect_uri:", config.connect_uri)
         self.client = Redash(self.config.connect_uri, self.config.api_key)
         self.client.session.headers.update(
             {
@@ -89,7 +88,6 @@ class IBTechnicalOwnersSource(Source):
 
     @staticmethod
     def build_workunit(ownership):
-        print(f"ownership in ownerships, ownership type:{type(ownership)} value:{ownership}")
         dataset_urn = builder.make_dataset_urn("kafka",
                                                f"{ownership.dc.lower()}.{ownership.cluster}.{ownership.topic}")
         owners = [builder.make_group_urn(owner.strip()) for owner in ownership.owners.split(",")]
