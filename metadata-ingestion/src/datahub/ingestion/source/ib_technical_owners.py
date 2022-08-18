@@ -87,7 +87,7 @@ class IBTechnicalOwnersSource(Source):
         owners_json = self.get_owners(self.config.lineage_query_id)
         ownerships = pd.read_json(json.dumps(owners_json))
 
-        result = ownerships.apply(lambda ownership: self.build_workunit(ownership))
+        result = ownerships.apply(lambda ownership: self.build_workunit(ownership), axis=1)
         print(f"result(ownerships.apply) type:{type(result)} value:{result}")
         return result
 
