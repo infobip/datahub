@@ -85,27 +85,29 @@ class IBTechnicalOwnersSource(Source):
 
     def get_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
         owners_json = self.get_owners(self.config.lineage_query_id)
-        print(f"type:{type(owners_json)}get_owners:{owners_json}")
         ownerships = pd.read_json(json.dumps(owners_json))
-        print(f"type:{type(ownerships)} ownerships(pd.read_json):{ownerships}")
 
-        for ownership in ownerships:
-            print(f"ownership in ownerships, ownership type:{type(ownership)} value:{ownership}")
-            dataset_urn = builder.make_dataset_urn("kafka",
-                                                   f"{ownership.dc.lower()}.{ownership.cluster}.{ownership.topic}")
-            owners = [builder.make_group_urn(owner.strip()) for owner in ownership.owners.split(",")]
-            ownership_aspect = builder.make_ownership_aspect_from_urn_list(owners,
-                                                                           OwnershipSourceTypeClass.SERVICE,
-                                                                           OwnershipTypeClass.TECHNICAL_OWNER)
-            yield MetadataWorkUnit(
-                dataset_urn,
-                mce=MetadataChangeEventClass(
-                    proposedSnapshot=DatasetSnapshotClass(
-                        urn=dataset_urn,
-                        aspects=[ownership_aspect],
-                    )
+        result = ownerships.apply(lambda ownership: self.build_workunit(ownership))
+        print(f"result(ownerships.apply) type:{type(result)} value:{result}")
+        return result
+
+    def build_workunit(self, ownership):
+        print(f"ownership in ownerships, ownership type:{type(ownership)} value:{ownership}")
+        dataset_urn = builder.make_dataset_urn("kafka",
+                                               f"{ownership.dc.lower()}.{ownership.cluster}.{ownership.topic}")
+        owners = [builder.make_group_urn(owner.strip()) for owner in ownership.owners.split(",")]
+        ownership_aspect = builder.make_ownership_aspect_from_urn_list(owners,
+                                                                       OwnershipSourceTypeClass.SERVICE,
+                                                                       OwnershipTypeClass.TECHNICAL_OWNER)
+        return MetadataWorkUnit(
+            dataset_urn,
+            mce=MetadataChangeEventClass(
+                proposedSnapshot=DatasetSnapshotClass(
+                    urn=dataset_urn,
+                    aspects=[ownership_aspect],
                 )
             )
+        )
 
     def get_owners(self, query_id) -> str:
         url = f"api/queries/{query_id}/results"
