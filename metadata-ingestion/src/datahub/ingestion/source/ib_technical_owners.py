@@ -84,14 +84,11 @@ class IBTechnicalOwnersSource(Source):
         return cls(config, ctx)
 
     def get_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
-        owners_json = self.get_owners(self.config.lineage_query_id)
-        ownerships = pd.read_json(json.dumps(owners_json))
+        ownerships = pd.read_json(json.dumps(self.get_owners(self.config.lineage_query_id)))
+        return ownerships.apply(lambda ownership: self.build_workunit(ownership), axis=1).tolist()
 
-        result = ownerships.apply(lambda ownership: self.build_workunit(ownership), axis=1)
-        print(f"result(ownerships.apply) type:{type(result)} value:{result}")
-        return result
-
-    def build_workunit(self, ownership):
+    @staticmethod
+    def build_workunit(ownership):
         print(f"ownership in ownerships, ownership type:{type(ownership)} value:{ownership}")
         dataset_urn = builder.make_dataset_urn("kafka",
                                                f"{ownership.dc.lower()}.{ownership.cluster}.{ownership.topic}")
