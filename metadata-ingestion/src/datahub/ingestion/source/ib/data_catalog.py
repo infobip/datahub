@@ -3,10 +3,8 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, Iterable, Optional, Union
 
-import pyorient
-from pyorient import OrientRecord
-
 import datahub.emitter.mce_builder as builder
+import pyorient
 from datahub.configuration.common import ConfigModel
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.source import Source, SourceReport
@@ -14,22 +12,19 @@ from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
 from datahub.metadata.com.linkedin.pegasus2avro.metadata.snapshot import DatasetSnapshot
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
 from datahub.metadata.schema_classes import (
-    BooleanTypeClass,
     BrowsePathsClass,
     DatasetPropertiesClass,
-    NumberTypeClass,
     SchemaFieldClass,
     SchemaFieldDataTypeClass,
     SchemalessClass,
     KafkaSchemaClass,
     SchemaMetadataClass,
-    StringTypeClass,
-    BytesTypeClass,
-    DateTypeClass,
-    NullTypeClass,
     OwnershipSourceTypeClass,
     OwnershipTypeClass,
 )
+from pyorient import OrientRecord
+
+from src.datahub.ingestion.source.ib.ib_common import get_type_class
 
 logger = logging.getLogger(__name__)
 
@@ -127,37 +122,13 @@ def map_snapshot(table: OrientRecord) -> MetadataWorkUnit:
 
 def map_column(column: Dict[str, str]) -> SchemaFieldClass:
     data_type = column.get("dataType")
-    data_type = data_type.lower() if data_type is not None else "undefined"
-    type_class = get_type_class(data_type)
 
     return SchemaFieldClass(
         fieldPath=column["name"],
         description=column.get("description"),
-        type=SchemaFieldDataTypeClass(type=type_class),
+        type=SchemaFieldDataTypeClass(type=get_type_class(data_type)),
         nativeDataType=data_type,
     )
-
-
-def get_type_class(type_str: str):
-    type_class: Union[
-        "StringTypeClass", "BooleanTypeClass", "NumberTypeClass", "BytesTypeClass", "DateTypeClass", "NullTypeClass"]
-    if type_str in ["string",
-                    "char", "nchar",
-                    "varchar", "varchar(n)", "varchar(max)",
-                    "nvarchar", "nvarchar(max)",
-                    "text"]:
-        return StringTypeClass()
-    elif type_str in ["bit", "boolean"]:
-        return BooleanTypeClass()
-    elif type_str in ["integer", "int", "tinyint", "smallint", "bigint",
-                      "float", "real", "decimal", "numeric", "money"]:
-        return NumberTypeClass()
-    elif type_str in ["binary", "varbinary", "varbinary(max)"]:
-        return BytesTypeClass()
-    elif type_str in ["date", "smalldatetime", "datetime", "datetime2", "timestamp"]:
-        return DateTypeClass()
-    else:
-        return NullTypeClass()
 
 
 class DataCatalogSourceConfig(ConfigModel):
