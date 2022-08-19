@@ -28,8 +28,6 @@ class IBOwnersSourceConfig(IBRedashSourceConfig):
 class IBOwnersSource(IBRedashSource):
     platform = "kafka"
 
-    # 6v8YQZxGdaGZM6z9pMmrqV7c0v8r22QLejHB736q
-
     def __init__(self, config: IBOwnersSourceConfig, ctx: PipelineContext):
         super().__init__(config, ctx)
 
