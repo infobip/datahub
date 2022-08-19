@@ -33,10 +33,10 @@ class IBOwnersSource(IBRedashSource):
 
     def get_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
         return pd.read_json(json.dumps(self.query_get(self.config.query_id))).groupby(
-            ["dc", "cluster", "topic"], dropna=False).apply(lambda key, rows: self.build_workunit(key, rows), axis=1)
+            ["dc", "cluster", "topic"], dropna=False).apply(lambda key, fields_by_topic: self.build_workunit(fields_by_topic), axis=1)
 
-    def get_workunit(self, key: tuple, rows: pd.DataFrame):
-        first = rows.iloc[0]
+    def get_workunit(self, fields_by_topic: pd.DataFrame):
+        first = fields_by_topic.iloc[0]
         topic_name = first.topic
 
         parents = [
@@ -59,8 +59,8 @@ class IBOwnersSource(IBRedashSource):
             hash="",
             platform=f"urn:li:dataPlatform:{self.platform}",
             platformSchema=KafkaSchemaClass.construct_with_defaults(),
-            fields=[] if len(rows.index) == 1 and first.fieldName is None and first.fieldType is None else
-            [rows.apply(lambda column: self.map_column(column), axis=1)],
+            fields=[] if len(fields_by_topic.index) == 1 and first.fieldName is None and first.fieldType is None else
+            [fields_by_topic.apply(lambda field: self.map_column(field), axis=1)],
         )
         owners = [builder.make_group_urn(owner.strip()) for owner in first.owners.split(",")]
         ownership = builder.make_ownership_aspect_from_urn_list(owners,
@@ -75,12 +75,12 @@ class IBOwnersSource(IBRedashSource):
         return MetadataWorkUnit(properties.qualifiedName, mce=mce)
 
     @staticmethod
-    def map_column(row):
-        data_type = row.fieldType
+    def map_column(field):
+        data_type = field.fieldType
         return SchemaFieldClass(
-            fieldPath=row.fieldName,
-            description=row.description,
+            fieldPath=field.fieldName,
+            description=field.description,
             type=SchemaFieldDataTypeClass(type=get_type_class(data_type)),
             nativeDataType=data_type,
-            nullable=bool(row.nullable),
+            nullable=bool(field.nullable),
         )
