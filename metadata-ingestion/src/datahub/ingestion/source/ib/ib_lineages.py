@@ -6,7 +6,7 @@ from datahub.ingestion.api.decorators import config_class, platform_name
 from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
 from datahub.metadata.schema_classes import DatasetLineageTypeClass
 
-from src.datahub.ingestion.source.ib.ib_common import *
+from datahub.ingestion.source.ib.ib_common import *
 
 
 class IBLineagesSourceConfig(IBRedashSourceConfig):
