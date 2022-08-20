@@ -1,5 +1,4 @@
 import json
-import sys
 
 import pandas as pd
 from datahub.ingestion.api.decorators import config_class, platform_name
@@ -55,21 +54,14 @@ class IBKafkaSource(IBRedashSource):
 
         browse_paths = BrowsePathsClass([f"/prod/{self.platform}/{'/'.join(parents)}/{topic_name}"])
 
-        fields = fields_by_topic.apply(lambda field: self.map_column(field), axis=1).values.tolist()
-        [print(
-            f"field.fieldPath:{field.fieldPath}, field.description:{field.description}, field.nativeDataType:{field.nativeDataType}")
-         for field in fields]
-
-
         schema = SchemaMetadataClass(
             schemaName=self.platform,
             version=1,
             hash="",
             platform=f"urn:li:dataPlatform:{self.platform}",
             platformSchema=KafkaSchemaClass.construct_with_defaults(),
-            fields=[],
-            # fields=[] if len(fields_by_topic.index) == 1 and first.fieldName is None and first.fieldType is None else
-            # [fields_by_topic.apply(lambda field: self.map_column(field), axis=1)],
+            fields=fields_by_topic.dropna(subset=['fieldName', 'fieldType'], how='all').apply(
+                lambda field: self.map_column(field), axis=1),
         )
         owners = [builder.make_group_urn(owner.strip()) for owner in first.owners.split(",")]
         ownership = builder.make_ownership_aspect_from_urn_list(owners,
@@ -88,7 +80,7 @@ class IBKafkaSource(IBRedashSource):
         data_type = field.fieldType
         return SchemaFieldClass(
             fieldPath=field.fieldName,
-            description=field.description,
+            description=field.valueSet,
             type=SchemaFieldDataTypeClass(type=get_type_class(data_type)),
             nativeDataType=data_type,
             nullable=bool(field.nullable),
