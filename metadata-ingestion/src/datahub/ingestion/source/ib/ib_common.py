@@ -94,7 +94,7 @@ class IBRedashSource(Source):
 
     # todo implement?
     def get_report(self) -> SourceReport:
-        pass
+        return self.report
 
 
 def get_type_class(type_str: str):

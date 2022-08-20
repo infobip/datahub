@@ -16,7 +16,7 @@ from datahub.metadata.schema_classes import (
     OwnershipTypeClass,
 )
 
-from datahub.ingestion.source.ib.ib_common import *
+import datahub.ingestion.source.ib.ib_common
 
 
 class IBKafkaSourceConfig(IBRedashSourceConfig):
