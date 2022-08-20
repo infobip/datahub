@@ -1,4 +1,5 @@
 import json
+import sys
 
 import pandas as pd
 from datahub.ingestion.api.decorators import config_class, platform_name
@@ -55,7 +56,8 @@ class IBKafkaSource(IBRedashSource):
         browse_paths = BrowsePathsClass([f"/prod/{self.platform}/{'/'.join(parents)}/{topic_name}"])
 
         fields = [fields_by_topic.apply(lambda field: self.map_column(field), axis=1)]
-        print("FIELDS:", fields)
+        [print(field) for field in fields]
+        sys.exit()
 
 
         schema = SchemaMetadataClass(
