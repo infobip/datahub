@@ -60,8 +60,9 @@ class IBKafkaSource(IBRedashSource):
             hash="",
             platform=f"urn:li:dataPlatform:{self.platform}",
             platformSchema=KafkaSchemaClass.construct_with_defaults(),
-            fields=[] if len(fields_by_topic.index) == 1 and first.fieldName is None and first.fieldType is None else
-            [fields_by_topic.apply(lambda field: self.map_column(field), axis=1)],
+            fields=[],
+            # fields=[] if len(fields_by_topic.index) == 1 and first.fieldName is None and first.fieldType is None else
+            # [fields_by_topic.apply(lambda field: self.map_column(field), axis=1)],
         )
         owners = [builder.make_group_urn(owner.strip()) for owner in first.owners.split(",")]
         ownership = builder.make_ownership_aspect_from_urn_list(owners,
