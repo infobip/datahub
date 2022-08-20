@@ -34,7 +34,7 @@ class IBKafkaSource(IBRedashSource):
     def get_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
         json_data = pd.read_json(json.dumps(self.query_get(self.config.query_id)))
         json_data_grouped = json_data.groupby(["dc", "cluster", "topic"], dropna=False)
-        return json_data_grouped.apply(lambda fields_by_topic: self.build_workunit(fields_by_topic))
+        return json_data_grouped.apply(lambda fields_by_topic: self.get_workunit(fields_by_topic))
 
     def get_workunit(self, fields_by_topic: pd.DataFrame):
         first = fields_by_topic.iloc[0]
