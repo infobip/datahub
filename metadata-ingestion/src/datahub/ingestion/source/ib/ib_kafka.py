@@ -60,7 +60,7 @@ class IBKafkaSource(IBRedashSource):
             hash="",
             platform=f"urn:li:dataPlatform:{self.platform}",
             platformSchema=KafkaSchemaClass.construct_with_defaults(),
-            fields=fields_by_topic.dropna(subset=['fieldName', 'fieldType'], how='all').apply(
+            fields=fields_by_topic.dropna(subset='fieldName').apply(
                 lambda field: self.map_column(field), axis=1).values.tolist(),
         )
         owners = [builder.make_group_urn(owner.strip()) for owner in first.owners.split(",")]
