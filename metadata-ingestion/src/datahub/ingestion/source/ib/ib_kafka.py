@@ -16,7 +16,7 @@ from datahub.metadata.schema_classes import (
     OwnershipTypeClass,
 )
 
-from datahub.ingestion.source.ib.ib_common import *
+from src.datahub.ingestion.source.ib.ib_common import *
 
 
 class IBKafkaSourceConfig(IBRedashSourceConfig):
@@ -33,7 +33,7 @@ class IBKafkaSource(IBRedashSource):
 
     def get_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
         return pd.read_json(json.dumps(self.query_get(self.config.query_id))).groupby(
-            ["dc", "cluster", "topic"], dropna=False).apply(lambda key, fields_by_topic: self.build_workunit(fields_by_topic), axis=1)
+            ["dc", "cluster", "topic"], dropna=False).apply(lambda key, fields_by_topic: self.build_workunit(fields_by_topic))
 
     def get_workunit(self, fields_by_topic: pd.DataFrame):
         first = fields_by_topic.iloc[0]
