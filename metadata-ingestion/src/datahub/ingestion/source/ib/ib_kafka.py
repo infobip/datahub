@@ -19,16 +19,16 @@ from datahub.metadata.schema_classes import (
 from src.datahub.ingestion.source.ib.ib_common import *
 
 
-class IBOwnersSourceConfig(IBRedashSourceConfig):
+class IBKafkaSourceConfig(IBRedashSourceConfig):
     pass
 
 
 @platform_name("IBKafka")
-@config_class(IBOwnersSourceConfig)
-class IBOwnersSource(IBRedashSource):
+@config_class(IBKafkaSourceConfig)
+class IBKafkaSource(IBRedashSource):
     platform = "kafka"
 
-    def __init__(self, config: IBOwnersSourceConfig, ctx: PipelineContext):
+    def __init__(self, config: IBKafkaSourceConfig, ctx: PipelineContext):
         super().__init__(config, ctx)
 
     def get_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
