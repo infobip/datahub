@@ -56,7 +56,7 @@ class IBKafkaSource(IBRedashSource):
         browse_paths = BrowsePathsClass([f"/prod/{self.platform}/{'/'.join(parents)}/{topic_name}"])
 
         fields = [fields_by_topic.apply(lambda field: self.map_column(field), axis=1)]
-        [print(field) for field in fields]
+        [print(str(field)) for field in fields]
         sys.exit()
 
 
