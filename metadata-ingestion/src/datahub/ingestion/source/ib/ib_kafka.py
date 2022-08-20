@@ -54,6 +54,12 @@ class IBKafkaSource(IBRedashSource):
 
         browse_paths = BrowsePathsClass([f"/prod/{self.platform}/{'/'.join(parents)}/{topic_name}"])
 
+        fields = fields_by_topic.apply(lambda field: self.map_column(field), axis=1)
+        print("FIELDS TYPE: ", type(fields))
+        fields2 = [fields_by_topic.apply(lambda field: self.map_column(field), axis=1)]
+        print("FIELDS TYPE WITH []: ", type(fields2))
+
+
         schema = SchemaMetadataClass(
             schemaName=self.platform,
             version=1,
@@ -77,7 +83,7 @@ class IBKafkaSource(IBRedashSource):
         return MetadataWorkUnit(properties.qualifiedName, mce=mce)
 
     @staticmethod
-    def map_column(field):
+    def map_column(field) -> SchemaFieldClass:
         data_type = field.fieldType
         return SchemaFieldClass(
             fieldPath=field.fieldName,
