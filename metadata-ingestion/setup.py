@@ -470,7 +470,6 @@ entry_points = {
         "file = datahub.ingestion.source.file:GenericFileSource",
         "data-catalog = datahub.ingestion.source.ib.data_catalog:DataCatalogSource",
         "ib-lineages = datahub.ingestion.source.ib.ib_lineages:IBLineagesSource",
-        "ib-owners = datahub.ingestion.source.ib.ib_owners:IBOwnersSource",
         "ib-kafka = datahub.ingestion.source.ib.ib_kafka:IBKafkaSource",
         "sqlalchemy = datahub.ingestion.source.sql.sql_generic:SQLAlchemyGenericSource",
         "athena = datahub.ingestion.source.sql.athena:AthenaSource",
