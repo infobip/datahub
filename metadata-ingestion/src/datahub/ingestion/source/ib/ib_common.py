@@ -1,27 +1,48 @@
-import sys
+import logging
 import math
+import sys
 from abc import abstractmethod
-from typing import Union, Iterable
-import datahub.emitter.mce_builder as builder
-from datahub.ingestion.api.source import Source, SourceReport
-from datahub.configuration.common import ConfigModel
-from datahub.ingestion.api.common import PipelineContext, WorkUnit
+from typing import Iterable, Optional, Union, cast
+
+from pydantic.fields import Field
 from redash_toolbelt import Redash
+from requests.adapters import HTTPAdapter
+from urllib3 import Retry
+
+import datahub.emitter.mce_builder as builder
+from datahub.emitter.mcp import MetadataChangeProposalWrapper
+from datahub.ingestion.api.common import PipelineContext, WorkUnit
+from datahub.ingestion.api.workunit import MetadataWorkUnit
+from datahub.ingestion.source.state.checkpoint import Checkpoint
+from datahub.ingestion.source.state.redash_state import RedashCheckpointState
+from datahub.ingestion.source.state.stateful_ingestion_base import (
+    JobId,
+    StatefulIngestionConfig,
+    StatefulIngestionConfigBase,
+    StatefulIngestionReport,
+    StatefulIngestionSourceBase,
+)
+from datahub.metadata.com.linkedin.pegasus2avro.common import Status
 from datahub.metadata.schema_classes import (
+    ArrayTypeClass,
     BooleanTypeClass,
-    NumberTypeClass,
-    StringTypeClass,
     BytesTypeClass,
+    ChangeTypeClass,
     DateTypeClass,
     NullTypeClass,
-    ArrayTypeClass,
+    NumberTypeClass,
+    StatusClass,
+    StringTypeClass,
 )
-from pydantic.fields import Field
-from urllib3 import Retry
-from requests.adapters import HTTPAdapter
+
+logger = logging.getLogger(__name__)
 
 
-class IBRedashSourceConfig(ConfigModel):
+class IBRedashSourceStatefulIngestionConfig(StatefulIngestionConfig):
+    remove_stale_metadata: bool = True
+
+
+class IBRedashSourceConfig(StatefulIngestionConfigBase):
     connect_uri: str = Field(
         default="http://localhost:5000", description="Redash base URL."
     )
@@ -33,20 +54,25 @@ class IBRedashSourceConfig(ConfigModel):
     api_page_limit: int = Field(
         default=sys.maxsize,
         description="Limit on number of pages queried for ingesting dashboards and charts API "
-                    "during pagination. ",
+        "during pagination. ",
     )
+    stateful_ingestion: Optional[IBRedashSourceStatefulIngestionConfig] = None
 
 
-class IBRedashSource(Source):
+class RedashSourceReport(StatefulIngestionReport):
+    workunits_deleted: int = 0
+
+
+class IBRedashSource(StatefulIngestionSourceBase):
     batch_size = 1000
     config: IBRedashSourceConfig
     client: Redash
-    report: SourceReport
+    report: RedashSourceReport
 
     def __init__(self, config: IBRedashSourceConfig, ctx: PipelineContext):
-        super().__init__(ctx)
+        super().__init__(config, ctx)
         self.config: IBRedashSourceConfig = config
-        self.report: SourceReport = SourceReport()
+        self.report: RedashSourceReport = RedashSourceReport()
 
         self.config.connect_uri = self.config.connect_uri.strip("/")
         self.client = Redash(self.config.connect_uri, self.config.api_key)
@@ -86,31 +112,136 @@ class IBRedashSource(Source):
         return self.client._post(url).json()["query_result"]["data"]["rows"]
 
     @abstractmethod
+    def fetch_workunits(self) -> Iterable[WorkUnit]:
+        raise NotImplementedError("Sub-classes must implement this method.")
+
     def get_workunits(self) -> Iterable[WorkUnit]:
-        pass
+        if not self.is_stateful_ingestion_configured():
+            for wu in self.fetch_workunits():
+                self.report.workunits_produced += 1
+                yield wu
+
+        cur_checkpoint = self.get_current_checkpoint(
+            self.get_default_ingestion_job_id()
+        )
+        cur_checkpoint_state = (
+            cast(RedashCheckpointState, cur_checkpoint.state)
+            if cur_checkpoint is not None
+            else None
+        )
+
+        for wu in self.fetch_workunits():
+            self.report.workunits_produced += 1
+            if type(wu) is not MetadataWorkUnit:
+                yield wu
+                continue
+            wu.metadata.proposedSnapshot.aspects.append(StatusClass(removed=False))
+            if cur_checkpoint_state is not None:
+                cur_checkpoint_state.add_urn(wu.metadata.proposedSnapshot.urn)
+            yield wu
+
+        last_checkpoint = self.get_last_checkpoint(
+            self.get_default_ingestion_job_id(), RedashCheckpointState
+        )
+        last_checkpoint_state = (
+            cast(RedashCheckpointState, last_checkpoint.state)
+            if last_checkpoint is not None
+            else None
+        )
+        if (
+            self.source_config.stateful_ingestion
+            and self.source_config.stateful_ingestion.remove_stale_metadata
+            and last_checkpoint_state is not None
+            and cur_checkpoint_state is not None
+        ):
+            logger.info("deleting")
+            for urn in last_checkpoint_state.get_urns_not_in(cur_checkpoint_state):
+                self.report.workunits_deleted += 1
+                mcp = MetadataChangeProposalWrapper(
+                    entityType="dataset",
+                    entityUrn=urn,
+                    changeType=ChangeTypeClass.UPSERT,
+                    aspectName="status",
+                    aspect=Status(removed=True),
+                )
+                yield MetadataWorkUnit(id=f"soft-delete-{urn}", mcp=mcp)
 
     def close(self):
+        self.prepare_for_commit()
         self.client.session.close()
 
-    # todo implement?
-    def get_report(self) -> SourceReport:
+    def get_report(self) -> RedashSourceReport:
         return self.report
+
+    def is_checkpointing_enabled(self, job_id: JobId) -> bool:
+        if (
+            job_id == self.get_default_ingestion_job_id()
+            and self.is_stateful_ingestion_configured()
+            and self.source_config.stateful_ingestion
+            and self.source_config.stateful_ingestion.remove_stale_metadata
+        ):
+            return True
+
+        return False
+
+    def create_checkpoint(self, job_id: JobId) -> Optional[Checkpoint]:
+        assert self.ctx.pipeline_name is not None
+        if job_id == self.get_default_ingestion_job_id():
+            return Checkpoint(
+                job_name=job_id,
+                pipeline_name=self.ctx.pipeline_name,
+                platform_instance_id=self.get_platform_instance_id(),
+                run_id=self.ctx.run_id,
+                config=self.source_config,
+                state=RedashCheckpointState(),
+            )
+        return None
+
+    def get_platform_instance_id(self) -> str:
+        assert self.source_config.platform_instance is not None
+        return self.source_config.platform_instance
+
+    @abstractmethod
+    def get_default_ingestion_job_id(self) -> JobId:
+        raise NotImplementedError("Sub-classes must implement this method.")
 
 
 def get_type_class(type_str: str):
     type_str = type_str.lower() if type_str is not None else "undefined"
     type_class: Union[
-        "StringTypeClass", "BooleanTypeClass", "NumberTypeClass", "BytesTypeClass", "DateTypeClass", "NullTypeClass"]
-    if type_str in ["string",
-                    "char", "nchar",
-                    "varchar", "varchar(n)", "varchar(max)",
-                    "nvarchar", "nvarchar(max)",
-                    "text"]:
+        "StringTypeClass",
+        "BooleanTypeClass",
+        "NumberTypeClass",
+        "BytesTypeClass",
+        "DateTypeClass",
+        "NullTypeClass",
+    ]
+    if type_str in [
+        "string",
+        "char",
+        "nchar",
+        "varchar",
+        "varchar(n)",
+        "varchar(max)",
+        "nvarchar",
+        "nvarchar(max)",
+        "text",
+    ]:
         return StringTypeClass()
     elif type_str in ["bit", "boolean"]:
         return BooleanTypeClass()
-    elif type_str in ["integer", "int", "tinyint", "smallint", "bigint",
-                      "float", "real", "decimal", "numeric", "money"]:
+    elif type_str in [
+        "integer",
+        "int",
+        "tinyint",
+        "smallint",
+        "bigint",
+        "float",
+        "real",
+        "decimal",
+        "numeric",
+        "money",
+    ]:
         return NumberTypeClass()
     elif type_str in ["object", "binary", "varbinary", "varbinary(max)"]:
         return BytesTypeClass()
@@ -123,4 +254,6 @@ def get_type_class(type_str: str):
 
 
 def build_dataset_urn(platform: str, name: str, *parents: str):
-    return builder.make_dataset_urn(platform.lower(), f"{'.'.join(parents)}.{name}", "PROD")
+    return builder.make_dataset_urn(
+        platform.lower(), f"{'.'.join(parents)}.{name}", "PROD"
+    )
