@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Iterable, Union
 
 import pandas as pd
@@ -12,7 +13,10 @@ from datahub.ingestion.source.ib.ib_common import (
     IBRedashSourceConfig,
     build_dataset_urn,
 )
+from datahub.ingestion.source.state.stateful_ingestion_base import JobId
 from datahub.metadata.schema_classes import DatasetLineageTypeClass
+
+logger = logging.getLogger(__name__)
 
 
 class IBLineagesSourceConfig(IBRedashSourceConfig):
@@ -63,9 +67,12 @@ class IBLineagesSource(IBRedashSource):
                     )
                 )
 
-                yield MetadataWorkUnit(
-                    dst_dataset_urn,
-                    mce=builder.make_lineage_mce(
-                        src_urns, dst_dataset_urn, DatasetLineageTypeClass.COPY
-                    ),
-                )
+            yield MetadataWorkUnit(
+                dst_dataset_urn,
+                mce=builder.make_lineage_mce(
+                    src_urns, dst_dataset_urn, DatasetLineageTypeClass.COPY
+                ),
+            )
+
+    def get_default_ingestion_job_id(self) -> JobId:
+        return JobId("ingest_lineages_from_redash_source")

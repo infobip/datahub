@@ -120,6 +120,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
             for wu in self.fetch_workunits():
                 self.report.workunits_produced += 1
                 yield wu
+            return
 
         cur_checkpoint = self.get_current_checkpoint(
             self.get_default_ingestion_job_id()
