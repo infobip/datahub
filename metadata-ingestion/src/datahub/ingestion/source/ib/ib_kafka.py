@@ -16,7 +16,7 @@ from datahub.metadata.schema_classes import (
     SchemaMetadataClass,
 )
 
-from src.datahub.ingestion.source.ib.ib_common import *
+from datahub.ingestion.source.ib.ib_common import *
 
 
 class IBKafkaSourceConfig(IBRedashSourceConfig):
