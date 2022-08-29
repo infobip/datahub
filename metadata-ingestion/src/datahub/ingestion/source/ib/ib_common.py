@@ -256,5 +256,5 @@ def get_type_class(type_str: str):
 
 def build_dataset_urn(platform: str, name: str, *parents: str):
     return builder.make_dataset_urn(
-        platform.lower(), f"{'.'.join(parents)}.{name}", "PROD"
+        platform.lower(), f"{'.'.join(filter(lambda e: e is not None, parents))}.{name}", "PROD"
     )

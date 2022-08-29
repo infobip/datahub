@@ -51,7 +51,6 @@ class IBLineagesSource(IBRedashSource):
                 first.DstLocationCode,
                 first.DstDBName,
                 first.DstSchemaName,
-                first.DstTableName,
             )
 
             src_urns = []
