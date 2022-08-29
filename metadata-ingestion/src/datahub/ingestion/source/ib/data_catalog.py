@@ -3,8 +3,10 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, Iterable, Optional, Union
 
-import datahub.emitter.mce_builder as builder
 import pyorient
+from pyorient import OrientRecord
+
+import datahub.emitter.mce_builder as builder
 from datahub.configuration.common import ConfigModel
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.source import Source, SourceReport
@@ -14,16 +16,14 @@ from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
 from datahub.metadata.schema_classes import (
     BrowsePathsClass,
     DatasetPropertiesClass,
+    KafkaSchemaClass,
+    OwnershipSourceTypeClass,
+    OwnershipTypeClass,
     SchemaFieldClass,
     SchemaFieldDataTypeClass,
     SchemalessClass,
-    KafkaSchemaClass,
     SchemaMetadataClass,
-    OwnershipSourceTypeClass,
-    OwnershipTypeClass,
 )
-from pyorient import OrientRecord
-
 from src.datahub.ingestion.source.ib.ib_common import get_type_class
 
 logger = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ def map_snapshot(table: OrientRecord) -> MetadataWorkUnit:
         name=name,
         description=table.oRecordData.get("description"),
         customProperties=table.oRecordData.get("customFields"),
-        qualifiedName=f"{'.'.join(parents)}.{name}"
+        qualifiedName=f"{'.'.join(parents)}.{name}",
     )
 
     browse_paths = BrowsePathsClass([f"/prod/{platform}/{'/'.join(parents)}/{name}"])
@@ -103,9 +103,11 @@ def map_snapshot(table: OrientRecord) -> MetadataWorkUnit:
 
     technical_owner_name = table.oRecordData.get("dbTechnicalOwner")
     if technical_owner_name:
-        ownership = builder.make_ownership_aspect_from_urn_list([builder.make_group_urn(technical_owner_name)],
-                                                                OwnershipSourceTypeClass.SERVICE,
-                                                                OwnershipTypeClass.TECHNICAL_OWNER)
+        ownership = builder.make_ownership_aspect_from_urn_list(
+            [builder.make_group_urn(technical_owner_name)],
+            OwnershipSourceTypeClass.SERVICE,
+            OwnershipTypeClass.TECHNICAL_OWNER,
+        )
         aspects = [properties, browse_paths, schema, ownership]
 
     else:
