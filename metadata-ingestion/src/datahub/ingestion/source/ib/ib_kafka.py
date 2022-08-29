@@ -1,18 +1,8 @@
 import json
-from typing import Iterable, Union
 
 import pandas as pd
-
-import datahub.emitter.mce_builder as builder
-from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.decorators import config_class, platform_name
-from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
-from datahub.ingestion.source.ib.ib_common import (
-    IBRedashSource,
-    IBRedashSourceConfig,
-    get_type_class,
-)
-from datahub.ingestion.source.state.stateful_ingestion_base import JobId
+from datahub.ingestion.api.workunit import UsageStatsWorkUnit
 from datahub.metadata.com.linkedin.pegasus2avro.metadata.snapshot import DatasetSnapshot
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
 from datahub.metadata.schema_classes import (
@@ -25,6 +15,8 @@ from datahub.metadata.schema_classes import (
     SchemaFieldDataTypeClass,
     SchemaMetadataClass,
 )
+
+from src.datahub.ingestion.source.ib.ib_common import *
 
 
 class IBKafkaSourceConfig(IBRedashSourceConfig):
@@ -51,31 +43,24 @@ class IBKafkaSource(IBRedashSource):
         first = fields_by_topic.iloc[0]
         topic_name = first.topic
 
-        parents = [
-            first.dc,
-            first.cluster,
-        ]
-        dot_joined_parents = ".".join(parents)
+        dataset_path = [first.cluster, topic_name]
 
         properties = DatasetPropertiesClass(
             name=topic_name,
             description=first.description,
-            qualifiedName=f"{dot_joined_parents}.{topic_name}",
+            qualifiedName=build_dataset_qualified_name(first.dc, *dataset_path),
         )
 
-        browse_paths = BrowsePathsClass(
-            [f"/prod/{self.platform}/{'/'.join(parents)}/{topic_name}"]
-        )
+        browse_paths = BrowsePathsClass([build_dataset_browse_path(first.dc, *dataset_path)])
 
         schema = SchemaMetadataClass(
             schemaName=self.platform,
             version=1,
             hash="",
-            platform=f"urn:li:dataPlatform:{self.platform}",
+            platform=builder.make_data_platform_urn(self.platform),
             platformSchema=KafkaSchemaClass.construct_with_defaults(),
-            fields=fields_by_topic.dropna(subset="fieldName")
-            .apply(lambda field: self.map_column(field), axis=1)
-            .values.tolist(),
+            fields=fields_by_topic.dropna(subset="fieldName").apply(lambda field: self.map_column(field),
+                                                                    axis=1).values.tolist(),
         )
         owners = [
             builder.make_group_urn(owner.strip()) for owner in first.owners.split(",")
@@ -85,7 +70,7 @@ class IBKafkaSource(IBRedashSource):
         )
         aspects = [properties, browse_paths, schema, ownership]
         snapshot = DatasetSnapshot(
-            urn=f"urn:li:dataset:(urn:li:dataPlatform:{self.platform},{dot_joined_parents}.{topic_name},PROD)",
+            urn=build_dataset_urn(self.platform, first.dc, *dataset_path),
             aspects=aspects,
         )
         mce = MetadataChangeEvent(proposedSnapshot=snapshot)

@@ -54,7 +54,7 @@ class IBRedashSourceConfig(StatefulIngestionConfigBase):
     api_page_limit: int = Field(
         default=sys.maxsize,
         description="Limit on number of pages queried for ingesting dashboards and charts API "
-        "during pagination. ",
+                    "during pagination. ",
     )
     stateful_ingestion: Optional[IBRedashSourceStatefulIngestionConfig] = None
 
@@ -150,10 +150,10 @@ class IBRedashSource(StatefulIngestionSourceBase):
             else None
         )
         if (
-            self.source_config.stateful_ingestion
-            and self.source_config.stateful_ingestion.remove_stale_metadata
-            and last_checkpoint_state is not None
-            and cur_checkpoint_state is not None
+                self.source_config.stateful_ingestion
+                and self.source_config.stateful_ingestion.remove_stale_metadata
+                and last_checkpoint_state is not None
+                and cur_checkpoint_state is not None
         ):
             logger.info("deleting")
             for urn in last_checkpoint_state.get_urns_not_in(cur_checkpoint_state):
@@ -176,10 +176,10 @@ class IBRedashSource(StatefulIngestionSourceBase):
 
     def is_checkpointing_enabled(self, job_id: JobId) -> bool:
         if (
-            job_id == self.get_default_ingestion_job_id()
-            and self.is_stateful_ingestion_configured()
-            and self.source_config.stateful_ingestion
-            and self.source_config.stateful_ingestion.remove_stale_metadata
+                job_id == self.get_default_ingestion_job_id()
+                and self.is_stateful_ingestion_configured()
+                and self.source_config.stateful_ingestion
+                and self.source_config.stateful_ingestion.remove_stale_metadata
         ):
             return True
 
@@ -254,7 +254,19 @@ def get_type_class(type_str: str):
         return NullTypeClass()
 
 
-def build_dataset_urn(platform: str, name: str, *parents: str):
+def build_dataset_urn(platform: str, location_code: str, *path: str):
     return builder.make_dataset_urn(
-        platform.lower(), f"{'.'.join(filter(lambda e: e is not None, parents))}.{name}", "PROD"
+        platform.lower(), build_dataset_path_with_separator('.', location_code, *path), "PROD"
     )
+
+
+def build_dataset_qualified_name(location_code: str, *path: str):
+    return build_dataset_path_with_separator('.', location_code, *path)
+
+
+def build_dataset_browse_path(location_code: str, *path: str):
+    return f"/prod/{build_dataset_path_with_separator('/', location_code, *path)}"
+
+
+def build_dataset_path_with_separator(separator: str, location_code: str, *path: str):
+    return f"{location_code.lower()}{separator}{separator.join(filter(lambda e: e is not None, path))}"
