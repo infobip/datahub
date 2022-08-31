@@ -259,17 +259,6 @@ class IBRedashDatasetSource(IBRedashSource):
         dataset_path = [object_sample.locationCode, object_sample.parent1, object_sample.parent2, object_sample.parent3,
                         object_name]
 
-        container_parent_path = None
-        for i in range(1, len(dataset_path)):
-            container_path = dataset_path[:i]
-            if pd.isna(container_path[-1]):
-                break
-            yield from self.fetch_container_workunits(container_path, self.parent_subtypes[i - 1],
-                                                      container_parent_path)
-            container_parent_path = container_path
-
-        container = ContainerClass(container=build_container_urn(*container_parent_path))
-
         properties = DatasetPropertiesClass(
             name=object_name,
             description=object_sample.description,
@@ -293,7 +282,7 @@ class IBRedashDatasetSource(IBRedashSource):
         ownership = builder.make_ownership_aspect_from_urn_list(
             owners, OwnershipSourceTypeClass.SERVICE, OwnershipTypeClass.TECHNICAL_OWNER
         )
-        aspects = [container, properties, browse_paths, schema, ownership]
+        aspects = [properties, browse_paths, schema, ownership]
         snapshot = DatasetSnapshot(
             urn=build_dataset_urn(self.platform, *dataset_path),
             aspects=aspects,
@@ -309,6 +298,26 @@ class IBRedashDatasetSource(IBRedashSource):
                 entityUrn=snapshot.urn,
                 aspectName="subTypes",
                 aspect=SubTypesClass(typeNames=[self.object_subtype]),
+            ),
+        )
+
+        container_parent_path = None
+        for i in range(1, len(dataset_path)):
+            container_path = dataset_path[:i]
+            if pd.isna(container_path[-1]):
+                break
+            yield from self.fetch_container_workunits(container_path, self.parent_subtypes[i - 1],
+                                                      container_parent_path)
+            container_parent_path = container_path
+
+        yield MetadataWorkUnit(
+            id=f"{properties.qualifiedName}-container",
+            mcp=MetadataChangeProposalWrapper(
+                entityType="dataset",
+                changeType=ChangeTypeClass.UPSERT,
+                entityUrn=snapshot.urn,
+                aspectName="container",
+                aspect=ContainerClass(container=build_container_urn(*container_parent_path)),
             ),
         )
 
