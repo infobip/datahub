@@ -304,7 +304,7 @@ class IBRedashDatasetSource(IBRedashSource):
         )
 
     def fetch_containers_workunits(self, location_code: str, *dataset_containers: str) -> Iterable[MetadataWorkUnit]:
-        parent_path = tuple(location_code.lower())
+        parent_path = (location_code.lower(),)
         yield from self.fetch_container_workunits(parent_path, self.parent_subtypes[0])
 
         for i in range(1, len(dataset_containers)):
