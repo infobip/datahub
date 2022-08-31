@@ -252,7 +252,7 @@ class IBRedashDatasetSource(IBRedashSource):
         result = json_data_grouped.apply(
             lambda fields_by_object: self.fetch_object_workunits(fields_by_object)
         )
-        print(f"RESULT TYPE:{type(result)}")
+        logger.error(f"RESULT TYPE:{type(result)}")
         return result
 
     def fetch_object_workunits(self, fields_by_object: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
@@ -262,7 +262,9 @@ class IBRedashDatasetSource(IBRedashSource):
         dataset_path = [object_sample.locationCode, object_sample.parent1, object_sample.parent2, object_sample.parent3,
                         object_name]
 
+        logger.error("BEFORE fetch_containers_workunits")
         yield from self.fetch_containers_workunits(*dataset_path)
+        logger.error("AFTER fetch_containers_workunits")
 
         properties = DatasetPropertiesClass(
             name=object_name,
