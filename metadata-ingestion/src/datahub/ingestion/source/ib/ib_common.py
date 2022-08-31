@@ -304,13 +304,16 @@ class IBRedashDatasetSource(IBRedashSource):
         )
 
     def fetch_containers_workunits(self, location_code: str, *dataset_parents: str) -> Iterable[MetadataWorkUnit]:
+        logger.info("fetch_containers_workunits")
         dataset_parents = [location_code.lower()] + list(dataset_parents)
         parent = None
         for i in range(1, len(dataset_parents)):
             parent = yield from self.fetch_container_workunits(parent, self.parent_subtypes[i], dataset_parents[:i])
+        logger.info("/fetch_containers_workunits")
 
     def fetch_container_workunits(self, parent: Optional[MetadataWorkUnit], container_subtype: str, *path) \
             -> Iterable[MetadataWorkUnit]:
+        logger.info("fetch_container_workunits")
         qualified_name = build_path_with_separator('.', *path)
         container_urn = builder.make_container_urn(qualified_name)
         if container_urn in self.containers_cache:
