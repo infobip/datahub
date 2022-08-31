@@ -249,8 +249,7 @@ class IBRedashDatasetSource(IBRedashSource):
         json_data_grouped = json_data.groupby(["locationCode", "parent1", "parent2", "parent3", "objectName"],
                                               dropna=False)
         result = json_data_grouped.apply(
-            lambda fields_by_object: self.fetch_object_workunits(fields_by_object)
-        )
+            lambda fields_by_object: (yield from self.fetch_object_workunits(fields_by_object)))
         return result
 
     def fetch_object_workunits(self, fields_by_object: pd.DataFrame):
@@ -291,9 +290,9 @@ class IBRedashDatasetSource(IBRedashSource):
             aspects=aspects,
         )
         mce = MetadataChangeEvent(proposedSnapshot=snapshot)
-        # yield MetadataWorkUnit(properties.qualifiedName, mce=mce)
+        yield MetadataWorkUnit(properties.qualifiedName, mce=mce)
 
-        return MetadataWorkUnit(
+        yield MetadataWorkUnit(
             id=f"{properties.qualifiedName}-subtype",
             mcp=MetadataChangeProposalWrapper(
                 entityType="dataset",
