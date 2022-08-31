@@ -132,14 +132,12 @@ class IBRedashSource(StatefulIngestionSourceBase):
         raise NotImplementedError("Sub-classes must implement this method.")
 
     def get_workunits(self) -> Iterable[WorkUnit]:
-        logger.error("START get_workunits")
         if not self.is_stateful_ingestion_configured():
             for wu in self.fetch_workunits():
                 self.report.workunits_produced += 1
                 yield wu
             return
 
-        logger.error(".")
         cur_checkpoint = self.get_current_checkpoint(
             self.get_default_ingestion_job_id()
         )
@@ -148,7 +146,6 @@ class IBRedashSource(StatefulIngestionSourceBase):
             if cur_checkpoint is not None
             else None
         )
-        logger.error(".")
 
         for wu in self.fetch_workunits():
             self.report.workunits_produced += 1
@@ -160,24 +157,20 @@ class IBRedashSource(StatefulIngestionSourceBase):
                 cur_checkpoint_state.add_urn(wu.metadata.proposedSnapshot.urn)
             yield wu
 
-        logger.error(".")
         last_checkpoint = self.get_last_checkpoint(
             self.get_default_ingestion_job_id(), RedashCheckpointState
         )
-        logger.error(".")
         last_checkpoint_state = (
             cast(RedashCheckpointState, last_checkpoint.state)
             if last_checkpoint is not None
             else None
         )
-        logger.error(".")
         if (
                 self.config.stateful_ingestion
                 and self.config.stateful_ingestion.remove_stale_metadata
                 and last_checkpoint_state is not None
                 and cur_checkpoint_state is not None
         ):
-            logger.info("deleting")
             for urn in last_checkpoint_state.get_urns_not_in(cur_checkpoint_state):
                 self.report.workunits_deleted += 1
                 mcp = MetadataChangeProposalWrapper(
@@ -188,7 +181,6 @@ class IBRedashSource(StatefulIngestionSourceBase):
                     aspect=Status(removed=True),
                 )
                 yield MetadataWorkUnit(id=f"soft-delete-{urn}", mcp=mcp)
-        logger.error("STOP get_workunits")
 
     def close(self):
         self.prepare_for_commit()
@@ -253,21 +245,15 @@ class IBRedashDatasetSource(IBRedashSource):
         self.source_config: IBRedashSourceConfig = config
 
     def fetch_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
-        logger.error("START fetch_workunits")
         json_data = pd.read_json(json.dumps(self.query_get(self.config.query_id)))
-        logger.error(f"json_data size: {len(json_data.index)}")
         json_data_grouped = json_data.groupby(["locationCode", "parent1", "parent2", "parent3", "objectName"],
                                               dropna=False)
-        logger.error(f"json_data_grouped ngroups: {json_data_grouped.ngroups}")
         result = json_data_grouped.apply(
             lambda fields_by_object: self.fetch_object_workunits(fields_by_object)
         )
-        logger.error(f"RESULT TYPE:{type(result)}")
-        logger.error("END fetch_workunits")
         return result
 
     def fetch_object_workunits(self, fields_by_object: pd.DataFrame):
-        logger.error("START fetch_object_workunits")
         print("START fetch_object_workunits")
         object_sample = fields_by_object.iloc[0]
         object_name = object_sample.objectName
@@ -275,9 +261,7 @@ class IBRedashDatasetSource(IBRedashSource):
         dataset_path = [object_sample.locationCode, object_sample.parent1, object_sample.parent2, object_sample.parent3,
                         object_name]
 
-        logger.error("BEFORE fetch_containers_workunits")
         # yield from self.fetch_containers_workunits(*dataset_path)
-        logger.error("AFTER fetch_containers_workunits")
 
         properties = DatasetPropertiesClass(
             name=object_name,
@@ -418,7 +402,6 @@ def build_dataset_urn(platform: str, location_code: str, *path: str):
 
 
 def build_dataset_qualified_name(location_code: str, *path: str):
-    logger.error(f"location code {location_code}, path: {path}")
     return build_dataset_path_with_separator('.', location_code, *path)
 
 
@@ -427,10 +410,8 @@ def build_dataset_browse_path(location_code: str, *path: str):
 
 
 def build_dataset_path_with_separator(separator: str, location_code: str, *path: str):
-    logger.error(f"separator: {separator}, location code {location_code}, path: {path}")
     return build_path_with_separator(separator, location_code.lower(), *path)
 
 
 def build_path_with_separator(separator: str, *path: str):
-    logger.error(f"separator: {separator}, path: {path}")
     return f"{separator.join(filter(lambda e: not pd.isna(e), list(path)))}"
