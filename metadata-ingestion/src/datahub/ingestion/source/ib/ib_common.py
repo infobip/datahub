@@ -12,7 +12,7 @@ from datahub.ingestion.api.common import PipelineContext, WorkUnit
 from datahub.ingestion.api.workunit import MetadataWorkUnit
 from datahub.ingestion.api.workunit import UsageStatsWorkUnit
 from datahub.ingestion.source.state.checkpoint import Checkpoint
-from src.datahub.ingestion.source.state.redash_state import RedashCheckpointState
+from datahub.ingestion.source.state.redash_state import RedashCheckpointState
 from datahub.ingestion.source.state.stateful_ingestion_base import (
     JobId,
     StatefulIngestionConfig,

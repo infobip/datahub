@@ -1,6 +1,6 @@
 from datahub.ingestion.api.decorators import config_class, platform_name
 
-from src.datahub.ingestion.source.ib.ib_common import *
+from datahub.ingestion.source.ib.ib_common import *
 
 
 class IBKafkaSourceConfig(IBRedashSourceConfig):
