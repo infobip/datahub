@@ -291,9 +291,9 @@ class IBRedashDatasetSource(IBRedashSource):
             aspects=aspects,
         )
         mce = MetadataChangeEvent(proposedSnapshot=snapshot)
-        yield MetadataWorkUnit(properties.qualifiedName, mce=mce)
+        # yield MetadataWorkUnit(properties.qualifiedName, mce=mce)
 
-        yield MetadataWorkUnit(
+        return MetadataWorkUnit(
             id=f"{properties.qualifiedName}-subtype",
             mcp=MetadataChangeProposalWrapper(
                 entityType="dataset",
