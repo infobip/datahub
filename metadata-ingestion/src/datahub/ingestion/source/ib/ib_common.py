@@ -4,7 +4,7 @@ import logging
 import math
 import sys
 from abc import abstractmethod
-from typing import Iterable, Optional, Union, cast, List
+from typing import Iterable, Optional, Union, cast, List, Tuple
 
 import datahub.emitter.mce_builder as builder
 import pandas as pd
@@ -317,8 +317,8 @@ class IBRedashDatasetSource(IBRedashSource):
 
         logger.info("/fetch_containers_workunits")
 
-    def fetch_container_workunits(self, path: tuple[str], container_subtype: str,
-                                  parent_path: Optional[tuple[str]] = None) \
+    def fetch_container_workunits(self, path: Tuple[str], container_subtype: str,
+                                  parent_path: Optional[Tuple[str]] = None) \
             -> Iterable[MetadataWorkUnit]:
         logger.info("fetch_container_workunits")
         qualified_name = build_qualified_name(*path)
