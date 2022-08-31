@@ -12,7 +12,7 @@ from datahub.ingestion.api.common import PipelineContext, WorkUnit
 from datahub.ingestion.api.workunit import MetadataWorkUnit
 from datahub.ingestion.api.workunit import UsageStatsWorkUnit
 from datahub.ingestion.source.state.checkpoint import Checkpoint
-from datahub.ingestion.source.state.redash_state import RedashCheckpointState
+from src.datahub.ingestion.source.state.redash_state import RedashCheckpointState
 from datahub.ingestion.source.state.stateful_ingestion_base import (
     JobId,
     StatefulIngestionConfig,
@@ -268,6 +268,7 @@ class IBRedashDatasetSource(IBRedashSource):
 
     def fetch_object_workunits(self, fields_by_object: pd.DataFrame):
         logger.error("START fetch_object_workunits")
+        print("START fetch_object_workunits")
         object_sample = fields_by_object.iloc[0]
         object_name = object_sample.objectName
 
@@ -275,7 +276,7 @@ class IBRedashDatasetSource(IBRedashSource):
                         object_name]
 
         logger.error("BEFORE fetch_containers_workunits")
-        yield from self.fetch_containers_workunits(*dataset_path)
+        # yield from self.fetch_containers_workunits(*dataset_path)
         logger.error("AFTER fetch_containers_workunits")
 
         properties = DatasetPropertiesClass(
@@ -309,7 +310,7 @@ class IBRedashDatasetSource(IBRedashSource):
             aspects=aspects,
         )
         mce = MetadataChangeEvent(proposedSnapshot=snapshot)
-        yield MetadataWorkUnit(properties.qualifiedName, mce=mce)
+        return MetadataWorkUnit(properties.qualifiedName, mce=mce)
 
     def fetch_containers_workunits(self, location_code: str, *dataset_parents: str) -> Iterable[MetadataWorkUnit]:
         dataset_parents = [location_code.lower()] + list(dataset_parents)
@@ -417,6 +418,7 @@ def build_dataset_urn(platform: str, location_code: str, *path: str):
 
 
 def build_dataset_qualified_name(location_code: str, *path: str):
+    logger.error(f"location code {location_code}, path: {path}")
     return build_dataset_path_with_separator('.', location_code, *path)
 
 
@@ -425,8 +427,10 @@ def build_dataset_browse_path(location_code: str, *path: str):
 
 
 def build_dataset_path_with_separator(separator: str, location_code: str, *path: str):
+    logger.error(f"separator: {separator}, location code {location_code}, path: {path}")
     return build_path_with_separator(separator, location_code.lower(), *path)
 
 
 def build_path_with_separator(separator: str, *path: str):
-    return f"{separator.join(filter(lambda e: e is not None, path))}"
+    logger.error(f"separator: {separator}, path: {path}")
+    return f"{separator.join(filter(lambda e: not pd.isna(e), list(path)))}"
