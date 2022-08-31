@@ -12,7 +12,7 @@ from datahub.ingestion.api.common import PipelineContext, WorkUnit
 from datahub.ingestion.api.workunit import MetadataWorkUnit
 from datahub.ingestion.api.workunit import UsageStatsWorkUnit
 from datahub.ingestion.source.state.checkpoint import Checkpoint
-from src.datahub.ingestion.source.state.redash_state import RedashCheckpointState
+from datahub.ingestion.source.state.redash_state import RedashCheckpointState
 from datahub.ingestion.source.state.stateful_ingestion_base import (
     JobId,
     StatefulIngestionConfig,
@@ -297,7 +297,7 @@ class IBRedashDatasetSource(IBRedashSource):
             platformSchema=KafkaSchemaClass.construct_with_defaults(),
             fields=fields_by_object.dropna(subset="fieldName").apply(lambda field: self.map_column(field),
                                                                      axis=1).values.tolist(),
-        )
+        )xr
         owners = [
             builder.make_group_urn(owner.strip()) for owner in object_sample.owners.split(",")
         ]
