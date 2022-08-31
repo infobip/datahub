@@ -268,8 +268,6 @@ class IBRedashDatasetSource(IBRedashSource):
             qualifiedName=build_dataset_qualified_name(*dataset_path),
         )
 
-        subtypes = SubTypesClass(typeNames=[self.object_subtype])
-
         browse_paths = BrowsePathsClass([build_dataset_browse_path(*dataset_path)])
 
         schema = SchemaMetadataClass(
@@ -287,13 +285,24 @@ class IBRedashDatasetSource(IBRedashSource):
         ownership = builder.make_ownership_aspect_from_urn_list(
             owners, OwnershipSourceTypeClass.SERVICE, OwnershipTypeClass.TECHNICAL_OWNER
         )
-        aspects = [properties, subtypes, browse_paths, schema, ownership]
+        aspects = [properties, browse_paths, schema, ownership]
         snapshot = DatasetSnapshot(
             urn=build_dataset_urn(self.platform, *dataset_path),
             aspects=aspects,
         )
         mce = MetadataChangeEvent(proposedSnapshot=snapshot)
-        return MetadataWorkUnit(properties.qualifiedName, mce=mce)
+        yield MetadataWorkUnit(properties.qualifiedName, mce=mce)
+
+        yield MetadataWorkUnit(
+            id=f"{properties.qualifiedName}-subtype",
+            mcp=MetadataChangeProposalWrapper(
+                entityType="dataset",
+                changeType=ChangeTypeClass.UPSERT,
+                entityUrn=snapshot.urn,
+                aspectName="subTypes",
+                aspect=SubTypesClass(typeNames=[self.object_subtype]),
+            ),
+        )
 
     def fetch_containers_workunits(self, location_code: str, *dataset_parents: str) -> Iterable[MetadataWorkUnit]:
         dataset_parents = [location_code.lower()] + list(dataset_parents)
