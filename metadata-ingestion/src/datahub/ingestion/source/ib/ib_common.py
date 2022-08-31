@@ -1,3 +1,4 @@
+import itertools
 import json
 import logging
 import math
@@ -248,9 +249,8 @@ class IBRedashDatasetSource(IBRedashSource):
         json_data = pd.read_json(json.dumps(self.query_get(self.config.query_id)))
         json_data_grouped = json_data.groupby(["locationCode", "parent1", "parent2", "parent3", "objectName"],
                                               dropna=False)
-        json_data_grouped.apply(
-            lambda fields_by_object: self.fetch_object_workunits(fields_by_object))\
-            .pipe(lambda v: (yield from v))
+        return itertools.chain.from_iterable(json_data_grouped.apply(
+            lambda fields_by_object: self.fetch_object_workunits(fields_by_object)))
 
     def fetch_object_workunits(self, fields_by_object: pd.DataFrame):
         object_sample = fields_by_object.iloc[0]
