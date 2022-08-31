@@ -353,7 +353,7 @@ class IBRedashDatasetSource(IBRedashSource):
         data_type = field.fieldType
         return SchemaFieldClass(
             fieldPath=field.fieldName,
-            description=field.valueSet,
+            description=field.fieldExampleValues,
             type=SchemaFieldDataTypeClass(type=get_type_class(data_type)),
             nativeDataType=data_type,
             nullable=bool(field.nullable),
