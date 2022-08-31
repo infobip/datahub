@@ -268,7 +268,7 @@ class IBRedashDatasetSource(IBRedashSource):
             qualifiedName=build_dataset_qualified_name(*dataset_path),
         )
 
-        # subtypes = SubTypesClass(typeNames=[self.object_subtype])
+        subtypes = SubTypesClass(typeNames=[self.object_subtype])
 
         browse_paths = BrowsePathsClass([build_dataset_browse_path(*dataset_path)])
 
@@ -287,7 +287,7 @@ class IBRedashDatasetSource(IBRedashSource):
         ownership = builder.make_ownership_aspect_from_urn_list(
             owners, OwnershipSourceTypeClass.SERVICE, OwnershipTypeClass.TECHNICAL_OWNER
         )
-        aspects = [properties, browse_paths, schema, ownership]
+        aspects = [properties, subtypes, browse_paths, schema, ownership]
         snapshot = DatasetSnapshot(
             urn=build_dataset_urn(self.platform, *dataset_path),
             aspects=aspects,

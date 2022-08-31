@@ -11,7 +11,7 @@ class IBKafkaSourceConfig(IBRedashSourceConfig):
 @config_class(IBKafkaSourceConfig)
 class IBKafkaSource(IBRedashDatasetSource):
     parent_subtypes = ["DataCenter", "Kafka Cluster"]
-    object_subtype = "Kafka Topic"
+    object_subtype = "KafkaTopic"
     platform = "kafka"
 
     def __init__(self, config: IBKafkaSourceConfig, ctx: PipelineContext):
