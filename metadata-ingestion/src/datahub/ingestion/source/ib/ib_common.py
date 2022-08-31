@@ -132,12 +132,14 @@ class IBRedashSource(StatefulIngestionSourceBase):
         raise NotImplementedError("Sub-classes must implement this method.")
 
     def get_workunits(self) -> Iterable[WorkUnit]:
+        logger.error("START get_workunits")
         if not self.is_stateful_ingestion_configured():
             for wu in self.fetch_workunits():
                 self.report.workunits_produced += 1
                 yield wu
             return
 
+        logger.error(".")
         cur_checkpoint = self.get_current_checkpoint(
             self.get_default_ingestion_job_id()
         )
@@ -146,6 +148,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
             if cur_checkpoint is not None
             else None
         )
+        logger.error(".")
 
         for wu in self.fetch_workunits():
             self.report.workunits_produced += 1
@@ -157,14 +160,17 @@ class IBRedashSource(StatefulIngestionSourceBase):
                 cur_checkpoint_state.add_urn(wu.metadata.proposedSnapshot.urn)
             yield wu
 
+        logger.error(".")
         last_checkpoint = self.get_last_checkpoint(
             self.get_default_ingestion_job_id(), RedashCheckpointState
         )
+        logger.error(".")
         last_checkpoint_state = (
             cast(RedashCheckpointState, last_checkpoint.state)
             if last_checkpoint is not None
             else None
         )
+        logger.error(".")
         if (
                 self.config.stateful_ingestion
                 and self.config.stateful_ingestion.remove_stale_metadata
@@ -182,6 +188,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
                     aspect=Status(removed=True),
                 )
                 yield MetadataWorkUnit(id=f"soft-delete-{urn}", mcp=mcp)
+        logger.error("STOP get_workunits")
 
     def close(self):
         self.prepare_for_commit()
