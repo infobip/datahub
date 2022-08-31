@@ -308,7 +308,9 @@ class IBRedashDatasetSource(IBRedashSource):
         dataset_parents = [location_code.lower()] + list(dataset_parents)
         parent = None
         for i in range(1, len(dataset_parents)):
-            parent = yield from self.fetch_container_workunits(parent, self.parent_subtypes[i], dataset_parents[:i])
+            logger.info("before yield to parent")
+            parent = yield from self.fetch_container_workunits(parent, self.parent_subtypes[i], *dataset_parents[:i])
+            logger.info(f"gor parent type:{type(parent)}, value: {parent}")
         logger.info("/fetch_containers_workunits")
 
     def fetch_container_workunits(self, parent: Optional[MetadataWorkUnit], container_subtype: str, *path) \
