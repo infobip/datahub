@@ -3,7 +3,7 @@ import logging
 import math
 import sys
 from abc import abstractmethod
-from typing import Iterable, Optional, Union, cast
+from typing import Iterable, Optional, Union, cast, List
 
 import datahub.emitter.mce_builder as builder
 import pandas as pd
@@ -233,7 +233,7 @@ class IBRedashDatasetSource(IBRedashSource):
 
     @property
     @abstractmethod
-    def parent_subtypes(self) -> list[str]:
+    def parent_subtypes(self) -> List[str]:
         raise NotImplementedError("Sub-classes must define this variable.")
 
     @abstractmethod
