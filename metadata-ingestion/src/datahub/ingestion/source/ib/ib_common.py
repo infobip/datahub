@@ -255,18 +255,17 @@ class IBRedashDatasetSource(IBRedashSource):
     def fetch_object_workunits(self, fields_by_object: pd.DataFrame):
         object_sample = fields_by_object.iloc[0]
         object_name = object_sample.objectName
-        location_code = object_sample.locationCode
 
-        dataset_path = [object_sample.parent1, object_sample.parent2, object_sample.parent3,
+        dataset_path = [object_sample.locationCode, object_sample.parent1, object_sample.parent2, object_sample.parent3,
                         object_name]
 
-        container_parent_path = [location_code.lower()]
-        yield from self.fetch_container_workunits(container_parent_path, self.parent_subtypes[0])
+        container_parent_path = None
         for i in range(1, len(dataset_path)):
             container_path = dataset_path[:i]
             if pd.isna(container_path[-1]):
                 break
-            yield from self.fetch_container_workunits(container_path, self.parent_subtypes[i], container_parent_path)
+            yield from self.fetch_container_workunits(container_path, self.parent_subtypes[i - 1],
+                                                      container_parent_path)
             container_parent_path = container_path
 
         container = ContainerClass(container=build_container_urn(*container_parent_path))
@@ -274,10 +273,10 @@ class IBRedashDatasetSource(IBRedashSource):
         properties = DatasetPropertiesClass(
             name=object_name,
             description=object_sample.description,
-            qualifiedName=build_dataset_qualified_name(location_code, *dataset_path),
+            qualifiedName=build_dataset_qualified_name(*dataset_path),
         )
 
-        browse_paths = BrowsePathsClass([build_dataset_browse_path(location_code, *dataset_path)])
+        browse_paths = BrowsePathsClass([build_dataset_browse_path(*dataset_path)])
 
         schema = SchemaMetadataClass(
             schemaName=self.platform,
@@ -294,9 +293,9 @@ class IBRedashDatasetSource(IBRedashSource):
         ownership = builder.make_ownership_aspect_from_urn_list(
             owners, OwnershipSourceTypeClass.SERVICE, OwnershipTypeClass.TECHNICAL_OWNER
         )
-        aspects = [properties, browse_paths, schema, ownership, container]
+        aspects = [container, properties, browse_paths, schema, ownership]
         snapshot = DatasetSnapshot(
-            urn=build_dataset_urn(self.platform, location_code, *dataset_path),
+            urn=build_dataset_urn(self.platform, *dataset_path),
             aspects=aspects,
         )
         mce = MetadataChangeEvent(proposedSnapshot=snapshot)
@@ -316,7 +315,7 @@ class IBRedashDatasetSource(IBRedashSource):
     def fetch_container_workunits(self, path: List[str], container_subtype: str,
                                   parent_path: Optional[List[str]] = None) \
             -> Iterable[MetadataWorkUnit]:
-        qualified_name = build_qualified_name(*path)
+        qualified_name = build_dataset_qualified_name(*path)
         container_urn = builder.make_container_urn(qualified_name)
         if container_urn in self.containers_cache:
             return
@@ -417,15 +416,11 @@ def build_dataset_urn(platform: str, location_code: str, *path: str):
 
 
 def build_container_urn(*path: str):
-    return builder.make_container_urn(build_qualified_name(*path))
+    return builder.make_container_urn(build_dataset_qualified_name(*path))
 
 
 def build_dataset_qualified_name(location_code: str, *path: str):
     return build_dataset_path_with_separator('.', location_code, *path)
-
-
-def build_qualified_name(*path: str):
-    return build_str_path_with_separator('.', *path)
 
 
 def build_dataset_browse_path(location_code: str, *path: str):
