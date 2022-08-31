@@ -307,9 +307,11 @@ class IBRedashDatasetSource(IBRedashSource):
         logger.info("fetch_containers_workunits")
         dataset_parents = [location_code.lower()] + list(dataset_parents)
         parent = None
-        for i in range(1, len(dataset_parents)):
+        range_start = 1
+        for i in range(range_start, len(dataset_parents)):
             logger.info("before yield to parent")
-            parent = yield from self.fetch_container_workunits(parent, self.parent_subtypes[i], *dataset_parents[:i])
+            parent = yield from self.fetch_container_workunits(parent, self.parent_subtypes[i - range_start],
+                                                               *dataset_parents[:i])
             logger.info(f"gor parent type:{type(parent)}, value: {parent}")
         logger.info("/fetch_containers_workunits")
 
@@ -335,7 +337,7 @@ class IBRedashDatasetSource(IBRedashSource):
                                                             ContainerClass(container=parent.metadata.entityUrn))
             yield self.build_container_workunit_with_aspect(container_urn, aspect=DataPlatformInstance(
                 platform=builder.make_data_platform_urn(self.platform),
-                ))
+            ))
 
     @staticmethod
     def build_container_workunit_with_aspect(urn: str, aspect):
