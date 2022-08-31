@@ -297,7 +297,7 @@ class IBRedashDatasetSource(IBRedashSource):
             platformSchema=KafkaSchemaClass.construct_with_defaults(),
             fields=fields_by_object.dropna(subset="fieldName").apply(lambda field: self.map_column(field),
                                                                      axis=1).values.tolist(),
-        )xr
+        )
         owners = [
             builder.make_group_urn(owner.strip()) for owner in object_sample.owners.split(",")
         ]
