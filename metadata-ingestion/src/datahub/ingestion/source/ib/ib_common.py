@@ -255,8 +255,10 @@ class IBRedashDatasetSource(IBRedashSource):
     def fetch_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
         logger.error("START fetch_workunits")
         json_data = pd.read_json(json.dumps(self.query_get(self.config.query_id)))
+        logger.error(f"json_data size: {len(json_data.index)}")
         json_data_grouped = json_data.groupby(["locationCode", "parent1", "parent2", "parent3", "objectName"],
                                               dropna=False)
+        logger.error(f"json_data_grouped size: {len(json_data_grouped.index)}")
         result = json_data_grouped.apply(
             lambda fields_by_object: self.fetch_object_workunits(fields_by_object)
         )
