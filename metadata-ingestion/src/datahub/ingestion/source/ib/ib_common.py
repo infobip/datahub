@@ -236,8 +236,8 @@ class IBRedashDatasetSource(IBRedashSource):
     def parent_subtypes(self) -> List[str]:
         raise NotImplementedError("Sub-classes must define this variable.")
 
-    @abstractmethod
     @property
+    @abstractmethod
     def object_subtype(self):
         raise NotImplementedError("Sub-classes must define this variable.")
 
