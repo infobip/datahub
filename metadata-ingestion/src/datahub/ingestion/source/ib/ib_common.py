@@ -21,7 +21,7 @@ from datahub.ingestion.source.state.stateful_ingestion_base import (
     StatefulIngestionReport,
     StatefulIngestionSourceBase,
 )
-from datahub.metadata.com.linkedin.pegasus2avro.common import Status
+from datahub.metadata.com.linkedin.pegasus2avro.common import Status, DataPlatformInstance
 from datahub.metadata.com.linkedin.pegasus2avro.container import ContainerProperties
 from datahub.metadata.com.linkedin.pegasus2avro.metadata.snapshot import DatasetSnapshot
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
@@ -259,7 +259,7 @@ class IBRedashDatasetSource(IBRedashSource):
         dataset_path = [object_sample.locationCode, object_sample.parent1, object_sample.parent2, object_sample.parent3,
                         object_name]
 
-        # yield from self.fetch_containers_workunits(*dataset_path)
+        yield from self.fetch_containers_workunits(*dataset_path)
 
         properties = DatasetPropertiesClass(
             name=object_name,
@@ -328,6 +328,9 @@ class IBRedashDatasetSource(IBRedashSource):
         if parent is not None:
             yield self.build_container_workunit_with_aspect(container_urn,
                                                             ContainerClass(container=parent.metadata.entityUrn))
+            yield self.build_container_workunit_with_aspect(container_urn, aspect=DataPlatformInstance(
+                platform=builder.make_data_platform_urn(self.platform),
+                ))
 
     @staticmethod
     def build_container_workunit_with_aspect(urn: str, aspect):
