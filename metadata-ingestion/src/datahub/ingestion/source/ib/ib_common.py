@@ -254,7 +254,6 @@ class IBRedashDatasetSource(IBRedashSource):
         return result
 
     def fetch_object_workunits(self, fields_by_object: pd.DataFrame):
-        print("START fetch_object_workunits")
         object_sample = fields_by_object.iloc[0]
         object_name = object_sample.objectName
 
