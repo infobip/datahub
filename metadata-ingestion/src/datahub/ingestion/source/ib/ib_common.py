@@ -254,10 +254,10 @@ class IBRedashDatasetSource(IBRedashSource):
             lambda fields_by_object: self.fetch_object_workunits(fields_by_object)
         )
         logger.error(f"RESULT TYPE:{type(result)}")
-        logger.error("START END")
+        logger.error("END fetch_workunits")
         return result
 
-    def fetch_object_workunits(self, fields_by_object: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
+    def fetch_object_workunits(self, fields_by_object: pd.DataFrame):
         logger.error("START fetch_object_workunits")
         object_sample = fields_by_object.iloc[0]
         object_name = object_sample.objectName
