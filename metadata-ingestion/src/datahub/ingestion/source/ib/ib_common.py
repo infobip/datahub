@@ -3,7 +3,6 @@ import logging
 import math
 import sys
 from abc import abstractmethod
-from functools import reduce
 from typing import Iterable, Optional, Union, cast, List
 
 import datahub.emitter.mce_builder as builder
@@ -13,7 +12,7 @@ from datahub.ingestion.api.common import PipelineContext, WorkUnit
 from datahub.ingestion.api.workunit import MetadataWorkUnit
 from datahub.ingestion.api.workunit import UsageStatsWorkUnit
 from datahub.ingestion.source.state.checkpoint import Checkpoint
-from datahub.ingestion.source.state.redash_state import RedashCheckpointState
+from src.datahub.ingestion.source.state.redash_state import RedashCheckpointState
 from datahub.ingestion.source.state.stateful_ingestion_base import (
     JobId,
     StatefulIngestionConfig,
@@ -249,11 +248,11 @@ class IBRedashDatasetSource(IBRedashSource):
         json_data = pd.read_json(json.dumps(self.query_get(self.config.query_id)))
         json_data_grouped = json_data.groupby(["locationCode", "parent1", "parent2", "parent3", "objectName"],
                                               dropna=False)
-        result = json_data_grouped.apply(
-            lambda fields_by_object: self.fetch_object_workunits(fields_by_object))
-        return result
+        json_data_grouped.apply(
+            lambda fields_by_object: self.fetch_object_workunits(fields_by_object))\
+            .pipe(lambda v: (yield from v))
 
-    def fetch_object_workunits(self, fields_by_object: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
+    def fetch_object_workunits(self, fields_by_object: pd.DataFrame):
         object_sample = fields_by_object.iloc[0]
         object_name = object_sample.objectName
 
