@@ -226,13 +226,13 @@ class IBRedashSource(StatefulIngestionSourceBase):
 class IBRedashDatasetSource(IBRedashSource):
     containers_cache = []
 
-    @abstractmethod
     @property
+    @abstractmethod
     def platform(self):
         raise NotImplementedError("Sub-classes must define this variable.")
 
-    @abstractmethod
     @property
+    @abstractmethod
     def parent_subtypes(self) -> list[str]:
         raise NotImplementedError("Sub-classes must define this variable.")
 
