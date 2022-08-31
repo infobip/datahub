@@ -294,7 +294,7 @@ class IBRedashDatasetSource(IBRedashSource):
         ownership = builder.make_ownership_aspect_from_urn_list(
             owners, OwnershipSourceTypeClass.SERVICE, OwnershipTypeClass.TECHNICAL_OWNER
         )
-        aspects = [container, properties, browse_paths, schema, ownership]
+        aspects = [properties, browse_paths, schema, ownership, container]
         snapshot = DatasetSnapshot(
             urn=build_dataset_urn(self.platform, location_code, *dataset_path),
             aspects=aspects,
