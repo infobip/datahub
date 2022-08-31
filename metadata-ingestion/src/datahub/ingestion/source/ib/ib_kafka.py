@@ -16,7 +16,7 @@ class IBKafkaSource(IBRedashDatasetSource):
 
     def __init__(self, config: IBKafkaSourceConfig, ctx: PipelineContext):
         super().__init__(config, ctx)
-        self.source_config: IBKafkaSourceConfig = config
+        self.config: IBKafkaSourceConfig = config
 
     def get_default_ingestion_job_id(self) -> JobId:
         return JobId("ingest_kafka_from_redash_source")

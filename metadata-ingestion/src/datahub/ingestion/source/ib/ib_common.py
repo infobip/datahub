@@ -249,16 +249,20 @@ class IBRedashDatasetSource(IBRedashSource):
         json_data = pd.read_json(json.dumps(self.query_get(self.config.query_id)))
         json_data_grouped = json_data.groupby(["locationCode", "parent1", "parent2", "parent3", "objectName"],
                                               dropna=False)
-        return json_data_grouped.apply(
-            lambda fields_by_object: self.fetch_workunit(fields_by_object)
+        result = json_data_grouped.apply(
+            lambda fields_by_object: self.fetch_object_workunits(fields_by_object)
         )
+        print(f"RESULT TYPE:{type(result)}")
+        return result
 
-    def fetch_workunit(self, fields_by_object: pd.DataFrame):
+    def fetch_object_workunits(self, fields_by_object: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
         object_sample = fields_by_object.iloc[0]
         object_name = object_sample.objectName
 
         dataset_path = [object_sample.locationCode, object_sample.parent1, object_sample.parent2, object_sample.parent3,
                         object_name]
+
+        yield from self.fetch_containers_workunits(*dataset_path)
 
         properties = DatasetPropertiesClass(
             name=object_name,
@@ -293,13 +297,14 @@ class IBRedashDatasetSource(IBRedashSource):
         mce = MetadataChangeEvent(proposedSnapshot=snapshot)
         yield MetadataWorkUnit(properties.qualifiedName, mce=mce)
 
-    def fetch_containers_workunits(self, location_code: str, *dataset_parents: str):
+    def fetch_containers_workunits(self, location_code: str, *dataset_parents: str) -> Iterable[MetadataWorkUnit]:
         dataset_parents = [location_code.lower()] + list(dataset_parents)
         parent = None
         for i in range(1, len(dataset_parents)):
-            parent = yield self.fetch_container_workunits(parent, self.parent_subtypes[i], dataset_parents[:i])
+            parent = yield from self.fetch_container_workunits(parent, self.parent_subtypes[i], dataset_parents[:i])
 
-    def fetch_container_workunits(self, parent: MetadataWorkUnit, container_subtype: str, *path) -> MetadataWorkUnit:
+    def fetch_container_workunits(self, parent: Optional[MetadataWorkUnit], container_subtype: str, *path) \
+            -> Iterable[MetadataWorkUnit]:
         qualified_name = build_path_with_separator('.', *path)
         container_urn = builder.make_container_urn(qualified_name)
         if container_urn in self.containers_cache:
