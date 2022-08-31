@@ -303,22 +303,25 @@ class IBRedashDatasetSource(IBRedashSource):
             ),
         )
 
-    def fetch_containers_workunits(self, location_code: str, *dataset_parents: str) -> Iterable[MetadataWorkUnit]:
+    def fetch_containers_workunits(self, location_code: str, *dataset_containers: str) -> Iterable[MetadataWorkUnit]:
         logger.info("fetch_containers_workunits")
-        dataset_parents = [location_code.lower()] + list(dataset_parents)
-        parent = None
-        range_start = 1
-        for i in range(range_start, len(dataset_parents)):
-            logger.info("before yield to parent")
-            parent = yield from self.fetch_container_workunits(parent, self.parent_subtypes[i - range_start],
-                                                               *dataset_parents[:i])
-            logger.info(f"gor parent type:{type(parent)}, value: {parent}")
+        parent_path = tuple(location_code.lower())
+        yield from self.fetch_container_workunits(parent_path, self.parent_subtypes[0])
+
+        for i in range(1, len(dataset_containers)):
+            path = dataset_containers[:i]
+            if pd.isna(path[-1]):
+                break
+            yield from self.fetch_container_workunits(path, self.parent_subtypes[i], parent_path)
+            parent_path = path
+
         logger.info("/fetch_containers_workunits")
 
-    def fetch_container_workunits(self, parent: Optional[MetadataWorkUnit], container_subtype: str, *path) \
+    def fetch_container_workunits(self, path: tuple[str], container_subtype: str,
+                                  parent_path: Optional[tuple[str]] = None) \
             -> Iterable[MetadataWorkUnit]:
         logger.info("fetch_container_workunits")
-        qualified_name = build_path_with_separator('.', *path)
+        qualified_name = build_qualified_name(*path)
         container_urn = builder.make_container_urn(qualified_name)
         if container_urn in self.containers_cache:
             return
@@ -332,9 +335,9 @@ class IBRedashDatasetSource(IBRedashSource):
 
         yield self.build_container_workunit_with_aspect(container_urn, SubTypesClass(typeNames=[container_subtype]))
 
-        if parent is not None:
+        if parent_path is not None:
             yield self.build_container_workunit_with_aspect(container_urn,
-                                                            ContainerClass(container=parent.metadata.entityUrn))
+                                                            ContainerClass(container=build_container_urn(*parent_path)))
             yield self.build_container_workunit_with_aspect(container_urn, aspect=DataPlatformInstance(
                 platform=builder.make_data_platform_urn(self.platform),
             ))
@@ -418,8 +421,16 @@ def build_dataset_urn(platform: str, location_code: str, *path: str):
     )
 
 
+def build_container_urn(*path: str):
+    return builder.make_container_urn(build_qualified_name(*path))
+
+
 def build_dataset_qualified_name(location_code: str, *path: str):
     return build_dataset_path_with_separator('.', location_code, *path)
+
+
+def build_qualified_name(*path: str):
+    return build_str_path_with_separator('.', *path)
 
 
 def build_dataset_browse_path(location_code: str, *path: str):
@@ -427,8 +438,8 @@ def build_dataset_browse_path(location_code: str, *path: str):
 
 
 def build_dataset_path_with_separator(separator: str, location_code: str, *path: str):
-    return build_path_with_separator(separator, location_code.lower(), *path)
+    return build_str_path_with_separator(separator, location_code.lower(), *path)
 
 
-def build_path_with_separator(separator: str, *path: str):
-    return f"{separator.join(filter(lambda e: not pd.isna(e), list(path)))}"
+def build_str_path_with_separator(separator: str, *path: str):
+    return f"{separator.join(filter(lambda e: not pd.isna(e), path))}"
