@@ -258,7 +258,7 @@ class IBRedashDatasetSource(IBRedashSource):
         logger.error(f"json_data size: {len(json_data.index)}")
         json_data_grouped = json_data.groupby(["locationCode", "parent1", "parent2", "parent3", "objectName"],
                                               dropna=False)
-        logger.error(f"json_data_grouped size: {len(json_data_grouped.index)}")
+        logger.error(f"json_data_grouped.keys size: {len(json_data_grouped.keys.index())}")
         result = json_data_grouped.apply(
             lambda fields_by_object: self.fetch_object_workunits(fields_by_object)
         )
