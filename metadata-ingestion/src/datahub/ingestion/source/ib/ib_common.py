@@ -341,6 +341,7 @@ class IBRedashDatasetSource(IBRedashSource):
         if parent_path is not None:
             yield self.build_container_workunit_with_aspect(container_urn,
                                                             ContainerClass(container=build_container_urn(*parent_path)))
+            # todo wrong, fix
             yield self.build_container_workunit_with_aspect(container_urn, aspect=DataPlatformInstance(
                 platform=builder.make_data_platform_urn(self.platform),
             ))
