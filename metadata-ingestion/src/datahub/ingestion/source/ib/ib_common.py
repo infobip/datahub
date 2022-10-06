@@ -1,8 +1,8 @@
-import itertools
 import json
 import logging
 import math
 import sys
+import re
 from abc import abstractmethod
 from typing import Iterable, List, Optional, Union, cast
 
@@ -62,8 +62,8 @@ class IBRedashSourceStatefulIngestionConfig(StatefulIngestionConfig):
 
 
 class RedashSourceReport(StatefulIngestionReport):
-    workunits_skipped: int = 0
-    workunits_deleted: int = 0
+    events_skipped: int = 0
+    events_deleted: int = 0
 
 
 class IBRedashSourceConfig(StatefulIngestionConfigBase):
@@ -138,7 +138,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
     def get_workunits(self) -> Iterable[WorkUnit]:
         if not self.is_stateful_ingestion_configured():
             for wu in self.fetch_workunits():
-                self.report.workunits_produced += 1
+                self.report.report_workunit(wu)
                 yield wu
             return
 
@@ -162,7 +162,6 @@ class IBRedashSource(StatefulIngestionSourceBase):
 
         for wu in self.fetch_workunits():
             if type(wu) is not MetadataWorkUnit:
-                self.report.workunits_produced += 1
                 yield wu
                 continue
 
@@ -184,13 +183,13 @@ class IBRedashSource(StatefulIngestionSourceBase):
                     last_checkpoint_state is None
                     or not last_checkpoint_state.has_workunit(urn, wu)
                 ):
-                    self.report.workunits_produced += 1
+                    self.report.report_workunit(wu)
                     yield wu
                     continue
                 else:
-                    self.report.workunits_skipped += 1
+                    self.report.events_skipped += 1
             else:
-                self.report.workunits_produced += 1
+                self.report.report_workunit(wu)
                 yield wu
 
         if (
@@ -275,50 +274,50 @@ class IBRedashDatasetSource(IBRedashSource):
 
     def fetch_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
         json_data = pd.read_json(json.dumps(self.query_get(self.config.query_id)))
-        json_data_grouped = json_data.groupby(
-            ["locationCode", "parent1", "parent2", "parent3", "objectName"],
-            dropna=False,
-        )
-        return itertools.chain.from_iterable(
-            json_data_grouped.apply(
-                lambda fields_by_object: self.fetch_object_workunits(fields_by_object)
-            )
-        )
 
-    def fetch_object_workunits(self, fields_by_object: pd.DataFrame):
-        object_sample = fields_by_object.iloc[0]
-        object_name = object_sample.objectName
+        for i, row in json_data.iterrows():
+            yield from self.fetch_object_workunits(row)
+
+    def fetch_object_workunits(self, row: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
+        object_name = row.objectName
 
         dataset_path = [
-            object_sample.locationCode,
-            object_sample.parent1,
-            object_sample.parent2,
-            object_sample.parent3,
+            row.locationCode,
+            row.parent1,
+            row.parent2,
+            row.parent3,
             object_name,
         ]
 
         properties = DatasetPropertiesClass(
             name=object_name,
-            description=object_sample.description,
+            description=row.description,
             qualifiedName=build_dataset_qualified_name(*dataset_path),
         )
 
         browse_paths = BrowsePathsClass([build_dataset_browse_path(*dataset_path)])
 
+        columns = (
+            list(map(lambda col: self.map_column(col), row.columns.split('|;|')))
+            if row.columns is not None
+            else []
+        )
         schema = SchemaMetadataClass(
             schemaName=self.platform,
             version=1,
             hash="",
             platform=builder.make_data_platform_urn(self.platform),
             platformSchema=KafkaSchemaClass.construct_with_defaults(),
-            fields=fields_by_object.dropna(subset="fieldName")
-            .apply(lambda field: self.map_column(field), axis=1)
-            .values.tolist(),
+            fields=columns,
         )
-        owners = [
-            builder.make_group_urn(owner.strip())
-            for owner in object_sample.owners.split(",")
-        ]
+
+        owners = []
+        if row.owners is not None:
+            owners = [
+                builder.make_group_urn(owner.strip())
+                for owner in row.owners.split(",")
+            ]
+
         ownership = builder.make_ownership_aspect_from_urn_list(
             owners, OwnershipSourceTypeClass.SERVICE, OwnershipTypeClass.TECHNICAL_OWNER
         )
@@ -411,13 +410,14 @@ class IBRedashDatasetSource(IBRedashSource):
 
     @staticmethod
     def map_column(field) -> SchemaFieldClass:
-        data_type = field.fieldType
+        parts = field.split("|:|")
+        data_type = parts[1]
         return SchemaFieldClass(
-            fieldPath=field.fieldName,
-            description=field.fieldExampleValues,
+            fieldPath=parts[0],
+            description=parts[3],
             type=SchemaFieldDataTypeClass(type=get_type_class(data_type)),
             nativeDataType=data_type,
-            nullable=bool(field.nullable),
+            nullable=bool(parts[2]),
         )
 
     @abstractmethod
@@ -497,4 +497,11 @@ def build_dataset_path_with_separator(separator: str, location_code: str, *path:
 
 
 def build_str_path_with_separator(separator: str, *path: str):
-    return f"{separator.join(filter(lambda e: not pd.isna(e), path))}"
+    replace_chars_regex = re.compile('[/\\\\&?*=]')
+    parts = []
+    for p in path:
+        if pd.isna(p):
+            continue
+        parts.append(replace_chars_regex.sub('-', p))
+
+    return separator.join(parts)
