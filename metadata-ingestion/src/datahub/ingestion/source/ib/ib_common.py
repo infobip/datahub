@@ -1,10 +1,12 @@
 import json
 import logging
 import math
-import sys
+import pickle
 import re
+import sys
+import zlib
 from abc import abstractmethod
-from typing import Iterable, List, Optional, Union, cast
+from typing import Dict, Iterable, List, Optional, Set, Union, cast
 
 import pandas as pd
 from pydantic.fields import Field
@@ -17,7 +19,10 @@ from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import PipelineContext, WorkUnit
 from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
 from datahub.ingestion.source.state.checkpoint import Checkpoint
-from datahub.ingestion.source.state.redash_state import RedashCheckpointState
+from datahub.ingestion.source.state.redash_state import (
+    RedashCheckpointsList,
+    RedashCheckpointState,
+)
 from datahub.ingestion.source.state.stateful_ingestion_base import (
     JobId,
     StatefulIngestionConfig,
@@ -53,6 +58,7 @@ from datahub.metadata.schema_classes import (
     StringTypeClass,
     SubTypesClass,
 )
+from datahub.utilities.urns.urn import Urn
 
 logger = logging.getLogger(__name__)
 
@@ -142,30 +148,15 @@ class IBRedashSource(StatefulIngestionSourceBase):
                 yield wu
             return
 
-        cur_checkpoint = self.get_current_checkpoint(
-            self.get_default_ingestion_job_id()
-        )
-        cur_checkpoint_state = (
-            cast(RedashCheckpointState, cur_checkpoint.state)
-            if cur_checkpoint is not None
-            else None
-        )
-
-        last_checkpoint = self.get_last_checkpoint(
-            self.get_default_ingestion_job_id(), RedashCheckpointState
-        )
-        last_checkpoint_state = (
-            cast(RedashCheckpointState, last_checkpoint.state)
-            if last_checkpoint is not None
-            else None
-        )
+        last_state = self._load_last_state()
+        current_state = self._create_current_state()
 
         for wu in self.fetch_workunits():
             if type(wu) is not MetadataWorkUnit:
                 yield wu
                 continue
 
-            if cur_checkpoint_state is not None:
+            if current_state is not None:
                 if type(wu.metadata) is MetadataChangeEvent:
                     urn = wu.metadata.proposedSnapshot.urn
                     wu.metadata.proposedSnapshot.aspects.append(
@@ -176,12 +167,11 @@ class IBRedashSource(StatefulIngestionSourceBase):
                 else:
                     raise TypeError(f"Unknown metadata type {type(wu.metadata)}")
 
-                cur_checkpoint_state.add_workunit(urn, wu)
+                IBRedashSource._state_add_workunit(current_state, urn, wu)
 
                 # Emitting workuntis not presented in last state
-                if (
-                    last_checkpoint_state is None
-                    or not last_checkpoint_state.has_workunit(urn, wu)
+                if last_state is None or not IBRedashSource._state_has_workunit(
+                    last_state, urn, wu
                 ):
                     self.report.report_workunit(wu)
                     yield wu
@@ -195,20 +185,28 @@ class IBRedashSource(StatefulIngestionSourceBase):
         if (
             self.config.stateful_ingestion
             and self.config.stateful_ingestion.remove_stale_metadata
-            and last_checkpoint_state is not None
-            and cur_checkpoint_state is not None
+            and last_state is not None
+            and current_state is not None
         ):
             # Deleting workunits not presented in current state
-            for urn in last_checkpoint_state.get_urns_not_in(cur_checkpoint_state):
+            for urn_str in last_state.keys() - current_state.keys():
+                urn = Urn.create_from_string(urn_str)
                 mcp = MetadataChangeProposalWrapper(
-                    entityType="dataset",
-                    entityUrn=urn,
+                    entityType=urn.get_type(),
+                    entityUrn=urn_str,
                     changeType=ChangeTypeClass.UPSERT,
                     aspectName="status",
                     aspect=Status(removed=True),
                 )
-                self.report.workunits_deleted += 1
-                yield MetadataWorkUnit(id=f"soft-delete-{urn}", mcp=mcp)
+                self.report.events_deleted += 1
+                yield MetadataWorkUnit(id=f"soft-delete-{urn_str}", mcp=mcp)
+
+        if (
+            self.config.stateful_ingestion
+            and not self.config.stateful_ingestion.ignore_new_state
+            and current_state is not None
+        ):
+            self._save_current_state(current_state)
 
     def close(self):
         self.prepare_for_commit()
@@ -219,7 +217,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
 
     def is_checkpointing_enabled(self, job_id: JobId) -> bool:
         if (
-            job_id == self.get_default_ingestion_job_id()
+            job_id.startswith(self.get_default_ingestion_job_id_prefix())
             and self.is_stateful_ingestion_configured()
             and self.config.stateful_ingestion
             and self.config.stateful_ingestion.remove_stale_metadata
@@ -230,14 +228,19 @@ class IBRedashSource(StatefulIngestionSourceBase):
 
     def create_checkpoint(self, job_id: JobId) -> Optional[Checkpoint]:
         assert self.ctx.pipeline_name is not None
-        if job_id == self.get_default_ingestion_job_id():
+        if job_id.startswith(self.get_default_ingestion_job_id_prefix()):
+            if job_id == self._get_checkpoints_list_job_id():
+                state = RedashCheckpointsList()
+            else:
+                state = RedashCheckpointState()
+
             return Checkpoint(
                 job_name=job_id,
                 pipeline_name=self.ctx.pipeline_name,
                 platform_instance_id=self.get_platform_instance_id(),
                 run_id=self.ctx.run_id,
                 config=self.config,
-                state=RedashCheckpointState(),
+                state=state,
             )
         return None
 
@@ -245,9 +248,90 @@ class IBRedashSource(StatefulIngestionSourceBase):
         assert self.config.platform_instance is not None
         return self.config.platform_instance
 
+    def _get_checkpoints_list_job_id(self):
+        return self.get_default_ingestion_job_id_prefix() + "checkpoints_list"
+
+    def _get_checkpoint_job_id(self, checkpoint_id: int):
+        return self.get_default_ingestion_job_id_prefix() + str(checkpoint_id)
+
+    def _load_last_state(self) -> Dict[str, Set[int]]:
+        last_checkpoints_list = self.get_last_checkpoint(
+            self._get_checkpoints_list_job_id(), RedashCheckpointsList
+        )
+        last_checkpoints_list_state = (
+            cast(RedashCheckpointsList, last_checkpoints_list.state)
+            if last_checkpoints_list is not None
+            else None
+        )
+        if last_checkpoints_list_state is None:
+            return None
+
+        state: Dict[str, Set[int]] = dict()
+        for checkpoint_id in last_checkpoints_list_state.get_ids():
+            checkpoint = self.get_last_checkpoint(
+                self._get_checkpoint_job_id(checkpoint_id), RedashCheckpointState
+            )
+            checkpoint_state = cast(RedashCheckpointState, checkpoint.state)
+            for urn, wu_list in checkpoint_state.get_entries().items():
+                state[urn] = wu_list
+
+        return state
+
+    def _create_current_state(self) -> Dict[str, Set[int]]:
+        if (
+            self.config.stateful_ingestion
+            and not self.config.stateful_ingestion.ignore_new_state
+        ):
+            return dict()
+        return None
+
+    def _save_current_state(self, state: Dict[str, Set[int]]):
+        cur_checkpoint_list = self.get_current_checkpoint(
+            self._get_checkpoints_list_job_id()
+        )
+
+        if cur_checkpoint_list is None:
+            return
+
+        cur_checkpoint_list_state = cast(
+            RedashCheckpointsList, cur_checkpoint_list.state
+        )
+
+        checkpoint_id: int = 0
+        cur_checkpoint = self.get_current_checkpoint(
+            self._get_checkpoint_job_id(checkpoint_id)
+        )
+        cur_checkpoint_state = cast(RedashCheckpointState, cur_checkpoint.state)
+        cur_checkpoint_list_state.add_id(checkpoint_id)
+
+        for urn, wu_list in state.items():
+            cur_checkpoint_state.add_entry(urn, wu_list)
+            if cur_checkpoint_state.size() >= 15000:
+                checkpoint_id += 1
+                cur_checkpoint = self.get_current_checkpoint(
+                    self._get_checkpoint_job_id(checkpoint_id)
+                )
+                cur_checkpoint_state = cast(RedashCheckpointState, cur_checkpoint.state)
+                cur_checkpoint_list_state.add_id(checkpoint_id)
+
     @abstractmethod
-    def get_default_ingestion_job_id(self) -> JobId:
+    def get_default_ingestion_job_id_prefix(self) -> JobId:
         raise NotImplementedError("Sub-classes must implement this method.")
+
+    @staticmethod
+    def _state_has_workunit(state: Dict[str, Set[int]], urn: str, wu: WorkUnit) -> bool:
+        workunit_hash = IBRedashSource._hash_workunit(wu)
+        return workunit_hash in state.get(urn, set())
+
+    @staticmethod
+    def _state_add_workunit(state: Dict[str, Set[int]], urn: str, wu: WorkUnit):
+        workunits = state.get(urn, set())
+        workunits.add(IBRedashSource._hash_workunit(wu))
+        state[urn] = workunits
+
+    @staticmethod
+    def _hash_workunit(wu: WorkUnit):
+        return zlib.crc32(pickle.dumps(wu)) & 0xFFFFFFFF
 
 
 class IBRedashDatasetSource(IBRedashSource):
@@ -282,7 +366,7 @@ class IBRedashDatasetSource(IBRedashSource):
         object_name = row.objectName
 
         dataset_path = [
-            row.locationCode,
+            row.locationCode.lower(),
             row.parent1,
             row.parent2,
             row.parent3,
@@ -298,8 +382,8 @@ class IBRedashDatasetSource(IBRedashSource):
         browse_paths = BrowsePathsClass([build_dataset_browse_path(*dataset_path)])
 
         columns = (
-            list(map(lambda col: self.map_column(col), row.columns.split('|;|')))
-            if row.columns is not None
+            list(map(lambda col: self.map_column(col), row.columns.split("|;|")))
+            if pd.notna(row.columns)
             else []
         )
         schema = SchemaMetadataClass(
@@ -314,8 +398,7 @@ class IBRedashDatasetSource(IBRedashSource):
         owners = []
         if row.owners is not None:
             owners = [
-                builder.make_group_urn(owner.strip())
-                for owner in row.owners.split(",")
+                builder.make_group_urn(owner.strip()) for owner in row.owners.split(",")
             ]
 
         ownership = builder.make_ownership_aspect_from_urn_list(
@@ -421,7 +504,7 @@ class IBRedashDatasetSource(IBRedashSource):
         )
 
     @abstractmethod
-    def get_default_ingestion_job_id(self) -> JobId:
+    def get_default_ingestion_job_id_prefix(self) -> JobId:
         pass
 
 
@@ -493,15 +576,15 @@ def build_dataset_browse_path(location_code: str, *path: str):
 
 
 def build_dataset_path_with_separator(separator: str, location_code: str, *path: str):
-    return build_str_path_with_separator(separator, location_code.lower(), *path)
+    return build_str_path_with_separator(separator, location_code, *path)
 
 
 def build_str_path_with_separator(separator: str, *path: str):
-    replace_chars_regex = re.compile('[/\\\\&?*=]')
+    replace_chars_regex = re.compile("[/\\\\&?*=]")
     parts = []
     for p in path:
         if pd.isna(p):
             continue
-        parts.append(replace_chars_regex.sub('-', p))
+        parts.append(replace_chars_regex.sub("-", p))
 
     return separator.join(parts)

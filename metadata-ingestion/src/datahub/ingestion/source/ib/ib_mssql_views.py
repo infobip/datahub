@@ -1,6 +1,10 @@
+from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.decorators import config_class, platform_name
-
-from datahub.ingestion.source.ib.ib_common import *
+from datahub.ingestion.api.stateful_ingestion_base import JobId
+from datahub.ingestion.source.ib.ib_common import (
+    IBRedashDatasetSource,
+    IBRedashSourceConfig,
+)
 
 
 class IBMSSQLViewsSourceConfig(IBRedashSourceConfig):
@@ -18,5 +22,5 @@ class IBMSSQLViewsSource(IBRedashDatasetSource):
         super().__init__(config, ctx)
         self.config: IBMSSQLViewsSourceConfig = config
 
-    def get_default_ingestion_job_id(self) -> JobId:
-        return JobId("ingest_mssql_views_from_redash_source")
+    def get_default_ingestion_job_id_prefix(self) -> JobId:
+        return JobId("ingest_mssql_views_from_redash_source_")
