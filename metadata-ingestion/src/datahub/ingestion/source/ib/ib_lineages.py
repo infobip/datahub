@@ -7,7 +7,7 @@ import pandas as pd
 import datahub.emitter.mce_builder as builder
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.decorators import config_class, platform_name
-from datahub.ingestion.api.stateful_ingestion_base import JobId
+from datahub.ingestion.source.state.stateful_ingestion_base import JobId
 from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
 from datahub.ingestion.source.ib.ib_common import IBRedashSource, IBRedashSourceConfig
 from datahub.metadata.schema_classes import DatasetLineageTypeClass
