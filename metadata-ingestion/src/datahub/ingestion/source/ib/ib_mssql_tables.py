@@ -1,7 +1,7 @@
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.decorators import config_class, platform_name
 from datahub.ingestion.source.state.stateful_ingestion_base import JobId
-from src.datahub.ingestion.source.ib.ib_common import (
+from datahub.ingestion.source.ib.ib_common import (
     IBRedashDatasetSource,
     IBRedashSourceConfig,
 )
