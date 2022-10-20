@@ -371,7 +371,7 @@ class IBRedashDatasetSource(IBRedashSource):
         object_name = row.objectName
 
         dataset_path = self.normalize_dataset_path([
-            row.locationCode.lower(),
+            row.locationCode,
             row.parent1,
             row.parent2,
             row.parent3,
