@@ -1,31 +1,26 @@
-import zlib
-from typing import Dict, Iterable, Set
+from typing import Dict, List, Set
 
-import pickle
-
-from datahub.ingestion.api.common import WorkUnit
 from datahub.ingestion.source.state.checkpoint import CheckpointStateBase
 
 
+class RedashCheckpointsList(CheckpointStateBase):
+    state_ids: List[int] = list()
+
+    def get_ids(self) -> List[int]:
+        return self.state_ids
+
+    def add_id(self, checkpoint_id: int):
+        self.state_ids.append(checkpoint_id)
+
+
 class RedashCheckpointState(CheckpointStateBase):
+    workunits_hash_by_urn: Dict[str, Set[int]] = dict()
 
-    _workunits_hash_by_urn: Dict[str, Set[int]] = dict()
+    def get_entries(self) -> Dict[str, Set[int]]:
+        return self.workunits_hash_by_urn
 
-    def get_urns_not_in(self, checkpoint: "RedashCheckpointState") -> Iterable[str]:
-        return self._workunits_hash_by_urn.keys() - checkpoint._workunits_hash_by_urn.keys()
+    def add_entry(self, urn: str, wu_list: Set[int]):
+        self.workunits_hash_by_urn[urn] = wu_list
 
-    def has_workunit(self, urn: str, wu: WorkUnit):
-        workunit_hash = RedashCheckpointState._hash_workunit(wu)
-        return workunit_hash in self._workunits_hash_by_urn.get(urn, set())
-
-    def add_workunit(self, urn: str, wu: WorkUnit) -> None:
-        workunits = self._workunits_hash_by_urn.get(urn, set())
-        workunits.add(RedashCheckpointState._hash_workunit(wu))
-        self._workunits_hash_by_urn[urn] = workunits
-
-    def get_workunits(self) -> Dict[str, Set[int]]:
-        return self._workunits_hash_by_urn
-
-    @staticmethod
-    def _hash_workunit(wu: WorkUnit) -> int:
-        return zlib.crc32(pickle.dumps(wu)) & 0xFFFFFFFF
+    def size(self) -> int:
+        return len(self.workunits_hash_by_urn)

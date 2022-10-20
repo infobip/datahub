@@ -1,6 +1,10 @@
+from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.decorators import config_class, platform_name
-
-from src.datahub.ingestion.source.ib.ib_common import *
+from datahub.ingestion.api.ingestion_job_checkpointing_provider_base import JobId
+from src.datahub.ingestion.source.ib.ib_common import (
+    IBRedashDatasetSource,
+    IBRedashSourceConfig,
+)
 
 
 class IBKafkaSourceConfig(IBRedashSourceConfig):
@@ -19,5 +23,5 @@ class IBKafkaSource(IBRedashDatasetSource):
         super().__init__(config, ctx)
         self.config: IBKafkaSourceConfig = config
 
-    def get_default_ingestion_job_id(self) -> JobId:
-        return JobId("ingest_kafka_from_redash_source")
+    def get_default_ingestion_job_id_prefix(self) -> JobId:
+        return JobId("ingest_kafka_from_redash_source_")
