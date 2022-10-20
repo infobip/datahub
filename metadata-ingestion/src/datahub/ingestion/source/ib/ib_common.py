@@ -55,6 +55,7 @@ from datahub.metadata.schema_classes import (
 )
 
 logger = logging.getLogger(__name__)
+ib_location_platform = "infobip-location"
 
 
 class IBRedashSourceStatefulIngestionConfig(StatefulIngestionConfig):
@@ -78,7 +79,7 @@ class IBRedashSourceConfig(StatefulIngestionConfigBase):
     api_page_limit: int = Field(
         default=sys.maxsize,
         description="Limit on number of pages queried for ingesting dashboards and charts API "
-        "during pagination. ",
+                    "during pagination. ",
     )
     stateful_ingestion: Optional[IBRedashSourceStatefulIngestionConfig] = None
 
@@ -180,8 +181,8 @@ class IBRedashSource(StatefulIngestionSourceBase):
 
                 # Emitting workuntis not presented in last state
                 if (
-                    last_checkpoint_state is None
-                    or not last_checkpoint_state.has_workunit(urn, wu)
+                        last_checkpoint_state is None
+                        or not last_checkpoint_state.has_workunit(urn, wu)
                 ):
                     self.report.report_workunit(wu)
                     yield wu
@@ -193,10 +194,10 @@ class IBRedashSource(StatefulIngestionSourceBase):
                 yield wu
 
         if (
-            self.config.stateful_ingestion
-            and self.config.stateful_ingestion.remove_stale_metadata
-            and last_checkpoint_state is not None
-            and cur_checkpoint_state is not None
+                self.config.stateful_ingestion
+                and self.config.stateful_ingestion.remove_stale_metadata
+                and last_checkpoint_state is not None
+                and cur_checkpoint_state is not None
         ):
             # Deleting workunits not presented in current state
             for urn in last_checkpoint_state.get_urns_not_in(cur_checkpoint_state):
@@ -219,10 +220,10 @@ class IBRedashSource(StatefulIngestionSourceBase):
 
     def is_checkpointing_enabled(self, job_id: JobId) -> bool:
         if (
-            job_id == self.get_default_ingestion_job_id()
-            and self.is_stateful_ingestion_configured()
-            and self.config.stateful_ingestion
-            and self.config.stateful_ingestion.remove_stale_metadata
+                job_id == self.get_default_ingestion_job_id()
+                and self.is_stateful_ingestion_configured()
+                and self.config.stateful_ingestion
+                and self.config.stateful_ingestion.remove_stale_metadata
         ):
             return True
 
@@ -250,6 +251,15 @@ class IBRedashSource(StatefulIngestionSourceBase):
         raise NotImplementedError("Sub-classes must implement this method.")
 
 
+class IBPathElementInfo:
+    subtype: str
+    is_location: bool
+
+    def __init__(self, subtype: str, is_location: bool = False):
+        self.subtype: str = subtype
+        self.is_location: bool = is_location
+
+
 class IBRedashDatasetSource(IBRedashSource):
     containers_cache = []
 
@@ -260,12 +270,7 @@ class IBRedashDatasetSource(IBRedashSource):
 
     @property
     @abstractmethod
-    def parent_subtypes(self) -> List[str]:
-        raise NotImplementedError("Sub-classes must define this variable.")
-
-    @property
-    @abstractmethod
-    def object_subtype(self):
+    def path_info(self) -> List[IBPathElementInfo]:
         raise NotImplementedError("Sub-classes must define this variable.")
 
     def __init__(self, config: IBRedashSourceConfig, ctx: PipelineContext):
@@ -281,13 +286,13 @@ class IBRedashDatasetSource(IBRedashSource):
     def fetch_object_workunits(self, row: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
         object_name = row.objectName
 
-        dataset_path = [
+        dataset_path = self.normalize_dataset_path([
             row.locationCode,
             row.parent1,
             row.parent2,
             row.parent3,
             object_name,
-        ]
+        ])
 
         properties = DatasetPropertiesClass(
             name=object_name,
@@ -336,7 +341,7 @@ class IBRedashDatasetSource(IBRedashSource):
                 changeType=ChangeTypeClass.UPSERT,
                 entityUrn=snapshot.urn,
                 aspectName="subTypes",
-                aspect=SubTypesClass(typeNames=[self.object_subtype]),
+                aspect=SubTypesClass(typeNames=[self.path_info[-1].subtype]),
             ),
         )
 
@@ -346,7 +351,7 @@ class IBRedashDatasetSource(IBRedashSource):
             if pd.isna(container_path[-1]):
                 break
             yield from self.fetch_container_workunits(
-                container_path, self.parent_subtypes[i - 1], container_parent_path
+                container_path, self.path_info[i - 1], container_parent_path
             )
             container_parent_path = container_path
 
@@ -364,10 +369,10 @@ class IBRedashDatasetSource(IBRedashSource):
         )
 
     def fetch_container_workunits(
-        self,
-        path: List[str],
-        container_subtype: str,
-        parent_path: Optional[List[str]] = None,
+            self,
+            path: List[str],
+            container_info: IBPathElementInfo,
+            parent_path: Optional[List[str]] = None,
     ) -> Iterable[MetadataWorkUnit]:
         qualified_name = build_dataset_qualified_name(*path)
         container_urn = builder.make_container_urn(qualified_name)
@@ -382,20 +387,21 @@ class IBRedashDatasetSource(IBRedashSource):
         )
 
         yield self.build_container_workunit_with_aspect(
-            container_urn, SubTypesClass(typeNames=[container_subtype])
+            container_urn, SubTypesClass(typeNames=[container_info.subtype])
+        )
+
+        yield self.build_container_workunit_with_aspect(
+            container_urn,
+            aspect=DataPlatformInstance(
+                platform=builder.make_data_platform_urn(ib_location_platform) if container_info.is_location
+                else builder.make_data_platform_urn(self.platform),
+            ),
         )
 
         if parent_path is not None:
             yield self.build_container_workunit_with_aspect(
                 container_urn,
                 ContainerClass(container=build_container_urn(*parent_path)),
-            )
-            # todo wrong, fix
-            yield self.build_container_workunit_with_aspect(
-                container_urn,
-                aspect=DataPlatformInstance(
-                    platform=builder.make_data_platform_urn(self.platform),
-                ),
             )
 
     @staticmethod
@@ -419,6 +425,10 @@ class IBRedashDatasetSource(IBRedashSource):
             nativeDataType=data_type,
             nullable=bool(parts[2]),
         )
+
+    def normalize_dataset_path(self, dataset_path: List[str]):
+        return list(map(lambda i_el: i_el[1].lower() if self.path_info[i_el[0]].is_location else i_el[1],
+                        enumerate(filter(lambda e: not pd.isna(e), dataset_path))))
 
     @abstractmethod
     def get_default_ingestion_job_id(self) -> JobId:
@@ -472,10 +482,10 @@ def get_type_class(type_str: str):
         return NullTypeClass()
 
 
-def build_dataset_urn(platform: str, location_code: str, *path: str):
+def build_dataset_urn(platform: str, *path: str):
     return builder.make_dataset_urn(
         platform.lower(),
-        build_dataset_path_with_separator(".", location_code, *path),
+        build_dataset_path_with_separator(".", *path),
         "PROD",
     )
 
@@ -484,24 +494,19 @@ def build_container_urn(*path: str):
     return builder.make_container_urn(build_dataset_qualified_name(*path))
 
 
-def build_dataset_qualified_name(location_code: str, *path: str):
-    return build_dataset_path_with_separator(".", location_code, *path)
+def build_dataset_qualified_name(*path: str):
+    return build_dataset_path_with_separator(".", *path)
 
 
-def build_dataset_browse_path(location_code: str, *path: str):
-    return f"/prod/{build_dataset_path_with_separator('/', location_code, *path)}"
+def build_dataset_browse_path(*path: str):
+    return f"/prod/{build_dataset_path_with_separator('/', *path)}"
 
 
-def build_dataset_path_with_separator(separator: str, location_code: str, *path: str):
-    return build_str_path_with_separator(separator, location_code.lower(), *path)
+def build_dataset_path_with_separator(separator: str, *path: str):
+    return build_str_path_with_separator(separator, *path)
 
 
 def build_str_path_with_separator(separator: str, *path: str):
     replace_chars_regex = re.compile('[/\\\\&?*=]')
-    parts = []
-    for p in path:
-        if pd.isna(p):
-            continue
-        parts.append(replace_chars_regex.sub('-', p))
+    return separator.join(map(lambda p: replace_chars_regex.sub('-', p), path))
 
-    return separator.join(parts)

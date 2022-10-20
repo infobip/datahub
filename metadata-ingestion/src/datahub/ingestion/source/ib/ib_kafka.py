@@ -1,6 +1,6 @@
 from datahub.ingestion.api.decorators import config_class, platform_name
 
-from datahub.ingestion.source.ib.ib_common import *
+from src.datahub.ingestion.source.ib.ib_common import *
 
 
 class IBKafkaSourceConfig(IBRedashSourceConfig):
@@ -10,8 +10,9 @@ class IBKafkaSourceConfig(IBRedashSourceConfig):
 @platform_name("IBKafka")
 @config_class(IBKafkaSourceConfig)
 class IBKafkaSource(IBRedashDatasetSource):
-    parent_subtypes = ["DataCenter", "Kafka Cluster"]
-    object_subtype = "Kafka Topic"
+    path_info = [IBPathElementInfo("DataCenter", True),
+                 IBPathElementInfo("Kafka Cluster"),
+                 IBPathElementInfo("Kafka Topic")]
     platform = "kafka"
 
     def __init__(self, config: IBKafkaSourceConfig, ctx: PipelineContext):

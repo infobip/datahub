@@ -1,6 +1,6 @@
 from datahub.ingestion.api.decorators import config_class, platform_name
 
-from datahub.ingestion.source.ib.ib_common import *
+from src.datahub.ingestion.source.ib.ib_common import *
 
 
 class IBMSSQLViewsSourceConfig(IBRedashSourceConfig):
@@ -10,7 +10,10 @@ class IBMSSQLViewsSourceConfig(IBRedashSourceConfig):
 @platform_name("IBMSSQL")
 @config_class(IBMSSQLViewsSourceConfig)
 class IBMSSQLViewsSource(IBRedashDatasetSource):
-    parent_subtypes = ["DataCenter", "Server", "Database", "Schema"]
+    parents_info = [IBPathElementInfo("DataCenter", True),
+                    IBPathElementInfo("Server", True),
+                    IBPathElementInfo("Database"),
+                    IBPathElementInfo("Schema")]
     object_subtype = "View"
     platform = "mssql"
 
