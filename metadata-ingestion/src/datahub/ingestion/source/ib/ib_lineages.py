@@ -11,7 +11,7 @@ from datahub.ingestion.source.state.stateful_ingestion_base import JobId
 from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
 from datahub.ingestion.source.ib.ib_common import IBRedashSource, IBRedashSourceConfig
 from datahub.metadata.schema_classes import DatasetLineageTypeClass
-from src.datahub.ingestion.source.ib.ib_common import build_dataset_urn
+from datahub.ingestion.source.ib.ib_common import build_dataset_urn
 
 logger = logging.getLogger(__name__)
 
