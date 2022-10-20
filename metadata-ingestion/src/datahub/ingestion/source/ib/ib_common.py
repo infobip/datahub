@@ -171,8 +171,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
                 IBRedashSource._state_add_workunit(current_state, urn, wu)
 
                 # Emitting workuntis not presented in last state
-                if last_state is None
-                        or not IBRedashSource._state_has_workunit(
+                if last_state is None or not IBRedashSource._state_has_workunit(
                     last_state, urn, wu
                 ):
                     self.report.report_workunit(wu)
