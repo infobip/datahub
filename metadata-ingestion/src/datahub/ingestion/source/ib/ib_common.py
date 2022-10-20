@@ -172,7 +172,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
 
                 # Emitting workuntis not presented in last state
                 if last_state is None or not IBRedashSource._state_has_workunit(
-                    last_state, urn, wu
+                        last_state, urn, wu
                 ):
                     self.report.report_workunit(wu)
                     yield wu
@@ -203,9 +203,9 @@ class IBRedashSource(StatefulIngestionSourceBase):
                 yield MetadataWorkUnit(id=f"soft-delete-{urn_str}", mcp=mcp)
 
         if (
-            self.config.stateful_ingestion
-            and not self.config.stateful_ingestion.ignore_new_state
-            and current_state is not None
+                self.config.stateful_ingestion
+                and not self.config.stateful_ingestion.ignore_new_state
+                and current_state is not None
         ):
             self._save_current_state(current_state)
 
@@ -280,8 +280,8 @@ class IBRedashSource(StatefulIngestionSourceBase):
 
     def _create_current_state(self) -> Dict[str, Set[int]]:
         if (
-            self.config.stateful_ingestion
-            and not self.config.stateful_ingestion.ignore_new_state
+                self.config.stateful_ingestion
+                and not self.config.stateful_ingestion.ignore_new_state
         ):
             return dict()
         return None
@@ -369,9 +369,14 @@ class IBRedashDatasetSource(IBRedashSource):
 
     def fetch_object_workunits(self, row: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
         object_name = row.objectName
+        location_code = row.locationCode
+        if pd.isna(object_name) or pd.isna(location_code):
+            self.report.report_failure("missing_mandatory_field",
+                                       f"object_name is None or location_code is None in {row.to_string()}")
+            return
 
         dataset_path = self.normalize_dataset_path([
-            row.locationCode,
+            location_code,
             row.parent1,
             row.parent2,
             row.parent3,
@@ -592,4 +597,3 @@ def build_dataset_path_with_separator(separator: str, *path: str):
 def build_str_path_with_separator(separator: str, *path: str):
     replace_chars_regex = re.compile("[/\\\\&?*=]")
     return separator.join(map(lambda p: replace_chars_regex.sub("-", p), path))
-
