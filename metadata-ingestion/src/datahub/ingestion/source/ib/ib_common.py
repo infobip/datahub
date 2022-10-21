@@ -85,7 +85,7 @@ class IBRedashSourceConfig(StatefulIngestionConfigBase):
     api_page_limit: int = Field(
         default=sys.maxsize,
         description="Limit on number of pages queried for ingesting dashboards and charts API "
-                    "during pagination. ",
+        "during pagination. ",
     )
     stateful_ingestion: Optional[IBRedashSourceStatefulIngestionConfig] = None
 
@@ -172,7 +172,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
 
                 # Emitting workuntis not presented in last state
                 if last_state is None or not IBRedashSource._state_has_workunit(
-                        last_state, urn, wu
+                    last_state, urn, wu
                 ):
                     self.report.report_workunit(wu)
                     yield wu
@@ -184,10 +184,10 @@ class IBRedashSource(StatefulIngestionSourceBase):
                 yield wu
 
         if (
-                self.config.stateful_ingestion
-                and self.config.stateful_ingestion.remove_stale_metadata
-                and last_state is not None
-                and current_state is not None
+            self.config.stateful_ingestion
+            and self.config.stateful_ingestion.remove_stale_metadata
+            and last_state is not None
+            and current_state is not None
         ):
             # Deleting workunits not presented in current state
             for urn_str in last_state.keys() - current_state.keys():
@@ -203,9 +203,9 @@ class IBRedashSource(StatefulIngestionSourceBase):
                 yield MetadataWorkUnit(id=f"soft-delete-{urn_str}", mcp=mcp)
 
         if (
-                self.config.stateful_ingestion
-                and not self.config.stateful_ingestion.ignore_new_state
-                and current_state is not None
+            self.config.stateful_ingestion
+            and not self.config.stateful_ingestion.ignore_new_state
+            and current_state is not None
         ):
             self._save_current_state(current_state)
 
@@ -218,10 +218,10 @@ class IBRedashSource(StatefulIngestionSourceBase):
 
     def is_checkpointing_enabled(self, job_id: JobId) -> bool:
         if (
-                job_id.startswith(self.get_default_ingestion_job_id_prefix())
-                and self.is_stateful_ingestion_configured()
-                and self.config.stateful_ingestion
-                and self.config.stateful_ingestion.remove_stale_metadata
+            job_id.startswith(self.get_default_ingestion_job_id_prefix())
+            and self.is_stateful_ingestion_configured()
+            and self.config.stateful_ingestion
+            and self.config.stateful_ingestion.remove_stale_metadata
         ):
             return True
 
@@ -280,8 +280,8 @@ class IBRedashSource(StatefulIngestionSourceBase):
 
     def _create_current_state(self) -> Dict[str, Set[int]]:
         if (
-                self.config.stateful_ingestion
-                and not self.config.stateful_ingestion.ignore_new_state
+            self.config.stateful_ingestion
+            and not self.config.stateful_ingestion.ignore_new_state
         ):
             return dict()
         return None
@@ -371,17 +371,21 @@ class IBRedashDatasetSource(IBRedashSource):
         object_name = row.objectName
         location_code = row.locationCode
         if pd.isna(object_name) or pd.isna(location_code):
-            self.report.report_failure("missing_mandatory_field",
-                                       f"object_name is None or location_code is None in {row.to_string()}")
+            self.report.report_failure(
+                "missing_mandatory_field",
+                f"object_name is None or location_code is None in {row.to_string()}",
+            )
             return
 
-        dataset_path = self.normalize_dataset_path([
-            location_code,
-            row.parent1,
-            row.parent2,
-            row.parent3,
-            object_name,
-        ])
+        dataset_path = self.normalize_dataset_path(
+            [
+                location_code,
+                row.parent1,
+                row.parent2,
+                row.parent3,
+                object_name,
+            ]
+        )
 
         properties = DatasetPropertiesClass(
             name=object_name,
@@ -457,10 +461,10 @@ class IBRedashDatasetSource(IBRedashSource):
         )
 
     def fetch_container_workunits(
-            self,
-            path: List[str],
-            container_info: IBPathElementInfo,
-            parent_path: Optional[List[str]] = None,
+        self,
+        path: List[str],
+        container_info: IBPathElementInfo,
+        parent_path: Optional[List[str]] = None,
     ) -> Iterable[MetadataWorkUnit]:
         qualified_name = build_dataset_qualified_name(*path)
         container_urn = builder.make_container_urn(qualified_name)
@@ -481,7 +485,8 @@ class IBRedashDatasetSource(IBRedashSource):
         yield self.build_container_workunit_with_aspect(
             container_urn,
             aspect=DataPlatformInstance(
-                platform=builder.make_data_platform_urn(ib_location_platform) if container_info.is_location
+                platform=builder.make_data_platform_urn(ib_location_platform)
+                if container_info.is_location
                 else builder.make_data_platform_urn(self.platform),
             ),
         )
@@ -515,8 +520,14 @@ class IBRedashDatasetSource(IBRedashSource):
         )
 
     def normalize_dataset_path(self, dataset_path: List[str]):
-        return list(map(lambda i_el: i_el[1].lower() if self.path_info[i_el[0]].is_location else i_el[1],
-                        enumerate(filter(lambda e: not pd.isna(e), dataset_path))))
+        return list(
+            map(
+                lambda i_el: i_el[1].lower()
+                if self.path_info[i_el[0]].is_location
+                else i_el[1],
+                enumerate(filter(lambda e: not pd.isna(e), dataset_path)),
+            )
+        )
 
     @abstractmethod
     def get_default_ingestion_job_id_prefix(self) -> JobId:

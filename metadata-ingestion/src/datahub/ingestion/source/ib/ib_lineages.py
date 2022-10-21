@@ -7,11 +7,14 @@ import pandas as pd
 import datahub.emitter.mce_builder as builder
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.decorators import config_class, platform_name
-from datahub.ingestion.source.state.stateful_ingestion_base import JobId
 from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
-from datahub.ingestion.source.ib.ib_common import IBRedashSource, IBRedashSourceConfig
+from datahub.ingestion.source.ib.ib_common import (
+    IBRedashSource,
+    IBRedashSourceConfig,
+    build_dataset_urn,
+)
+from datahub.ingestion.source.state.stateful_ingestion_base import JobId
 from datahub.metadata.schema_classes import DatasetLineageTypeClass
-from datahub.ingestion.source.ib.ib_common import build_dataset_urn
 
 logger = logging.getLogger(__name__)
 
