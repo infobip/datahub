@@ -61,7 +61,6 @@ from datahub.metadata.schema_classes import (
 from datahub.utilities.urns.urn import Urn
 
 logger = logging.getLogger(__name__)
-ib_location_platform = "infobip-location"
 
 
 class IBRedashSourceStatefulIngestionConfig(StatefulIngestionConfig):
@@ -485,7 +484,7 @@ class IBRedashDatasetSource(IBRedashSource):
         yield self.build_container_workunit_with_aspect(
             container_urn,
             aspect=DataPlatformInstance(
-                platform=builder.make_data_platform_urn(ib_location_platform)
+                platform=builder.make_data_platform_urn("infobip-location")
                 if container_info.is_location
                 else builder.make_data_platform_urn(self.platform),
             ),
