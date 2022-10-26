@@ -1,10 +1,8 @@
 import logging
 import math
-import pickle
 import sys
-import zlib
 from abc import abstractmethod
-from typing import Dict, Iterable, Optional, Set, cast
+from typing import Iterable, Optional
 
 from pydantic.fields import Field
 from redash_toolbelt import Redash
@@ -14,11 +12,8 @@ from urllib3 import Retry
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import PipelineContext, WorkUnit
 from datahub.ingestion.api.workunit import MetadataWorkUnit
+from datahub.ingestion.source.ib.utils.state_manager import StateManager
 from datahub.ingestion.source.state.checkpoint import Checkpoint
-from datahub.ingestion.source.state.redash_state import (
-    RedashCheckpointsList,
-    RedashCheckpointState,
-)
 from datahub.ingestion.source.state.stateful_ingestion_base import (
     JobId,
     StatefulIngestionConfig,
@@ -64,12 +59,21 @@ class IBRedashSource(StatefulIngestionSourceBase):
     batch_size = 1000
     config: IBRedashSourceConfig
     client: Redash
+    state_manager: StateManager
     report: RedashSourceReport
 
     def __init__(self, config: IBRedashSourceConfig, ctx: PipelineContext):
         super().__init__(config, ctx)
         self.config: IBRedashSourceConfig = config
         self.report: RedashSourceReport = RedashSourceReport()
+        self.state_manager = StateManager(
+            config,
+            ctx,
+            self.get_default_ingestion_job_id_prefix(),
+            self.get_platform_instance_id(),
+            self.get_last_checkpoint,
+            self.get_current_checkpoint,
+        )
 
         self.config.connect_uri = self.config.connect_uri.strip("/")
         self.client = Redash(self.config.connect_uri, self.config.api_key)
@@ -119,48 +123,35 @@ class IBRedashSource(StatefulIngestionSourceBase):
                 yield wu
             return
 
-        last_state = self._load_last_state()
-        current_state = self._create_current_state()
-
         for wu in self.fetch_workunits():
             if type(wu) is not MetadataWorkUnit:
                 yield wu
                 continue
 
-            if current_state is not None:
-                if type(wu.metadata) is MetadataChangeEvent:
-                    urn = wu.metadata.proposedSnapshot.urn
-                    wu.metadata.proposedSnapshot.aspects.append(
-                        StatusClass(removed=False)
-                    )
-                elif type(wu.metadata) is MetadataChangeProposalWrapper:
-                    urn = wu.metadata.entityUrn
-                else:
-                    raise TypeError(f"Unknown metadata type {type(wu.metadata)}")
-
-                IBRedashSource._state_add_workunit(current_state, urn, wu)
-
-                # Emitting workuntis not presented in last state
-                if last_state is None or not IBRedashSource._state_has_workunit(
-                    last_state, urn, wu
-                ):
-                    self.report.report_workunit(wu)
-                    yield wu
-                    continue
-                else:
-                    self.report.events_skipped += 1
+            if type(wu.metadata) is MetadataChangeEvent:
+                urn = wu.metadata.proposedSnapshot.urn
+                wu.metadata.proposedSnapshot.aspects.append(StatusClass(removed=False))
+            elif type(wu.metadata) is MetadataChangeProposalWrapper:
+                urn = wu.metadata.entityUrn
             else:
+                raise TypeError(f"Unknown metadata type {type(wu.metadata)}")
+
+            self.state_manager.current_add_workunit(urn, wu)
+
+            # Emitting workuntis not presented in last state
+            if not self.state_manager.last_has_workunit(urn, wu):
                 self.report.report_workunit(wu)
                 yield wu
+                continue
+            else:
+                self.report.events_skipped += 1
 
         if (
             self.config.stateful_ingestion
             and self.config.stateful_ingestion.remove_stale_metadata
-            and last_state is not None
-            and current_state is not None
         ):
             # Deleting workunits not presented in current state
-            for urn_str in last_state.keys() - current_state.keys():
+            for urn_str in self.state_manager.get_deleted_urns():
                 urn = Urn.create_from_string(urn_str)
                 mcp = MetadataChangeProposalWrapper(
                     entityType=urn.get_type(),
@@ -172,12 +163,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
                 self.report.events_deleted += 1
                 yield MetadataWorkUnit(id=f"soft-delete-{urn_str}", mcp=mcp)
 
-        if (
-            self.config.stateful_ingestion
-            and not self.config.stateful_ingestion.ignore_new_state
-            and current_state is not None
-        ):
-            self._save_current_state(current_state)
+        self.state_manager.save_state()
 
     def close(self):
         self.prepare_for_commit()
@@ -198,108 +184,12 @@ class IBRedashSource(StatefulIngestionSourceBase):
         return False
 
     def create_checkpoint(self, job_id: JobId) -> Optional[Checkpoint]:
-        assert self.ctx.pipeline_name is not None
-        if job_id.startswith(self.get_default_ingestion_job_id_prefix()):
-            if job_id == self._get_checkpoints_list_job_id():
-                state = RedashCheckpointsList()
-            else:
-                state = RedashCheckpointState()
-
-            return Checkpoint(
-                job_name=job_id,
-                pipeline_name=self.ctx.pipeline_name,
-                platform_instance_id=self.get_platform_instance_id(),
-                run_id=self.ctx.run_id,
-                config=self.config,
-                state=state,
-            )
-        return None
+        return self.state_manager.create_checkpoint(job_id)
 
     def get_platform_instance_id(self) -> str:
         assert self.config.platform_instance is not None
         return self.config.platform_instance
 
-    def _get_checkpoints_list_job_id(self):
-        return self.get_default_ingestion_job_id_prefix() + "checkpoints_list"
-
-    def _get_checkpoint_job_id(self, checkpoint_id: int):
-        return self.get_default_ingestion_job_id_prefix() + str(checkpoint_id)
-
-    def _load_last_state(self) -> Dict[str, Set[int]]:
-        last_checkpoints_list = self.get_last_checkpoint(
-            self._get_checkpoints_list_job_id(), RedashCheckpointsList
-        )
-        last_checkpoints_list_state = (
-            cast(RedashCheckpointsList, last_checkpoints_list.state)
-            if last_checkpoints_list is not None
-            else None
-        )
-        if last_checkpoints_list_state is None:
-            return None
-
-        state: Dict[str, Set[int]] = dict()
-        for checkpoint_id in last_checkpoints_list_state.get_ids():
-            checkpoint = self.get_last_checkpoint(
-                self._get_checkpoint_job_id(checkpoint_id), RedashCheckpointState
-            )
-            checkpoint_state = cast(RedashCheckpointState, checkpoint.state)
-            for urn, wu_list in checkpoint_state.get_entries().items():
-                state[urn] = wu_list
-
-        return state
-
-    def _create_current_state(self) -> Dict[str, Set[int]]:
-        if (
-            self.config.stateful_ingestion
-            and not self.config.stateful_ingestion.ignore_new_state
-        ):
-            return dict()
-        return None
-
-    def _save_current_state(self, state: Dict[str, Set[int]]):
-        cur_checkpoint_list = self.get_current_checkpoint(
-            self._get_checkpoints_list_job_id()
-        )
-
-        if cur_checkpoint_list is None:
-            return
-
-        cur_checkpoint_list_state = cast(
-            RedashCheckpointsList, cur_checkpoint_list.state
-        )
-
-        checkpoint_id: int = 0
-        cur_checkpoint = self.get_current_checkpoint(
-            self._get_checkpoint_job_id(checkpoint_id)
-        )
-        cur_checkpoint_state = cast(RedashCheckpointState, cur_checkpoint.state)
-        cur_checkpoint_list_state.add_id(checkpoint_id)
-
-        for urn, wu_list in state.items():
-            cur_checkpoint_state.add_entry(urn, wu_list)
-            if cur_checkpoint_state.size() >= 15000:
-                checkpoint_id += 1
-                cur_checkpoint = self.get_current_checkpoint(
-                    self._get_checkpoint_job_id(checkpoint_id)
-                )
-                cur_checkpoint_state = cast(RedashCheckpointState, cur_checkpoint.state)
-                cur_checkpoint_list_state.add_id(checkpoint_id)
-
     @abstractmethod
     def get_default_ingestion_job_id_prefix(self) -> JobId:
         raise NotImplementedError("Sub-classes must implement this method.")
-
-    @staticmethod
-    def _state_has_workunit(state: Dict[str, Set[int]], urn: str, wu: WorkUnit) -> bool:
-        workunit_hash = IBRedashSource._hash_workunit(wu)
-        return workunit_hash in state.get(urn, set())
-
-    @staticmethod
-    def _state_add_workunit(state: Dict[str, Set[int]], urn: str, wu: WorkUnit):
-        workunits = state.get(urn, set())
-        workunits.add(IBRedashSource._hash_workunit(wu))
-        state[urn] = workunits
-
-    @staticmethod
-    def _hash_workunit(wu: WorkUnit):
-        return zlib.crc32(pickle.dumps(wu)) & 0xFFFFFFFF

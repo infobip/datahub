@@ -56,8 +56,11 @@ class IBLineagesSource(IBRedashSource):
                     parent2=first.dstParent2,
                     parent3=first.dstParent3,
                     object_name=first.dstObjectName,
-                ))
-            dst_dataset_urn = DatasetUtils.build_dataset_urn(dst_platform, *dst_dataset_path)
+                ),
+            )
+            dst_dataset_urn = DatasetUtils.build_dataset_urn(
+                dst_platform, *dst_dataset_path
+            )
 
             src_urns = []
             # TODO for to map()/transform()
@@ -72,8 +75,11 @@ class IBLineagesSource(IBRedashSource):
                         parent2=row.srcParent2,
                         parent3=row.srcParent3,
                         object_name=row.srcObjectName,
-                    ))
-                src_urns.append(DatasetUtils.build_dataset_urn(src_platform, *src_dataset_path))
+                    ),
+                )
+                src_urns.append(
+                    DatasetUtils.build_dataset_urn(src_platform, *src_dataset_path)
+                )
 
             yield MetadataWorkUnit(
                 dst_dataset_urn,

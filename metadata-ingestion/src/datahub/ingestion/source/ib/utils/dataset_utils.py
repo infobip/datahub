@@ -42,15 +42,11 @@ class IBPathElementInfo:
     element_type: IBPathElementType
     name: str
     value: str
-    is_nullable: bool
 
-    def __init__(
-        self, element_type: IBPathElementType, name: str, value: str, is_nullable: bool
-    ):
+    def __init__(self, element_type: IBPathElementType, name: str, value: str):
         self.element_type = element_type
         self.name = name
         self.value = value
-        self.is_nullable = is_nullable
 
 
 class DatasetUtils:
@@ -69,12 +65,9 @@ class DatasetUtils:
         result: List[IBPathElementInfo] = []
         for p in path:
             if pd.isna(p.value):
-                if p.is_nullable:
-                    continue
-                else:
-                    raise ValueError(f"Null value is not allowed for {p.name}, "
-                                     f"path: {generic_path}, platform: {platform}")
-
+                raise ValueError(
+                    f"Null value is not allowed for {p.name}, path: {generic_path}, platform: {platform}"
+                )
             if p.element_type == IBPathElementType.LOCATION:
                 p.value = p.value.lower()
             result.append(p)
@@ -103,16 +96,16 @@ class DatasetUtils:
                 IBPathElementType.LOCATION,
                 "DataCenter",
                 generic_path.location_code,
-                False,
             ),
             IBPathElementInfo(
-                IBPathElementType.CLUSTER, "Kafka Cluster", generic_path.parent1, False
+                IBPathElementType.CLUSTER,
+                "Kafka Cluster",
+                generic_path.parent1,
             ),
             IBPathElementInfo(
                 IBPathElementType.OBJECT,
                 subtype,
                 generic_path.object_name,
-                False,
             ),
         ]
 
@@ -126,21 +119,25 @@ class DatasetUtils:
                 IBPathElementType.LOCATION,
                 "DataCenter",
                 generic_path.location_code,
-                False,
             ),
             IBPathElementInfo(
-                IBPathElementType.LOCATION, "Server", generic_path.parent1, False
+                IBPathElementType.LOCATION,
+                "Server",
+                generic_path.parent1,
             ),
             IBPathElementInfo(
-                IBPathElementType.CLUSTER, "Database", generic_path.parent2, False
+                IBPathElementType.CLUSTER,
+                "Database",
+                generic_path.parent2,
             ),
             IBPathElementInfo(
-                IBPathElementType.CLUSTER, "Schema", generic_path.parent3, False
+                IBPathElementType.CLUSTER,
+                "Schema",
+                generic_path.parent3,
             ),
             IBPathElementInfo(
                 IBPathElementType.OBJECT,
                 subtype,
                 generic_path.object_name,
-                False,
             ),
         ]
