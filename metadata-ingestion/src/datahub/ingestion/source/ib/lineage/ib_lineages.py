@@ -1,11 +1,11 @@
 import json
 import logging
-from typing import Iterable, Union, List, Set, Dict
+from typing import Dict, Iterable, List, Set, Union
 
 import pandas as pd
 
 import datahub.emitter.mce_builder as builder
-
+from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.decorators import config_class, platform_name
 from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
@@ -15,22 +15,12 @@ from datahub.ingestion.source.ib.utils.dataset_utils import (
     IBGenericPathElements,
 )
 from datahub.ingestion.source.state.stateful_ingestion_base import JobId
-from datahub.metadata.schema_classes import DatasetLineageTypeClass
-
-from datahub.metadata.schema_classes import UpstreamClass
-
-
-from datahub.emitter.mcp import MetadataChangeProposalWrapper
-
-from datahub.metadata.schema_classes import ChangeTypeClass
-
-from datahub.metadata.schema_classes import UpstreamLineageClass
-
-from datahub.metadata.com.linkedin.pegasus2avro.dataset import FineGrainedLineage
-
-from datahub.metadata.com.linkedin.pegasus2avro.dataset import FineGrainedLineageUpstreamType
-
-from datahub.metadata.com.linkedin.pegasus2avro.dataset import FineGrainedLineageDownstreamType
+from datahub.metadata.schema_classes import (
+    ChangeTypeClass,
+    DatasetLineageTypeClass,
+    UpstreamClass,
+    UpstreamLineageClass,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -94,22 +84,30 @@ class IBLineagesSource(IBRedashSource):
                         object_name=row.srcObjectName,
                     ),
                 )
-                src_dataset_urn = DatasetUtils.build_dataset_urn(src_platform, *src_dataset_path)
+                src_dataset_urn = DatasetUtils.build_dataset_urn(
+                    src_platform, *src_dataset_path
+                )
                 upstream_tables_urns.add(src_dataset_urn)
 
                 # TODO unify schema field urn generation between ingesters
                 if pd.notna(row.srcFieldName) and pd.notna(row.dstFieldName):
                     finegrained_lineages_container.add_column(
-                        dst_column_urn=builder.make_schema_field_urn(dst_dataset_urn, row.dstFieldName),
-                        src_column_urn=builder.make_schema_field_urn(src_dataset_urn, row.srcFieldName)
+                        dst_column_urn=builder.make_schema_field_urn(
+                            dst_dataset_urn, row.dstFieldName
+                        ),
+                        src_column_urn=builder.make_schema_field_urn(
+                            src_dataset_urn, row.srcFieldName
+                        ),
                     )
 
             upstream_tables: List[UpstreamClass] = []
             for urn in upstream_tables_urns:
-                upstream_tables.append(UpstreamClass(
+                upstream_tables.append(
+                    UpstreamClass(
                         dataset=urn,
                         type=DatasetLineageTypeClass.TRANSFORMED,
-                ))
+                    )
+                )
 
             # finegrained_lineages: List[FineGrainedLineage] = []
             # for (dst_column_urn, src_column_urns) in finegrained_lineages_container.get_columns().items():
@@ -152,4 +150,3 @@ class FineGrainedLineagesContainer:
 
     def get_columns(self) -> Dict[str, Set[str]]:
         return self._column_urns
-
