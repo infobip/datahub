@@ -187,7 +187,6 @@ class IBRedashSource(StatefulIngestionSourceBase):
         return self.state_manager.create_checkpoint(job_id)
 
     def get_platform_instance_id(self) -> str:
-        assert self.config.platform_instance is not None
         return self.config.platform_instance
 
     @abstractmethod
