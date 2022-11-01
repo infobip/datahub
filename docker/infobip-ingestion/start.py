@@ -20,6 +20,7 @@ parser.add_argument('-l', '--recipe-list-file',
                     action='ExtractRecipesFromRecipeListFileAction',
                     nargs='*',
                     dest="recipeFiles",
+                    metavar="recipeListFile",
                     help="file which contains list of recipe file names/paths (one name per one line)",
                     default=[])
 
@@ -27,6 +28,7 @@ parser.add_argument('-r', '--recipe-file',
                     action="extend",
                     nargs='*',
                     dest="recipeFiles",
+                    metavar="recipeFile",
                     help="recipe file name/path",
                     default=[])
 
@@ -36,11 +38,10 @@ if len(args.recipeFiles) > 0:
     print("--- Final recipes list:", args.recipeFiles)
 
     for recipeFile in args.recipeFiles:
-        print("--- Executing recipe: '$recipeFile'", recipeFile)
-        # subprocess.run(["", "ingest -c", recipeFile])
+        print("--- Executing recipe: '" + recipeFile + "'")
         subprocess.run(["/datahub-src/metadata-ingestion/venv/bin/datahub", "ingest", "-c", recipeFile])
-        print("--- /Executing recipe: '$recipeFile'", recipeFile, "succeeded")
+        print("--- /Executing recipe: '" + recipeFile + "' succeeded")
 else:
     print("--- No recipes provided")
     print()
-    parser.print_help();
+    parser.print_help()
