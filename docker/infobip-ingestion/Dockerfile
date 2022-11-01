@@ -12,5 +12,5 @@ RUN python3 -m pip install --upgrade pip==19.3.1 wheel setuptools acryl-datahub
 COPY . /datahub-src
 RUN cd /datahub-src && ./gradlew :metadata-ingestion:installDev --stacktrace
 
-ENTRYPOINT ["/datahub-src/docker/infobip-ingestion/start.sh"]
+ENTRYPOINT ["/datahub-src/docker/infobip-ingestion/start.py"]
 CMD ["--help"]
