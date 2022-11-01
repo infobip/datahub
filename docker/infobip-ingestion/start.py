@@ -8,8 +8,8 @@ class ExtractRecipesFromRecipeListFileAction(argparse.Action):
         recipeFiles = getattr(namespace, self.dest) or []
         for fileListFileName in values:
             with open(fileListFileName) as fileListFile:
-                for line in fileListFile:
-                    recipeFiles.append(line.strip())
+                for recipeFileName in fileListFile:
+                    recipeFiles.append(recipeFileName.strip())
         setattr(namespace, self.dest, recipeFiles)
 
 
