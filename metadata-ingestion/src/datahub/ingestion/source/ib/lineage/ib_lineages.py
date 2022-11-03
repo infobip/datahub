@@ -15,6 +15,11 @@ from datahub.ingestion.source.ib.utils.dataset_utils import (
     IBGenericPathElements,
 )
 from datahub.ingestion.source.state.stateful_ingestion_base import JobId
+from datahub.metadata.com.linkedin.pegasus2avro.dataset import (
+    FineGrainedLineage,
+    FineGrainedLineageDownstreamType,
+    FineGrainedLineageUpstreamType,
+)
 from datahub.metadata.schema_classes import (
     ChangeTypeClass,
     DatasetLineageTypeClass,
@@ -109,16 +114,19 @@ class IBLineagesSource(IBRedashSource):
                     )
                 )
 
-            # finegrained_lineages: List[FineGrainedLineage] = []
-            # for (dst_column_urn, src_column_urns) in finegrained_lineages_container.get_columns().items():
-            #     finegrained_lineages.append(FineGrainedLineage(
-            #         upstreamType=FineGrainedLineageUpstreamType.FIELD_SET,
-            #         upstreams=list(src_column_urns),
-            #         downstreamType=FineGrainedLineageDownstreamType.FIELD,
-            #         downstreams=[
-            #             dst_column_urn
-            #         ]
-            #     ))
+            finegrained_lineages: List[FineGrainedLineage] = []
+            for (
+                dst_column_urn,
+                src_column_urns,
+            ) in finegrained_lineages_container.get_columns().items():
+                finegrained_lineages.append(
+                    FineGrainedLineage(
+                        upstreamType=FineGrainedLineageUpstreamType.FIELD_SET,
+                        upstreams=list(src_column_urns),
+                        downstreamType=FineGrainedLineageDownstreamType.FIELD,
+                        downstreams=[dst_column_urn],
+                    )
+                )
 
             yield MetadataWorkUnit(
                 id=f"{dst_dataset_urn}-lineage",
@@ -127,8 +135,10 @@ class IBLineagesSource(IBRedashSource):
                     changeType=ChangeTypeClass.UPSERT,
                     entityUrn=dst_dataset_urn,
                     aspectName="upstreamLineage",
-                    # aspect=UpstreamLineageClass(upstreams=upstream_tables, fineGrainedLineages=finegrained_lineages),
-                    aspect=UpstreamLineageClass(upstreams=upstream_tables),
+                    aspect=UpstreamLineageClass(
+                        upstreams=upstream_tables,
+                        fineGrainedLineages=finegrained_lineages,
+                    ),
                 ),
             )
 
@@ -144,8 +154,7 @@ class FineGrainedLineagesContainer:
 
     def add_column(self, dst_column_urn: str, src_column_urn: str):
         src_columns = self._column_urns.get(dst_column_urn, set())
-        if len(src_columns) < 5:
-            src_columns.add(src_column_urn)
+        src_columns.add(src_column_urn)
         self._column_urns[dst_column_urn] = src_columns
 
     def get_columns(self) -> Dict[str, Set[str]]:
