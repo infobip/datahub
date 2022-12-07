@@ -38,9 +38,11 @@ const FormInput = styled(Input)`
     }
 `;
 
+/*
 const SsoDivider = styled(Divider)`
     background-color: white;
 `;
+*/
 
 const SsoButton = styled(Button)`
     &&& {
