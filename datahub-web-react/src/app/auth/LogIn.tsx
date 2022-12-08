@@ -42,7 +42,6 @@ const FormInput = styled(Input)`
 const SsoDivider = styled(Divider)`
     background-color: white;
 `;
-*/
 
 const SsoButton = styled(Button)`
     &&& {
@@ -62,6 +61,7 @@ const LoginLogo = styled(LoginOutlined)`
 const SsoTextSpan = styled.span`
     padding-top: 6px;
 `;
+*/
 
 export type LogInProps = Record<string, never>;
 
