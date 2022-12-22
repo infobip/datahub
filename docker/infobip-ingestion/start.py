@@ -52,7 +52,7 @@ if len(args.recipeFiles) > 0:
     if failures == 0:
         sys.exit(0)
     else:
-        sys.exit(f"{failures} error occurred during ingest")
+        sys.exit(f"{failures} errors occurred during ingest")
 
 else:
     print("--- No recipes provided")
