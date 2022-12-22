@@ -42,7 +42,7 @@ if len(args.recipeFiles) > 0:
     for recipeFile in args.recipeFiles:
         print("--- Executing recipe: '" + recipeFile + "'")
 
-        status = subprocess.run(["/home/akravtsov/Documents/IdeaProjects/infobip-datahub/metadata-ingestion/venv/bin/datahub", "ingest", "-c", recipeFile])
+        status = subprocess.run(["/datahub-src/metadata-ingestion/venv/bin/datahub", "ingest", "-c", recipeFile])
         if status.returncode == 0:
             print("--- /Executing recipe: '" + recipeFile + "' succeeded")
         else:
