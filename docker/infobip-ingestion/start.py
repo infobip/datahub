@@ -1,5 +1,6 @@
 import argparse
 import subprocess
+import sys
 
 
 class ExtractRecipesFromRecipeListFileAction(argparse.Action):
@@ -37,10 +38,22 @@ args = parser.parse_args()
 if len(args.recipeFiles) > 0:
     print("--- Final recipes list:", args.recipeFiles)
 
+    failures = 0
     for recipeFile in args.recipeFiles:
         print("--- Executing recipe: '" + recipeFile + "'")
-        subprocess.run(["/datahub-src/metadata-ingestion/venv/bin/datahub", "ingest", "-c", recipeFile])
-        print("--- /Executing recipe: '" + recipeFile + "' succeeded")
+
+        status = subprocess.run(["/home/akravtsov/Documents/IdeaProjects/infobip-datahub/metadata-ingestion/venv/bin/datahub", "ingest", "-c", recipeFile])
+        if status.returncode == 0:
+            print("--- /Executing recipe: '" + recipeFile + "' succeeded")
+        else:
+            failures += 1
+            print("--- /Executing recipe: '" + recipeFile + "' failed")
+
+    if failures == 0:
+        sys.exit(0)
+    else:
+        sys.exit(f"{failures} error occurred during ingest")
+
 else:
     print("--- No recipes provided")
     print()
