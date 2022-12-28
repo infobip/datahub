@@ -4,17 +4,17 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Generic, Iterable, List, Optional, Type, TypeVar, Union, cast
 
-from pydantic import BaseModel
-
 from datahub.configuration.common import ConfigModel
+from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.closeable import Closeable
 from datahub.ingestion.api.common import PipelineContext, RecordEnvelope, WorkUnit
+from datahub.ingestion.api.prometheus_metrics import ingestionEntitiesCounter, ingestionIssuesCounter
 from datahub.ingestion.api.report import Report
 from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
+from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent, MetadataChangeProposal
 from datahub.utilities.lossy_collections import LossyDict, LossyList
 from datahub.utilities.type_annotations import get_class_from_annotation
-
-from datahub.ingestion.api.prometheus_metrics import ingestionEntitiesCounter, ingestionIssuesCounter
+from pydantic import BaseModel
 
 
 class SourceCapability(Enum):
@@ -45,12 +45,23 @@ class SourceReport(Report):
     def report_workunit(self, wu: WorkUnit) -> None:
         self.events_produced += 1
         self.event_ids.append(wu.id)
+
+        # send metrics to prometheus:
         if isinstance(wu, MetadataWorkUnit):
-            for metadata_change_proposal in iter(wu.decompose_mce_into_mcps()):
+            if isinstance(wu.metadata, MetadataChangeEvent):
+                for mcp in iter(wu.decompose_mce_into_mcps()):
+                    ingestionEntitiesCounter.labels(work_unit_class=wu.__class__.__name__,
+                                                    entity_type=mcp.metadata.entityType,
+                                                    change_type=mcp.metadata.changeType
+                                                    ).inc()
+            elif isinstance(wu.metadata, MetadataChangeProposal) or \
+                    isinstance(wu.metadata, MetadataChangeProposalWrapper):
                 ingestionEntitiesCounter.labels(work_unit_class=wu.__class__.__name__,
-                                                entity_type=metadata_change_proposal.metadata.entityType).inc(1)
+                                                entity_type=wu.metadata.entityType,
+                                                change_type=wu.metadata.changeType
+                                                ).inc()
         elif isinstance(wu, UsageStatsWorkUnit):
-            ingestionEntitiesCounter.labels(wu_class=wu.__class__.__name__, entity_type='none').inc(1)
+            ingestionEntitiesCounter.labels(wu_class=wu.__class__.__name__, entity_type='none', changeType='none').inc()
 
     def report_warning(self, key: str, reason: str) -> None:
         warnings = self.warnings.get(key, LossyList())
