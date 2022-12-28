@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Generic, Iterable, List, Optional, Type, TypeVar, Union, cast
 
+from pydantic import BaseModel
+
 from datahub.configuration.common import ConfigModel
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.closeable import Closeable
@@ -14,7 +16,6 @@ from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent, MetadataChangeProposal
 from datahub.utilities.lossy_collections import LossyDict, LossyList
 from datahub.utilities.type_annotations import get_class_from_annotation
-from pydantic import BaseModel
 
 
 class SourceCapability(Enum):
