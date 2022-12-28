@@ -67,13 +67,13 @@ class SourceReport(Report):
         warnings = self.warnings.get(key, LossyList())
         warnings.append(reason)
         self.warnings[key] = warnings
-        ingestionIssuesCounter.labels(issue_type='warning', reason=reason).inc(1)
+        ingestionIssuesCounter.labels(issue_type='warning', reason=reason).inc()
 
     def report_failure(self, key: str, reason: str) -> None:
         failures = self.failures.get(key, LossyList())
         failures.append(reason)
         self.failures[key] = failures
-        ingestionIssuesCounter.labels(issue_type='failure', reason=reason).inc(1)
+        ingestionIssuesCounter.labels(issue_type='failure', reason=reason).inc()
 
     def __post_init__(self) -> None:
         self.start_time = datetime.datetime.now()
