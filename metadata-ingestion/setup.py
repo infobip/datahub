@@ -26,6 +26,7 @@ base_requirements = {
     "typing-inspect",
     "pydantic>=1.5.1",
     "mixpanel>=4.9.0",
+    "prometheus_client>=0.15.0",
 }
 
 framework_common = {

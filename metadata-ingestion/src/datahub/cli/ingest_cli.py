@@ -12,6 +12,7 @@ import click
 import click_spinner
 from click_default_group import DefaultGroup
 from tabulate import tabulate
+from prometheus_client import start_http_server
 
 import datahub as datahub_package
 from datahub.cli import cli_utils
@@ -117,6 +118,10 @@ def run(
     def run_pipeline_to_completion(
         pipeline: Pipeline, structured_report: Optional[str] = None
     ) -> int:
+        logger.info("Starting http server for Prometheus Python Client (Prometheus exporter)")
+        start_http_server(4318)
+        logger.info("/Started http server for Prometheus Python Client (Prometheus exporter)")
+
         logger.info("Starting metadata ingestion")
         with click_spinner.spinner(
             beep=False, disable=no_spinner, force=False, stream=sys.stdout
