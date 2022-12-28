@@ -119,7 +119,7 @@ def run(
         pipeline: Pipeline, structured_report: Optional[str] = None
     ) -> int:
         logger.info("Starting http server for Prometheus Python Client (Prometheus exporter)")
-        start_http_server(4318)
+        start_http_server(54318)
         logger.info("/Started http server for Prometheus Python Client (Prometheus exporter)")
 
         logger.info("Starting metadata ingestion")
