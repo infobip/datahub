@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import sys
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -121,8 +122,6 @@ def run(
         logger.info("Starting http server for Prometheus Python Client (Prometheus exporter)")
         start_http_server(54318)
         logger.info("/Started http server for Prometheus Python Client (Prometheus exporter)")
-        logger.info("UPDATE!!!")
-        sys.exit(-1)
 
         logger.info("Starting metadata ingestion")
         with click_spinner.spinner(
@@ -142,6 +141,11 @@ def run(
                 logger.info("Finished metadata ingestion")
                 pipeline.log_ingestion_stats()
                 ret = pipeline.pretty_print_summary(warnings_as_failure=strict_warnings)
+
+                logger.info("Sleeping for 60 seconds so that prometheus is able to grab all the metrics")
+                time.sleep(60)
+                logger.info("/Sleeping finished")
+
                 return ret
 
     async def run_pipeline_async(pipeline: Pipeline) -> int:
