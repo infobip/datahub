@@ -52,10 +52,11 @@ class SourceReport(Report):
             if isinstance(wu.metadata, MetadataChangeEvent):
                 for mcp in iter(wu.decompose_mce_into_mcps()):
                     ingestionEntitiesCounter.labels(
-                        work_unit=wu.__class__.__name__ + '.' + wu.metadata.__class__.__name__,
+                        work_unit=wu.__class__.__name__ + '.' + wu.metadata.__class__.__name__ + '-' +
+                                  mcp.__class__.__name__ + '.' + mcp.metadata.__class__.__name__,
                         entity_type=mcp.metadata.entityType,
                         change_type=mcp.metadata.changeType
-                        ).inc()
+                    ).inc()
             elif isinstance(wu.metadata, MetadataChangeProposal) or \
                     isinstance(wu.metadata, MetadataChangeProposalWrapper):
                 ingestionEntitiesCounter.labels(work_unit=wu.__class__.__name__ + '.' + wu.metadata.__class__.__name__,
