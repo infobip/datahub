@@ -122,6 +122,7 @@ def run(
         start_http_server(54318)
         logger.info("/Started http server for Prometheus Python Client (Prometheus exporter)")
         logger.info("UPDATE!!!")
+        sys.exit(-1)
 
         logger.info("Starting metadata ingestion")
         with click_spinner.spinner(
