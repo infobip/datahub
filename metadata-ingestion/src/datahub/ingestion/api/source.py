@@ -63,8 +63,6 @@ class SourceReport(Report):
                                                 entity_type=wu.metadata.entityType,
                                                 change_type=wu.metadata.changeType
                                                 ).inc()
-        elif isinstance(wu, UsageStatsWorkUnit):
-            ingestionEntitiesCounter.labels(wu_class=wu.__class__.__name__, entity_type='none', changeType='none').inc()
 
     def report_warning(self, key: str, reason: str) -> None:
         warnings = self.warnings.get(key, LossyList())
