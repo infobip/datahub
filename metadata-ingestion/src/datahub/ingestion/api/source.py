@@ -7,15 +7,13 @@ from typing import Dict, Generic, Iterable, List, Optional, Type, TypeVar, Union
 from pydantic import BaseModel
 
 from datahub.configuration.common import ConfigModel
-from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.closeable import Closeable
 from datahub.ingestion.api.common import PipelineContext, RecordEnvelope, WorkUnit
-from datahub.ingestion.api.prometheus_metrics import ingestionEntitiesCounter, ingestionIssuesCounter
 from datahub.ingestion.api.report import Report
-from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
-from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent, MetadataChangeProposal
 from datahub.utilities.lossy_collections import LossyDict, LossyList
 from datahub.utilities.type_annotations import get_class_from_annotation
+from datahub.ingestion.api.prometheus_metrics import report_ingested_workunit_to_prometheus, \
+    report_ingestion_issue_to_prometheus
 
 
 class SourceCapability(Enum):
@@ -47,34 +45,19 @@ class SourceReport(Report):
         self.events_produced += 1
         self.event_ids.append(wu.id)
 
-        # send metrics to prometheus:
-        if isinstance(wu, MetadataWorkUnit):
-            if isinstance(wu.metadata, MetadataChangeEvent):
-                for mcp in iter(wu.decompose_mce_into_mcps()):
-                    ingestionEntitiesCounter.labels(
-                        work_unit=wu.__class__.__name__ + '.' + wu.metadata.__class__.__name__ + '-' +
-                                  mcp.__class__.__name__ + '.' + mcp.metadata.__class__.__name__,
-                        entity_type=mcp.metadata.entityType,
-                        change_type=mcp.metadata.changeType
-                    ).inc()
-            elif isinstance(wu.metadata, MetadataChangeProposal) or \
-                    isinstance(wu.metadata, MetadataChangeProposalWrapper):
-                ingestionEntitiesCounter.labels(work_unit=wu.__class__.__name__ + '.' + wu.metadata.__class__.__name__,
-                                                entity_type=wu.metadata.entityType,
-                                                change_type=wu.metadata.changeType
-                                                ).inc()
+        report_ingested_workunit_to_prometheus(wu)
 
     def report_warning(self, key: str, reason: str) -> None:
         warnings = self.warnings.get(key, LossyList())
         warnings.append(reason)
         self.warnings[key] = warnings
-        ingestionIssuesCounter.labels(issue_type='warning', reason=reason).inc()
+        report_ingestion_issue_to_prometheus('warning', reason)
 
     def report_failure(self, key: str, reason: str) -> None:
         failures = self.failures.get(key, LossyList())
         failures.append(reason)
         self.failures[key] = failures
-        ingestionIssuesCounter.labels(issue_type='failure', reason=reason).inc()
+        report_ingestion_issue_to_prometheus('failure', reason)
 
     def __post_init__(self) -> None:
         self.start_time = datetime.datetime.now()
