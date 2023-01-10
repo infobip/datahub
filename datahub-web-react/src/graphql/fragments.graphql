@@ -73,7 +73,11 @@ fragment parentContainersFields on ParentContainersResult {
 fragment parentNodesFields on ParentNodesResult {
     count
     nodes {
-        ...glossaryNode
+        urn
+        type
+        properties {
+            name
+        }
     }
 }
 
@@ -346,6 +350,9 @@ fragment dataJobFields on DataJob {
     dataPlatformInstance {
         ...dataPlatformInstanceFields
     }
+    privileges {
+        canEditLineage
+    }
 }
 
 fragment dashboardFields on Dashboard {
@@ -428,6 +435,9 @@ fragment dashboardFields on Dashboard {
     }
     subTypes {
         typeNames
+    }
+    privileges {
+        canEditLineage
     }
 }
 
@@ -711,6 +721,7 @@ fragment nonRecursiveMLModel on MLModel {
     properties {
         description
         date
+        externalUrl
         version
         type
         trainingMetrics {
@@ -755,6 +766,9 @@ fragment nonRecursiveMLModel on MLModel {
     deprecation {
         ...deprecationFields
     }
+    institutionalMemory {
+        ...institutionalMemoryFields
+    }    
 }
 
 fragment nonRecursiveMLModelGroupFields on MLModelGroup {

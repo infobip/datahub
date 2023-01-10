@@ -1,5 +1,4 @@
 import logging
-from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, Generic, Optional, Type, TypeVar, cast
 
@@ -57,12 +56,15 @@ class StatefulIngestionConfig(ConfigModel):
         default=False,
         description="The type of the ingestion state provider registered with datahub.",
     )
-    # fmt: off
-    # 16MB
-    max_checkpoint_state_size: pydantic.PositiveInt = Field(default=2**24, description="The maximum size of the checkpoint state in bytes. Default is 16MB")  # 16MB
-    # fmt: on
+    max_checkpoint_state_size: pydantic.PositiveInt = Field(
+        default=2**24,  # 16 MB
+        description="The maximum size of the checkpoint state in bytes. Default is 16MB",
+        hidden_from_schema=True,
+    )
     state_provider: Optional[DynamicTypedStateProviderConfig] = Field(
-        default=None, description="The ingestion state provider configuration."
+        default=None,
+        description="The ingestion state provider configuration.",
+        hidden_from_schema=True,
     )
     ignore_old_state: bool = Field(
         default=False,
@@ -113,7 +115,6 @@ class StatefulIngestionSourceBase(Source):
     ) -> None:
         super().__init__(ctx)
         self.stateful_ingestion_config = config.stateful_ingestion
-        self.source_config_type = type(config)
         self.last_checkpoints: Dict[JobId, Optional[Checkpoint]] = {}
         self.cur_checkpoints: Dict[JobId, Optional[Checkpoint]] = {}
         self.run_summaries_to_report: Dict[JobId, DatahubIngestionRunSummaryClass] = {}
@@ -160,10 +161,12 @@ class StatefulIngestionSourceBase(Source):
                 Dict[str, Any],
                 self.stateful_ingestion_config.state_provider.dict().get("config", {}),
             )
-            self.ingestion_checkpointing_state_provider = checkpointing_state_provider_class.create(  # type: ignore
-                config_dict=config_dict,
-                ctx=self.ctx,
-                name=checkpointing_state_provider_class.__name__,
+            self.ingestion_checkpointing_state_provider = (
+                checkpointing_state_provider_class.create(
+                    config_dict=config_dict,
+                    ctx=self.ctx,
+                    name=checkpointing_state_provider_class.__name__,
+                )
             )
             assert self.ingestion_checkpointing_state_provider
             if self.stateful_ingestion_config.ignore_old_state:
@@ -220,10 +223,11 @@ class StatefulIngestionSourceBase(Source):
             raise ValueError(f"No use-case handler for job_id{job_id}")
         return self._usecase_handlers[job_id].is_checkpointing_enabled()
 
-    # Methods that sub-classes must implement
-    @abstractmethod
     def get_platform_instance_id(self) -> str:
-        raise NotImplementedError("Sub-classes must implement this method.")
+        # This method is retained for backwards compatibility, but it is not
+        # required that new sources implement it. We mainly need it for the
+        # fallback logic in _get_last_checkpoint.
+        raise NotImplementedError("no platform_instance_id configured")
 
     def _get_last_checkpoint(
         self, job_id: JobId, checkpoint_state_class: Type[StateType]
@@ -233,17 +237,33 @@ class StatefulIngestionSourceBase(Source):
         """
         last_checkpoint: Optional[Checkpoint] = None
         if self.is_stateful_ingestion_configured():
+            # TRICKY: We currently don't include the platform_instance_id in the
+            # checkpoint urn, but we previously did. As such, we need to fallback
+            # and try the old urn format if the new format doesn't return anything.
+
             # Obtain the latest checkpoint from GMS for this job.
+            assert self.ctx.pipeline_name
             last_checkpoint_aspect = self.ingestion_checkpointing_state_provider.get_latest_checkpoint(  # type: ignore
-                pipeline_name=self.ctx.pipeline_name,  # type: ignore
-                platform_instance_id=self.get_platform_instance_id(),
+                pipeline_name=self.ctx.pipeline_name,
                 job_name=job_id,
             )
+            if last_checkpoint_aspect is None:
+                # Try again with the platform_instance_id, if implemented.
+                try:
+                    platform_instance_id = self.get_platform_instance_id()
+                except NotImplementedError:
+                    pass
+                else:
+                    last_checkpoint_aspect = self.ingestion_checkpointing_state_provider.get_latest_checkpoint(  # type: ignore
+                        pipeline_name=self.ctx.pipeline_name,
+                        job_name=job_id,
+                        platform_instance_id=platform_instance_id,
+                    )
+
             # Convert it to a first-class Checkpoint object.
             last_checkpoint = Checkpoint[StateType].create_from_checkpoint_aspect(
                 job_name=job_id,
                 checkpoint_aspect=last_checkpoint_aspect,
-                config_class=self.source_config_type,
                 state_class=checkpoint_state_class,
             )
         return last_checkpoint
@@ -323,3 +343,7 @@ class StatefulIngestionSourceBase(Source):
     def prepare_for_commit(self) -> None:
         """NOTE: Sources should call this method from their close method."""
         self._prepare_checkpoint_states_for_commit()
+
+    def close(self) -> None:
+        self.prepare_for_commit()
+        super().close()
