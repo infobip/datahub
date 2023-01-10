@@ -26,7 +26,6 @@ base_requirements = {
     "typing-inspect",
     "pydantic>=1.5.1",
     "mixpanel>=4.9.0",
-    "prometheus_client>=0.15.0",
 }
 
 framework_common = {
@@ -54,6 +53,7 @@ framework_common = {
     "cached_property",
     "ijson",
     "click-spinner",
+    "prometheus_client>=0.15.0",
 }
 
 kafka_common = {
