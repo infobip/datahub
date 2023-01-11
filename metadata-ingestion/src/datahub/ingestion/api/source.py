@@ -51,6 +51,8 @@ from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
 from datahub.metadata.schema_classes import UpstreamLineageClass
 from datahub.utilities.lossy_collections import LossyDict, LossyList
 from datahub.utilities.type_annotations import get_class_from_annotation
+from datahub.ingestion.api.prometheus_metrics import report_ingested_workunit_to_prometheus, \
+    report_ingestion_issue_to_prometheus
 
 logger = logging.getLogger(__name__)
 
@@ -244,81 +246,31 @@ class SourceReport(Report):
                                 "fineGrainedLineages"
                             ].append(urn)
 
+        report_ingested_workunit_to_prometheus(wu)
+
     def report_warning(
-        self,
-        message: LiteralString,
-        context: Optional[str] = None,
-        title: Optional[LiteralString] = None,
-        exc: Optional[BaseException] = None,
-    ) -> None:
-        self._structured_logs.report_log(
-            StructuredLogLevel.WARN, message, title, context, exc, log=False
-        )
-
-    def warning(
-        self,
-        message: LiteralString,
-        context: Optional[str] = None,
-        title: Optional[LiteralString] = None,
-        exc: Optional[BaseException] = None,
-    ) -> None:
-        self._structured_logs.report_log(
-            StructuredLogLevel.WARN, message, title, context, exc, log=True
-        )
-
-    def report_failure(
-        self,
-        message: LiteralString,
-        context: Optional[str] = None,
-        title: Optional[LiteralString] = None,
-        exc: Optional[BaseException] = None,
-        log: bool = True,
-    ) -> None:
-        self._structured_logs.report_log(
-            StructuredLogLevel.ERROR, message, title, context, exc, log=log
-        )
-
-    def failure(
-        self,
-        message: LiteralString,
-        context: Optional[str] = None,
-        title: Optional[LiteralString] = None,
-        exc: Optional[BaseException] = None,
-        log: bool = True,
-    ) -> None:
-        self._structured_logs.report_log(
-            StructuredLogLevel.ERROR, message, title, context, exc, log=log
-        )
-
-    def info(
-        self,
-        message: LiteralString,
-        context: Optional[str] = None,
-        title: Optional[LiteralString] = None,
-        exc: Optional[BaseException] = None,
-        log: bool = True,
-    ) -> None:
-        self._structured_logs.report_log(
-            StructuredLogLevel.INFO, message, title, context, exc, log=log
-        )
-
-    @contextlib.contextmanager
-    def report_exc(
-        self,
-        message: LiteralString,
-        title: Optional[LiteralString] = None,
-        context: Optional[str] = None,
-        level: StructuredLogLevel = StructuredLogLevel.ERROR,
-    ) -> Iterator[None]:
-        # Convenience method that helps avoid boilerplate try/except blocks.
-        # TODO: I'm not super happy with the naming here - it's not obvious that this
-        # suppresses the exception in addition to reporting it.
-        try:
-            yield
-        except Exception as exc:
+            self,
+            message: LiteralString,
+            context: Optional[str] = None,
+            title: Optional[LiteralString] = None,
+            exc: Optional[BaseException] = None,
+        ) -> None:
             self._structured_logs.report_log(
-                level, message=message, title=title, context=context, exc=exc
+                StructuredLogLevel.WARN, message, title, context, exc, log=False
             )
+            report_ingestion_issue_to_prometheus('warning', reason)
+
+        def warning(
+            self,
+            message: LiteralString,
+            context: Optional[str] = None,
+            title: Optional[LiteralString] = None,
+            exc: Optional[BaseException] = None,
+        ) -> None:
+            self._structured_logs.report_log(
+                StructuredLogLevel.WARN, message, title, context, exc, log=True
+            )
+            report_ingestion_issue_to_prometheus('failure', reason)
 
     def __post_init__(self) -> None:
         self.start_time = datetime.datetime.now()
