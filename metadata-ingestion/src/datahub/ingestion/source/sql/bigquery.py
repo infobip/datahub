@@ -792,8 +792,11 @@ class BigQuerySource(SQLAlchemySource):
             # Bigquery only supports one partition column
             # https://stackoverflow.com/questions/62886213/adding-multiple-partitioned-columns-to-bigquery-table-from-sql-query
             row = result.fetchone()
+            if row and hasattr(row, "_asdict"):
+                # Compat with sqlalchemy 1.4 Row type.
+                row = row._asdict()
             if row:
-                return BigQueryPartitionColumn(**row)
+                return BigQueryPartitionColumn(**dict(row.items()))
             return None
 
     def get_shard_from_table(self, table: str) -> Tuple[str, Optional[str]]:
@@ -958,7 +961,7 @@ WHERE
         )
 
     def get_profile_args(self) -> Dict:
-        return {"temp_table_db": self.config.project_id}
+        return {}
 
     def is_dataset_eligible_for_profiling(
         self,
@@ -1193,7 +1196,9 @@ WHERE
             backcompat_instance_for_guid=self.config.env,
         )
 
-    def gen_database_containers(self, database: str) -> Iterable[MetadataWorkUnit]:
+    def gen_database_containers(
+        self, inspector: Inspector, database: str
+    ) -> Iterable[MetadataWorkUnit]:
         domain_urn = self._gen_domain_urn(database)
 
         database_container_key = self.gen_database_key(database)
@@ -1210,7 +1215,7 @@ WHERE
             yield wu
 
     def gen_schema_containers(
-        self, schema: str, db_name: str
+        self, inspector: Inspector, schema: str, db_name: str
     ) -> Iterable[MetadataWorkUnit]:
         schema_container_key = self.gen_schema_key(db_name, schema)
 
