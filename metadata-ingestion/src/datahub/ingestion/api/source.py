@@ -12,6 +12,8 @@ from datahub.ingestion.api.common import PipelineContext, RecordEnvelope, WorkUn
 from datahub.ingestion.api.report import Report
 from datahub.utilities.lossy_collections import LossyDict, LossyList
 from datahub.utilities.type_annotations import get_class_from_annotation
+from datahub.ingestion.api.prometheus_metrics import report_ingested_workunit_to_prometheus, \
+    report_ingestion_issue_to_prometheus
 
 
 class SourceCapability(Enum):
@@ -43,15 +45,19 @@ class SourceReport(Report):
         self.events_produced += 1
         self.event_ids.append(wu.id)
 
+        report_ingested_workunit_to_prometheus(wu)
+
     def report_warning(self, key: str, reason: str) -> None:
         warnings = self.warnings.get(key, LossyList())
         warnings.append(reason)
         self.warnings[key] = warnings
+        report_ingestion_issue_to_prometheus('warning', reason)
 
     def report_failure(self, key: str, reason: str) -> None:
         failures = self.failures.get(key, LossyList())
         failures.append(reason)
         self.failures[key] = failures
+        report_ingestion_issue_to_prometheus('failure', reason)
 
     def __post_init__(self) -> None:
         self.start_time = datetime.datetime.now()

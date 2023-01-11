@@ -53,6 +53,7 @@ framework_common = {
     "cached_property",
     "ijson",
     "click-spinner",
+    "prometheus_client>=0.15.0",
     "requests_file",
 }
 
