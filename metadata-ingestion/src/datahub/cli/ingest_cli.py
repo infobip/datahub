@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import sys
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -12,6 +13,7 @@ import click
 import click_spinner
 from click_default_group import DefaultGroup
 from tabulate import tabulate
+from prometheus_client import start_http_server
 
 import datahub as datahub_package
 from datahub.cli import cli_utils
@@ -97,6 +99,12 @@ def ingest() -> None:
 @click.option(
     "--no-spinner", type=bool, is_flag=True, default=False, help="Turn off spinner"
 )
+@click.option(
+    "--prometheus-exporter-port",
+    type=int,
+    default=-1,
+    help="Port which prometheus_client's Prometheus Exporter will listen on, will not start prometheus_client if port < 0",
+)
 @click.pass_context
 @telemetry.with_telemetry
 @memory_leak_detector.with_leak_detection
@@ -111,12 +119,18 @@ def run(
     report_to: str,
     no_default_report: bool,
     no_spinner: bool,
+    prometheus_exporter_port: int,
 ) -> None:
     """Ingest metadata into DataHub."""
 
     def run_pipeline_to_completion(
         pipeline: Pipeline, structured_report: Optional[str] = None
     ) -> int:
+        if prometheus_exporter_port > 0:
+            logger.info("Starting http server for Prometheus Python Client (Prometheus exporter)")
+            start_http_server(prometheus_exporter_port)
+            logger.info("/Started http server for Prometheus Python Client (Prometheus exporter)")
+
         logger.info("Starting metadata ingestion")
         with click_spinner.spinner(
             beep=False, disable=no_spinner, force=False, stream=sys.stdout
@@ -135,6 +149,12 @@ def run(
                 logger.info("Finished metadata ingestion")
                 pipeline.log_ingestion_stats()
                 ret = pipeline.pretty_print_summary(warnings_as_failure=strict_warnings)
+
+                if prometheus_exporter_port > 0:
+                    logger.info("Sleeping for 60 seconds so that prometheus is able to grab all the metrics")
+                    time.sleep(60)
+                    logger.info("/Sleeping finished")
+
                 return ret
 
     async def run_pipeline_async(pipeline: Pipeline) -> int:
