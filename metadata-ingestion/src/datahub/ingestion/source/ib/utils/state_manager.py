@@ -34,14 +34,12 @@ class StateManager:
         config: StatefulIngestionConfigBase,
         ctx: PipelineContext,
         job_id_prefix: str,
-        platform_instance: str,
         last_states_factory: Callable[[JobId, Type[StateType]], Optional[Checkpoint]],
         current_states_factory: Callable[[JobId], Optional[Checkpoint]],
     ):
         self._config = config
         self._ctx = ctx
         self._job_id_prefix = job_id_prefix
-        self._platform_instance = platform_instance
         self._last_states_factory = last_states_factory
         self._current_states_factory = current_states_factory
 
@@ -56,9 +54,7 @@ class StateManager:
             return Checkpoint(
                 job_name=job_id,
                 pipeline_name=self._ctx.pipeline_name,
-                platform_instance_id=self._platform_instance,
                 run_id=self._ctx.run_id,
-                config=self._config,
                 state=state,
             )
         return None

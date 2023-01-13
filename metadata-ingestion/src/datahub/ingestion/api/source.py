@@ -36,6 +36,10 @@ from datahub.ingestion.api.auto_work_units.auto_ensure_aspect_size import (
 )
 from datahub.ingestion.api.closeable import Closeable
 from datahub.ingestion.api.common import PipelineContext, RecordEnvelope, WorkUnit
+from datahub.ingestion.api.prometheus_metrics import (
+    report_ingested_workunit_to_prometheus,
+    report_ingestion_issue_to_prometheus,
+)
 from datahub.ingestion.api.report import Report
 from datahub.ingestion.api.source_helpers import (
     auto_browse_path_v2,
@@ -51,8 +55,6 @@ from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
 from datahub.metadata.schema_classes import UpstreamLineageClass
 from datahub.utilities.lossy_collections import LossyDict, LossyList
 from datahub.utilities.type_annotations import get_class_from_annotation
-from datahub.ingestion.api.prometheus_metrics import report_ingested_workunit_to_prometheus, \
-    report_ingestion_issue_to_prometheus
 
 logger = logging.getLogger(__name__)
 
