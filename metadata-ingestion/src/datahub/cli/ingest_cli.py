@@ -12,8 +12,8 @@ from typing import Optional
 import click
 import click_spinner
 from click_default_group import DefaultGroup
-from tabulate import tabulate
 from prometheus_client import start_http_server
+from tabulate import tabulate
 
 import datahub as datahub_package
 from datahub.cli import cli_utils
@@ -127,9 +127,13 @@ def run(
         pipeline: Pipeline, structured_report: Optional[str] = None
     ) -> int:
         if prometheus_exporter_port > 0:
-            logger.info("Starting http server for Prometheus Python Client (Prometheus exporter)")
+            logger.info(
+                "Starting http server for Prometheus Python Client (Prometheus exporter)"
+            )
             start_http_server(prometheus_exporter_port)
-            logger.info("/Started http server for Prometheus Python Client (Prometheus exporter)")
+            logger.info(
+                "/Started http server for Prometheus Python Client (Prometheus exporter)"
+            )
 
         logger.info("Starting metadata ingestion")
         with click_spinner.spinner(disable=no_spinner):
@@ -149,7 +153,9 @@ def run(
                 ret = pipeline.pretty_print_summary(warnings_as_failure=strict_warnings)
 
                 if prometheus_exporter_port > 0:
-                    logger.info("Sleeping for 60 seconds so that prometheus is able to grab all the metrics")
+                    logger.info(
+                        "Sleeping for 60 seconds so that prometheus is able to grab all the metrics"
+                    )
                     time.sleep(60)
                     logger.info("/Sleeping finished")
 

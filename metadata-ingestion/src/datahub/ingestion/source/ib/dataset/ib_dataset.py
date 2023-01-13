@@ -246,14 +246,6 @@ class IBRedashDatasetSource(IBRedashSource):
     @staticmethod
     def _get_type_class(type_str: str):
         type_str = type_str.lower() if type_str is not None else "undefined"
-        type_class: Union[
-            "StringTypeClass",
-            "BooleanTypeClass",
-            "NumberTypeClass",
-            "BytesTypeClass",
-            "DateTypeClass",
-            "NullTypeClass",
-        ]
         if type_str in [
             "string",
             "char",

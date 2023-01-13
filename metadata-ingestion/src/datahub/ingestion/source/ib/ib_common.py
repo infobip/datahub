@@ -70,7 +70,6 @@ class IBRedashSource(StatefulIngestionSourceBase):
             config,
             ctx,
             self.get_default_ingestion_job_id_prefix(),
-            self.get_platform_instance_id(),
             self.get_last_checkpoint,
             self.get_current_checkpoint,
         )
@@ -185,9 +184,6 @@ class IBRedashSource(StatefulIngestionSourceBase):
 
     def create_checkpoint(self, job_id: JobId) -> Optional[Checkpoint]:
         return self.state_manager.create_checkpoint(job_id)
-
-    def get_platform_instance_id(self) -> str:
-        return self.config.platform_instance
 
     @abstractmethod
     def get_default_ingestion_job_id_prefix(self) -> JobId:
