@@ -68,7 +68,7 @@ class IBRedashDatasetSource(IBRedashSource):
     def fetch_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
         logger.warning("--- IBRedashDatasetSource.fetch_workunits - started '" + self.config.query_id + "'")
         query = self.query_get(self.config.query_id)
-        logger.warning("--- IBRedashDatasetSource.fetch_workunits - query '" + query + "'")
+        logger.warning("--- IBRedashDatasetSource.fetch_workunits - query created/")
         dumps = json.dumps(query)
         logger.warning("--- IBRedashDatasetSource.fetch_workunits - json.dumps(query) completed")
         json_data = pd.read_json(dumps)
@@ -78,8 +78,6 @@ class IBRedashDatasetSource(IBRedashSource):
             logger.warning(
                 "--- IBRedashDatasetSource.fetch_workunits - _fetch_object_workunits(row[" + i + "]) started")
             yield from self._fetch_object_workunits(row)
-            logger.warning(
-                "--- IBRedashDatasetSource.fetch_workunits - _fetch_object_workunits(row[" + i + "]) completed")
 
         logger.warning("--- IBRedashDatasetSource.fetch_workunits/ - finished ")
 
