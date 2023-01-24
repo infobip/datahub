@@ -1,4 +1,5 @@
 import json
+import logging
 from abc import abstractmethod
 from typing import Iterable, List, Optional, Union
 
@@ -41,6 +42,7 @@ from datahub.metadata.schema_classes import (
     SubTypesClass,
 )
 
+logger: logging.Logger = logging.getLogger(__name__)
 
 class IBRedashDatasetSource(IBRedashSource):
     containers_cache = []
@@ -64,10 +66,22 @@ class IBRedashDatasetSource(IBRedashSource):
         self.source_config: IBRedashSourceConfig = config
 
     def fetch_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
-        json_data = pd.read_json(json.dumps(self.query_get(self.config.query_id)))
+        logger.warning("--- IBRedashDatasetSource.fetch_workunits - started '" + self.config.query_id + "'")
+        query = self.query_get(self.config.query_id)
+        logger.warning("--- IBRedashDatasetSource.fetch_workunits - query '" + query + "'")
+        dumps = json.dumps(query)
+        logger.warning("--- IBRedashDatasetSource.fetch_workunits - json.dumps(query) completed")
+        json_data = pd.read_json(dumps)
+        logger.warning("--- IBRedashDatasetSource.fetch_workunits - pd.read_json(dumps) completed")
 
         for i, row in json_data.iterrows():
+            logger.warning(
+                "--- IBRedashDatasetSource.fetch_workunits - _fetch_object_workunits(row[" + i + "]) started")
             yield from self._fetch_object_workunits(row)
+            logger.warning(
+                "--- IBRedashDatasetSource.fetch_workunits - _fetch_object_workunits(row[" + i + "]) completed")
+
+        logger.warning("--- IBRedashDatasetSource.fetch_workunits/ - finished ")
 
     def _fetch_object_workunits(self, row: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
         object_name = row.objectName
