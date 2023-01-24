@@ -76,7 +76,7 @@ class IBRedashDatasetSource(IBRedashSource):
 
         for i, row in json_data.iterrows():
             logger.warning(
-                "--- IBRedashDatasetSource.fetch_workunits - _fetch_object_workunits(row[" + i + "]) started")
+                "--- IBRedashDatasetSource.fetch_workunits - _fetch_object_workunits(row[" + str(i) + "]) started")
             yield from self._fetch_object_workunits(row)
 
         logger.warning("--- IBRedashDatasetSource.fetch_workunits/ - finished ")
