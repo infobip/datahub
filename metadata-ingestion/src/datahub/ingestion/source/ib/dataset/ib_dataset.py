@@ -3,9 +3,8 @@ import logging
 from abc import abstractmethod
 from typing import Iterable, List, Optional, Union
 
-import pandas as pd
-
 import datahub.emitter.mce_builder as builder
+import pandas as pd
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
@@ -74,12 +73,12 @@ class IBRedashDatasetSource(IBRedashSource):
         json_data = pd.read_json(dumps)
         logger.warning("--- IBRedashDatasetSource.fetch_workunits - pd.read_json(dumps) completed")
 
+        rows_count = 0
         for i, row in json_data.iterrows():
-            logger.warning(
-                "--- IBRedashDatasetSource.fetch_workunits - _fetch_object_workunits(row[" + str(i) + "]) started")
+            rows_count = rows_count + 1
             yield from self._fetch_object_workunits(row)
 
-        logger.warning("--- IBRedashDatasetSource.fetch_workunits/ - finished ")
+        logger.warning("--- IBRedashDatasetSource.fetch_workunits/ - finished rows_count: " + str(rows_count))
 
     def _fetch_object_workunits(self, row: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
         object_name = row.objectName
