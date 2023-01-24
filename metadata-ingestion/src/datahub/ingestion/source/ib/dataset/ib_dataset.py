@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from abc import abstractmethod
 from typing import Iterable, List, Optional, Union
 
@@ -43,6 +44,7 @@ from datahub.metadata.schema_classes import (
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+
 class IBRedashDatasetSource(IBRedashSource):
     containers_cache = []
 
@@ -79,8 +81,31 @@ class IBRedashDatasetSource(IBRedashSource):
             yield from self._fetch_object_workunits(row)
 
         logger.warning("--- IBRedashDatasetSource.fetch_workunits/ - finished rows_count: " + str(rows_count))
+        logger.warning("--- IBRedashDatasetSource._fetch_object_workunits/ - stats:"
+                       " 1: " + str(self.time1) + " 2: " + str(self.time2) + " 3: " + str(self.time4) + " 4: " + str(
+            self.time4) +
+                       " 5: " + str(self.time5) + " 6: " + str(self.time6) + " 7: " + str(self.time7) + " 8: " + str(
+            self.time8) +
+                       " 9: " + str(self.time9) + " 10: " + str(self.time10) + " 11: " + str(self.time11))
+
+    time1: int = 0
+    time2: int = 0
+    time3: int = 0
+    time4: int = 0
+    time5: int = 0
+    time6: int = 0
+    time7: int = 0
+    time8: int = 0
+    time9: int = 0
+    time10: int = 0
+    time11: int = 0
+
+    @staticmethod
+    def now_millis() -> int:
+        return int(time.time() * 1000)
 
     def _fetch_object_workunits(self, row: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
+        time0 = IBRedashDatasetSource.now_millis()
         object_name = row.objectName
 
         dataset_path = DatasetUtils.map_path(
@@ -95,6 +120,9 @@ class IBRedashDatasetSource(IBRedashSource):
             ),
         )
 
+        time1 = IBRedashDatasetSource.now_millis()
+        self.time1 = self.time1 + (time1 - time0)
+
         properties = DatasetPropertiesClass(
             name=object_name,
             description=row.description,
@@ -103,9 +131,15 @@ class IBRedashDatasetSource(IBRedashSource):
             ),
         )
 
+        time2 = IBRedashDatasetSource.now_millis()
+        self.time2 = self.time2 + (time2 - time1)
+
         browse_paths = BrowsePathsClass(
             [f"/prod/{DatasetUtils.join_path('/', *dataset_path)}"]
         )
+
+        time3 = IBRedashDatasetSource.now_millis()
+        self.time3 = self.time3 + (time3 - time2)
 
         columns = (
             list(
@@ -117,6 +151,8 @@ class IBRedashDatasetSource(IBRedashSource):
             if pd.notna(row.columns)
             else []
         )
+        time4 = IBRedashDatasetSource.now_millis()
+        self.time4 = self.time4 + (time4 - time3)
         schema = SchemaMetadataClass(
             schemaName=self.platform,
             version=1,
@@ -126,15 +162,25 @@ class IBRedashDatasetSource(IBRedashSource):
             fields=columns,
         )
 
+        time5 = IBRedashDatasetSource.now_millis()
+        self.time5 = self.time5 + (time5 - time4)
+
         owners = []
         if row.owners is not None:
             owners = [
                 builder.make_group_urn(owner.strip()) for owner in row.owners.split(",")
             ]
 
+        time6 = IBRedashDatasetSource.now_millis()
+        self.time6 = self.time6 + (time6 - time5)
+
         ownership = builder.make_ownership_aspect_from_urn_list(
             owners, OwnershipSourceTypeClass.SERVICE, OwnershipTypeClass.TECHNICAL_OWNER
         )
+
+        time7 = IBRedashDatasetSource.now_millis()
+        self.time7 = self.time7 + (time7 - time6)
+
         aspects = [properties, browse_paths, schema, ownership]
         snapshot = DatasetSnapshot(
             urn=DatasetUtils.build_dataset_urn(self.platform, *dataset_path),
@@ -142,6 +188,9 @@ class IBRedashDatasetSource(IBRedashSource):
         )
         mce = MetadataChangeEvent(proposedSnapshot=snapshot)
         yield MetadataWorkUnit(properties.qualifiedName, mce=mce)
+
+        time8 = IBRedashDatasetSource.now_millis()
+        self.time8 = self.time8 + (time8 - time7)
 
         yield MetadataWorkUnit(
             id=f"{properties.qualifiedName}-subtype",
@@ -154,6 +203,9 @@ class IBRedashDatasetSource(IBRedashSource):
             ),
         )
 
+        time9 = IBRedashDatasetSource.now_millis()
+        self.time9 = self.time9 + (time9 - time8)
+
         container_parent_path = None
         for i in range(1, len(dataset_path)):
             container_path = dataset_path[:i]
@@ -163,6 +215,9 @@ class IBRedashDatasetSource(IBRedashSource):
                 container_path, dataset_path[i - 1], container_parent_path
             )
             container_parent_path = container_path
+
+        time10 = IBRedashDatasetSource.now_millis()
+        self.time10 = self.time10 + (time10 - time9)
 
         yield MetadataWorkUnit(
             id=f"{properties.qualifiedName}-container",
@@ -178,6 +233,9 @@ class IBRedashDatasetSource(IBRedashSource):
                 ),
             ),
         )
+
+        time11 = IBRedashDatasetSource.now_millis()
+        self.time11 = self.time11 + (time11 - time10)
 
     def _fetch_container_workunits(
         self,
