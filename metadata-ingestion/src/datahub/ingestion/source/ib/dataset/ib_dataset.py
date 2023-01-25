@@ -82,12 +82,12 @@ class IBRedashDatasetSource(IBRedashSource):
 
         logger.warning("--- IBRedashDatasetSource.fetch_workunits/ - finished rows_count: " + str(rows_count))
         logger.warning("--- IBRedashDatasetSource._fetch_object_workunits/ - stats:"
-                       " 1: " + str(self.time1) + " 2: " + str(self.time2) + " 3: " + str(self.time4) + " 4: " + str(
-            self.time4) +
-                       " 5: " + str(self.time5) + " 6: " + str(self.time6) + " 7: " + str(self.time7) + " 8: " + str(
-            self.time8) +
+                       " 0: " + str(self.time0) + " 1: " + str(self.time1) + " 2: " + str(self.time2) +
+                       " 3: " + str(self.time4) + " 4: " + str(self.time4) + " 5: " + str(self.time5) +
+                       " 6: " + str(self.time6) + " 7: " + str(self.time7) + " 8: " + str(self.time8) +
                        " 9: " + str(self.time9) + " 10: " + str(self.time10) + " 11: " + str(self.time11))
 
+    time0: int = 0
     time1: int = 0
     time2: int = 0
     time3: int = 0
@@ -105,17 +105,28 @@ class IBRedashDatasetSource(IBRedashSource):
         return int(time.time() * 1000)
 
     def _fetch_object_workunits(self, row: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
-        time0 = IBRedashDatasetSource.now_millis()
+        time_minus_1 = IBRedashDatasetSource.now_millis()
+
         object_name = row.objectName
+        row_location_code = row.locationCode
+        row_parent1 = row.parent1
+        row_parent2 = row.parent2
+        row_parent3 = row.parent3
+        row_description = row.description
+        row_columns = row.columns
+        row_owners = row.owners
+
+        time0 = IBRedashDatasetSource.now_millis()
+        self.time0 = self.time0 + (time0 - time_minus_1)
 
         dataset_path = DatasetUtils.map_path(
             self.platform,
             self.object_subtype,
             IBGenericPathElements(
-                location_code=row.locationCode,
-                parent1=row.parent1,
-                parent2=row.parent2,
-                parent3=row.parent3,
+                location_code=row_location_code,
+                parent1=row_parent1,
+                parent2=row_parent2,
+                parent3=row_parent3,
                 object_name=object_name,
             ),
         )
@@ -125,7 +136,7 @@ class IBRedashDatasetSource(IBRedashSource):
 
         properties = DatasetPropertiesClass(
             name=object_name,
-            description=row.description,
+            description=row_description,
             qualifiedName=IBRedashDatasetSource._build_dataset_qualified_name(
                 *dataset_path
             ),
@@ -145,10 +156,10 @@ class IBRedashDatasetSource(IBRedashSource):
             list(
                 map(
                     lambda col: IBRedashDatasetSource._map_column(col),
-                    row.columns.split("|;|"),
+                    row_columns.split("|;|"),
                 )
             )
-            if pd.notna(row.columns)
+            if pd.notna(row_columns)
             else []
         )
         time4 = IBRedashDatasetSource.now_millis()
@@ -166,9 +177,9 @@ class IBRedashDatasetSource(IBRedashSource):
         self.time5 = self.time5 + (time5 - time4)
 
         owners = []
-        if row.owners is not None:
+        if row_owners is not None:
             owners = [
-                builder.make_group_urn(owner.strip()) for owner in row.owners.split(",")
+                builder.make_group_urn(owner.strip()) for owner in row_owners.split(",")
             ]
 
         time6 = IBRedashDatasetSource.now_millis()
