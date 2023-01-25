@@ -85,7 +85,7 @@ class IBRedashDatasetSource(IBRedashSource):
                        " 0: " + str(IBRedashDatasetSource.ns_to_ms(self.time0)) +
                        " 1: " + str(IBRedashDatasetSource.ns_to_ms(self.time1)) +
                        " 2: " + str(IBRedashDatasetSource.ns_to_ms(self.time2)) +
-                       " 3: " + str(IBRedashDatasetSource.ns_to_ms(self.time4)) +
+                       " 3: " + str(IBRedashDatasetSource.ns_to_ms(self.time3)) +
                        " 4: " + str(IBRedashDatasetSource.ns_to_ms(self.time4)) +
                        " 5: " + str(IBRedashDatasetSource.ns_to_ms(self.time5)) +
                        " 6: " + str(IBRedashDatasetSource.ns_to_ms(self.time6)) +
