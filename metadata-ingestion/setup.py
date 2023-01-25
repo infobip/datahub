@@ -494,6 +494,7 @@ entry_points = {
         "file = datahub.ingestion.source.file:GenericFileSource",
         "ib-lineages = datahub.ingestion.source.ib.lineage.ib_lineages:IBLineagesSource",
         "ib-kafka = datahub.ingestion.source.ib.dataset.ib_kafka:IBKafkaSource",
+        "ib-elasticsearch = datahub.ingestion.source.ib.dataset.ib_elasticsearch:IBElasticsearchSource",
         "ib-mssql-views = datahub.ingestion.source.ib.dataset.ib_mssql_views:IBMSSQLViewsSource",
         "ib-mssql-tables = datahub.ingestion.source.ib.dataset.ib_mssql_tables:IBMSSQLTablesSource",
         "sqlalchemy = datahub.ingestion.source.sql.sql_generic:SQLAlchemyGenericSource",
