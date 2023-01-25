@@ -86,7 +86,9 @@ class IBRedashDatasetSource(IBRedashSource):
 
         properties = DatasetPropertiesClass(
             name=object_name,
-            description=row.description if pd.notna(row.description) else None,  # pandas maps empty description as nan
+            description=row.description
+            if pd.notna(row.description)
+            else None,  # pandas maps empty description as nan
             qualifiedName=IBRedashDatasetSource._build_dataset_qualified_name(
                 *dataset_path
             ),

@@ -113,7 +113,7 @@ class DatasetUtils:
 
     @staticmethod
     def _map_elasticsearch_path(
-            object_subtype: str, generic_path: IBGenericPathElements
+        object_subtype: str, generic_path: IBGenericPathElements
     ) -> List[IBPathElementInfo]:
         subtype = object_subtype if pd.notna(object_subtype) else "Index"
         return [
