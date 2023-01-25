@@ -82,10 +82,18 @@ class IBRedashDatasetSource(IBRedashSource):
 
         logger.warning("--- IBRedashDatasetSource.fetch_workunits/ - finished rows_count: " + str(rows_count))
         logger.warning("--- IBRedashDatasetSource._fetch_object_workunits/ - stats:"
-                       " 0: " + str(self.time0) + " 1: " + str(self.time1) + " 2: " + str(self.time2) +
-                       " 3: " + str(self.time4) + " 4: " + str(self.time4) + " 5: " + str(self.time5) +
-                       " 6: " + str(self.time6) + " 7: " + str(self.time7) + " 8: " + str(self.time8) +
-                       " 9: " + str(self.time9) + " 10: " + str(self.time10) + " 11: " + str(self.time11))
+                       " 0: " + str(IBRedashDatasetSource.ns_to_ms(self.time0)) +
+                       " 1: " + str(IBRedashDatasetSource.ns_to_ms(self.time1)) +
+                       " 2: " + str(IBRedashDatasetSource.ns_to_ms(self.time2)) +
+                       " 3: " + str(IBRedashDatasetSource.ns_to_ms(self.time4)) +
+                       " 4: " + str(IBRedashDatasetSource.ns_to_ms(self.time4)) +
+                       " 5: " + str(IBRedashDatasetSource.ns_to_ms(self.time5)) +
+                       " 6: " + str(IBRedashDatasetSource.ns_to_ms(self.time6)) +
+                       " 7: " + str(IBRedashDatasetSource.ns_to_ms(self.time7)) +
+                       " 8: " + str(IBRedashDatasetSource.ns_to_ms(self.time8)) +
+                       " 9: " + str(IBRedashDatasetSource.ns_to_ms(self.time9)) +
+                       " 10: "+ str(IBRedashDatasetSource.ns_to_ms(self.time10)) +
+                       " 11: " + str(IBRedashDatasetSource.ns_to_ms(self.time11)))
 
     time0: int = 0
     time1: int = 0
@@ -101,11 +109,15 @@ class IBRedashDatasetSource(IBRedashSource):
     time11: int = 0
 
     @staticmethod
-    def now_millis() -> int:
-        return int(time.time() * 1000)
+    def now_ns() -> int:
+        return time.time_ns()
+
+    @staticmethod
+    def ns_to_ms(ns:int) -> int:
+        return int(ns/1_000_000)
 
     def _fetch_object_workunits(self, row: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
-        time_minus_1 = IBRedashDatasetSource.now_millis()
+        time_minus_1 = IBRedashDatasetSource.now_ns()
 
         object_name = row.objectName
         row_location_code = row.locationCode
@@ -116,7 +128,7 @@ class IBRedashDatasetSource(IBRedashSource):
         row_columns = row.columns
         row_owners = row.owners
 
-        time0 = IBRedashDatasetSource.now_millis()
+        time0 = IBRedashDatasetSource.now_ns()
         self.time0 = self.time0 + (time0 - time_minus_1)
 
         dataset_path = DatasetUtils.map_path(
@@ -131,7 +143,7 @@ class IBRedashDatasetSource(IBRedashSource):
             ),
         )
 
-        time1 = IBRedashDatasetSource.now_millis()
+        time1 = IBRedashDatasetSource.now_ns()
         self.time1 = self.time1 + (time1 - time0)
 
         properties = DatasetPropertiesClass(
@@ -142,14 +154,14 @@ class IBRedashDatasetSource(IBRedashSource):
             ),
         )
 
-        time2 = IBRedashDatasetSource.now_millis()
+        time2 = IBRedashDatasetSource.now_ns()
         self.time2 = self.time2 + (time2 - time1)
 
         browse_paths = BrowsePathsClass(
             [f"/prod/{DatasetUtils.join_path('/', *dataset_path)}"]
         )
 
-        time3 = IBRedashDatasetSource.now_millis()
+        time3 = IBRedashDatasetSource.now_ns()
         self.time3 = self.time3 + (time3 - time2)
 
         columns = (
@@ -162,7 +174,7 @@ class IBRedashDatasetSource(IBRedashSource):
             if pd.notna(row_columns)
             else []
         )
-        time4 = IBRedashDatasetSource.now_millis()
+        time4 = IBRedashDatasetSource.now_ns()
         self.time4 = self.time4 + (time4 - time3)
         schema = SchemaMetadataClass(
             schemaName=self.platform,
@@ -173,7 +185,7 @@ class IBRedashDatasetSource(IBRedashSource):
             fields=columns,
         )
 
-        time5 = IBRedashDatasetSource.now_millis()
+        time5 = IBRedashDatasetSource.now_ns()
         self.time5 = self.time5 + (time5 - time4)
 
         owners = []
@@ -182,14 +194,14 @@ class IBRedashDatasetSource(IBRedashSource):
                 builder.make_group_urn(owner.strip()) for owner in row_owners.split(",")
             ]
 
-        time6 = IBRedashDatasetSource.now_millis()
+        time6 = IBRedashDatasetSource.now_ns()
         self.time6 = self.time6 + (time6 - time5)
 
         ownership = builder.make_ownership_aspect_from_urn_list(
             owners, OwnershipSourceTypeClass.SERVICE, OwnershipTypeClass.TECHNICAL_OWNER
         )
 
-        time7 = IBRedashDatasetSource.now_millis()
+        time7 = IBRedashDatasetSource.now_ns()
         self.time7 = self.time7 + (time7 - time6)
 
         aspects = [properties, browse_paths, schema, ownership]
@@ -200,7 +212,7 @@ class IBRedashDatasetSource(IBRedashSource):
         mce = MetadataChangeEvent(proposedSnapshot=snapshot)
         yield MetadataWorkUnit(properties.qualifiedName, mce=mce)
 
-        time8 = IBRedashDatasetSource.now_millis()
+        time8 = IBRedashDatasetSource.now_ns()
         self.time8 = self.time8 + (time8 - time7)
 
         yield MetadataWorkUnit(
@@ -214,7 +226,7 @@ class IBRedashDatasetSource(IBRedashSource):
             ),
         )
 
-        time9 = IBRedashDatasetSource.now_millis()
+        time9 = IBRedashDatasetSource.now_ns()
         self.time9 = self.time9 + (time9 - time8)
 
         container_parent_path = None
@@ -227,7 +239,7 @@ class IBRedashDatasetSource(IBRedashSource):
             )
             container_parent_path = container_path
 
-        time10 = IBRedashDatasetSource.now_millis()
+        time10 = IBRedashDatasetSource.now_ns()
         self.time10 = self.time10 + (time10 - time9)
 
         yield MetadataWorkUnit(
@@ -245,7 +257,7 @@ class IBRedashDatasetSource(IBRedashSource):
             ),
         )
 
-        time11 = IBRedashDatasetSource.now_millis()
+        time11 = IBRedashDatasetSource.now_ns()
         self.time11 = self.time11 + (time11 - time10)
 
     def _fetch_container_workunits(
