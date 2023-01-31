@@ -9,7 +9,7 @@ class IBElasticsearchSourceConfig(IBRedashSourceConfig):
     pass
 
 
-@platform_name("IBKafka")
+@platform_name("IBElastic")
 @config_class(IBElasticsearchSourceConfig)
 class IBElasticsearchSource(IBRedashDatasetSource):
     platform = "elasticsearch"
