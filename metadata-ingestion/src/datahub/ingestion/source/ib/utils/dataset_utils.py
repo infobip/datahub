@@ -57,6 +57,8 @@ class DatasetUtils:
         path: List[IBPathElementInfo]
         if platform == "kafka":
             path = DatasetUtils._map_kafka_path(object_subtype, generic_path)
+        elif platform == "elasticsearch":
+            path = DatasetUtils._map_elasticsearch_path(object_subtype, generic_path)
         elif platform == "mssql":
             path = DatasetUtils._map_mssql_path(object_subtype, generic_path)
         else:
@@ -100,6 +102,29 @@ class DatasetUtils:
             IBPathElementInfo(
                 IBPathElementType.CLUSTER,
                 "Kafka Cluster",
+                generic_path.parent1,
+            ),
+            IBPathElementInfo(
+                IBPathElementType.OBJECT,
+                subtype,
+                generic_path.object_name,
+            ),
+        ]
+
+    @staticmethod
+    def _map_elasticsearch_path(
+        object_subtype: str, generic_path: IBGenericPathElements
+    ) -> List[IBPathElementInfo]:
+        subtype = object_subtype if pd.notna(object_subtype) else "Index"
+        return [
+            IBPathElementInfo(
+                IBPathElementType.LOCATION,
+                "DataCenter",
+                generic_path.location_code,
+            ),
+            IBPathElementInfo(
+                IBPathElementType.CLUSTER,
+                "Elasticsearch Cluster",
                 generic_path.parent1,
             ),
             IBPathElementInfo(
