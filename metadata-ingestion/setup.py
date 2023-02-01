@@ -725,6 +725,7 @@ entry_points = {
         "ib-mssql-tables = datahub.ingestion.source.ib.ib_mssql_tables:IBMSSQLTablesSource",
         "datahub = datahub.ingestion.source.datahub.datahub_source:DataHubSource",
         "ib-redash-lineages = datahub.ingestion.source.ib_redash_lineages:IBRedashLineagesSource",
+        "ib-elasticsearch = datahub.ingestion.source.ib.dataset.ib_elasticsearch:IBElasticsearchSource",
         "sqlalchemy = datahub.ingestion.source.sql.sql_generic:SQLAlchemyGenericSource",
         "athena = datahub.ingestion.source.sql.athena:AthenaSource",
         "azure-ad = datahub.ingestion.source.identity.azure_ad:AzureADSource",
