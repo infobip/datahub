@@ -172,6 +172,10 @@ fragment ownershipFields on Ownership {
     }
 }
 
+fragment embedFields on Embed {
+    renderUrl
+}
+
 fragment institutionalMemoryFields on InstitutionalMemory {
     elements {
         url
@@ -249,6 +253,9 @@ fragment nonRecursiveDatasetFields on Dataset {
     deprecation {
         ...deprecationFields
     }
+    embed {
+        ...embedFields
+    }
 }
 
 fragment nonRecursiveDataFlowFields on DataFlow {
@@ -309,6 +316,7 @@ fragment nonRecursiveDataJobFields on DataJob {
 fragment dataJobFields on DataJob {
     urn
     type
+    exists
     lastIngested
     dataFlow {
         ...nonRecursiveDataFlowFields
@@ -358,6 +366,7 @@ fragment dataJobFields on DataJob {
 fragment dashboardFields on Dashboard {
     urn
     type
+    exists
     lastIngested
     tool
     dashboardId
@@ -405,6 +414,9 @@ fragment dashboardFields on Dashboard {
     status {
         removed
     }
+    embed {
+        ...embedFields
+    }
     deprecation {
         ...deprecationFields
     }
@@ -438,12 +450,14 @@ fragment dashboardFields on Dashboard {
     }
     privileges {
         canEditLineage
+        canEditEmbed
     }
 }
 
 fragment nonRecursiveMLFeature on MLFeature {
     urn
     type
+    exists
     lastIngested
     name
     featureNamespace
@@ -512,6 +526,7 @@ fragment nonRecursiveMLFeature on MLFeature {
 fragment nonRecursiveMLPrimaryKey on MLPrimaryKey {
     urn
     type
+    exists
     lastIngested
     name
     featureNamespace
@@ -580,6 +595,7 @@ fragment nonRecursiveMLPrimaryKey on MLPrimaryKey {
 fragment nonRecursiveMLFeatureTable on MLFeatureTable {
     urn
     type
+    exists
     lastIngested
     name
     platform {
@@ -705,6 +721,7 @@ fragment schemaMetadataFields on SchemaMetadata {
 fragment nonRecursiveMLModel on MLModel {
     urn
     type
+    exists
     lastIngested
     name
     description
@@ -768,12 +785,13 @@ fragment nonRecursiveMLModel on MLModel {
     }
     institutionalMemory {
         ...institutionalMemoryFields
-    }    
+    }
 }
 
 fragment nonRecursiveMLModelGroupFields on MLModelGroup {
     urn
     type
+    exists
     lastIngested
     name
     description

@@ -51,7 +51,7 @@ from datahub.ingestion.api.ingestion_job_checkpointing_provider_base import JobI
 from datahub.ingestion.api.workunit import MetadataWorkUnit
 from datahub.ingestion.source.aws import s3_util
 from datahub.ingestion.source.aws.aws_common import AwsSourceConfig
-from datahub.ingestion.source.aws.s3_util import make_s3_urn
+from datahub.ingestion.source.aws.s3_util import is_s3_uri, make_s3_urn
 from datahub.ingestion.source.glue_profiling_config import GlueProfilingConfig
 from datahub.ingestion.source.state.checkpoint import Checkpoint
 from datahub.ingestion.source.state.sql_common_state import (
@@ -75,7 +75,6 @@ from datahub.metadata.com.linkedin.pegasus2avro.schema import (
     SchemaMetadata,
 )
 from datahub.metadata.schema_classes import (
-    ChangeTypeClass,
     DataFlowInfoClass,
     DataFlowSnapshotClass,
     DataJobInfoClass,
@@ -87,19 +86,21 @@ from datahub.metadata.schema_classes import (
     DatasetProfileClass,
     DatasetPropertiesClass,
     GlobalTagsClass,
-    JobStatusClass,
     MetadataChangeEventClass,
     OwnerClass,
     OwnershipClass,
     OwnershipTypeClass,
     PartitionSpecClass,
     PartitionTypeClass,
-    StatusClass,
     TagAssociationClass,
     UpstreamClass,
     UpstreamLineageClass,
 )
 from datahub.utilities.hive_schema_to_avro import get_schema_fields_for_hive_column
+from datahub.utilities.source_helpers import (
+    auto_stale_entity_removal,
+    auto_status_aspect,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,9 +109,7 @@ DEFAULT_PLATFORM = "glue"
 VALID_PLATFORMS = [DEFAULT_PLATFORM, "athena"]
 
 
-class GlueSourceConfig(
-    AwsSourceConfig, GlueProfilingConfig, StatefulIngestionConfigBase
-):
+class GlueSourceConfig(AwsSourceConfig, StatefulIngestionConfigBase):
     extract_owners: Optional[bool] = Field(
         default=True,
         description="When enabled, extracts ownership from Glue directly and overwrites existing owners. When disabled, ownership is left empty for datasets.",
@@ -712,7 +711,7 @@ class GlueSource(StatefulIngestionSourceBase):
             ] = mce_builder.get_aspect_if_available(mce, DatasetPropertiesClass)
             if dataset_properties and "Location" in dataset_properties.customProperties:
                 location = dataset_properties.customProperties["Location"]
-                if location.startswith("s3://"):
+                if is_s3_uri(location):
                     s3_dataset_urn = make_s3_urn(location, self.source_config.env)
                     if self.source_config.glue_s3_lineage_direction == "upstream":
                         upstream_lineage = UpstreamLineageClass(
@@ -724,10 +723,7 @@ class GlueSource(StatefulIngestionSourceBase):
                             ]
                         )
                         mcp = MetadataChangeProposalWrapper(
-                            entityType="dataset",
                             entityUrn=mce.proposedSnapshot.urn,
-                            changeType=ChangeTypeClass.UPSERT,
-                            aspectName="upstreamLineage",
                             aspect=upstream_lineage,
                         )
                         return mcp
@@ -742,10 +738,7 @@ class GlueSource(StatefulIngestionSourceBase):
                             ]
                         )
                         mcp = MetadataChangeProposalWrapper(
-                            entityType="dataset",
                             entityUrn=s3_dataset_urn,
-                            changeType=ChangeTypeClass.UPSERT,
-                            aspectName="upstreamLineage",
                             aspect=upstream_lineage,
                         )
                         return mcp
@@ -827,10 +820,7 @@ class GlueSource(StatefulIngestionSourceBase):
             )
 
         mcp = MetadataChangeProposalWrapper(
-            entityType="dataset",
             entityUrn=mce.proposedSnapshot.urn,
-            changeType=ChangeTypeClass.UPSERT,
-            aspectName="datasetProfile",
             aspect=dataset_profile,
         )
         return mcp
@@ -942,12 +932,11 @@ class GlueSource(StatefulIngestionSourceBase):
         return None
 
     def _get_domain_wu(
-        self, dataset_name: str, entity_urn: str, entity_type: str
+        self, dataset_name: str, entity_urn: str
     ) -> Iterable[MetadataWorkUnit]:
         domain_urn = self._gen_domain_urn(dataset_name)
         if domain_urn:
             wus = add_domain_to_entity_wu(
-                entity_type=entity_type,
                 entity_urn=entity_urn,
                 domain_urn=domain_urn,
             )
@@ -956,6 +945,12 @@ class GlueSource(StatefulIngestionSourceBase):
                 yield wu
 
     def get_workunits(self) -> Iterable[MetadataWorkUnit]:
+        return auto_stale_entity_removal(
+            self.stale_entity_removal_handler,
+            auto_status_aspect(self.get_workunits_internal()),
+        )
+
+    def get_workunits_internal(self) -> Iterable[MetadataWorkUnit]:
         database_seen = set()
         databases, tables = self.get_all_tables_and_databases()
 
@@ -997,14 +992,10 @@ class GlueSource(StatefulIngestionSourceBase):
             yield from self._get_domain_wu(
                 dataset_name=full_table_name,
                 entity_urn=dataset_urn,
-                entity_type="dataset",
             )
             yield from self.add_table_to_database_container(
                 dataset_urn=dataset_urn, db_name=database_name
             )
-
-            # Add table to the checkpoint state.
-            self.stale_entity_removal_handler.add_entity_to_state("table", dataset_urn)
 
             mcp = self.get_lineage_if_enabled(mce)
             if mcp:
@@ -1026,9 +1017,6 @@ class GlueSource(StatefulIngestionSourceBase):
 
         if self.extract_transforms:
             yield from self._transform_extraction()
-
-        # Clean up stale entities.
-        yield from self.stale_entity_removal_handler.gen_removed_entity_workunits()
 
     def _transform_extraction(self) -> Iterable[MetadataWorkUnit]:
         dags: Dict[str, Optional[Dict[str, Any]]] = {}
@@ -1111,6 +1099,7 @@ class GlueSource(StatefulIngestionSourceBase):
                 },
                 uri=table.get("Location"),
                 tags=[],
+                name=table["Name"],
                 qualifiedName=self.get_glue_arn(
                     account_id=table["CatalogId"],
                     database=table["DatabaseName"],

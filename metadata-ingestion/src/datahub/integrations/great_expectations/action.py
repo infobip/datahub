@@ -53,7 +53,6 @@ from datahub.metadata.com.linkedin.pegasus2avro.assertion import (
     DatasetAssertionScope,
 )
 from datahub.metadata.com.linkedin.pegasus2avro.common import DataPlatformInstance
-from datahub.metadata.com.linkedin.pegasus2avro.events.metadata import ChangeType
 from datahub.metadata.schema_classes import PartitionSpecClass, PartitionTypeClass
 from datahub.utilities.sql_parser import DefaultSQLParser
 
@@ -170,30 +169,21 @@ class DataHubValidationAction(ValidationAction):
 
                 # Construct a MetadataChangeProposalWrapper object.
                 assertion_info_mcp = MetadataChangeProposalWrapper(
-                    entityType="assertion",
-                    changeType=ChangeType.UPSERT,
                     entityUrn=assertion["assertionUrn"],
-                    aspectName="assertionInfo",
                     aspect=assertion["assertionInfo"],
                 )
                 emitter.emit_mcp(assertion_info_mcp)
 
                 # Construct a MetadataChangeProposalWrapper object.
                 assertion_platform_mcp = MetadataChangeProposalWrapper(
-                    entityType="assertion",
-                    changeType=ChangeType.UPSERT,
                     entityUrn=assertion["assertionUrn"],
-                    aspectName="dataPlatformInstance",
                     aspect=assertion["assertionPlatform"],
                 )
                 emitter.emit_mcp(assertion_platform_mcp)
 
                 for assertionResult in assertion["assertionResults"]:
                     dataset_assertionResult_mcp = MetadataChangeProposalWrapper(
-                        entityType="assertion",
-                        changeType=ChangeType.UPSERT,
                         entityUrn=assertionResult.assertionUrn,
-                        aspectName="assertionRunEvent",
                         aspect=assertionResult,
                     )
 
@@ -754,12 +744,14 @@ def make_dataset_urn_from_sqlalchemy_uri(
             return None
         # If data platform is snowflake, we artificially lowercase the Database name.
         # This is because DataHub also does this during ingestion.
-        # Ref: https://github.com/datahub-project/datahub/blob/master/metadata-ingestion%2Fsrc%2Fdatahub%2Fingestion%2Fsource%2Fsql%2Fsnowflake.py#L272
+        # Ref: https://github.com/datahub-project/datahub/blob/master/metadata-ingestion/src/datahub/ingestion/source/snowflake/snowflake_utils.py#L155
         database_name = (
             url_instance.database.lower()
             if data_platform == "snowflake"
             else url_instance.database
         )
+        if database_name.endswith(f"/{schema_name}"):
+            database_name = database_name[: -len(f"/{schema_name}")]
         schema_name = (
             schema_name
             if exclude_dbname

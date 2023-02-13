@@ -29,7 +29,6 @@ from datahub.metadata.com.linkedin.pegasus2avro.metadata.snapshot import (
 )
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
 from datahub.metadata.schema_classes import (
-    ChangeTypeClass,
     CorpGroupInfoClass,
     CorpUserInfoClass,
     GroupMembershipClass,
@@ -296,10 +295,7 @@ class AzureADSource(Source):
                     yield wu
 
                     group_origin_mcp = MetadataChangeProposalWrapper(
-                        entityType="corpGroup",
                         entityUrn=datahub_corp_group_snapshot.urn,
-                        changeType=ChangeTypeClass.UPSERT,
-                        aspectName="origin",
                         aspect=OriginClass(OriginTypeClass.EXTERNAL, "AZURE_AD"),
                     )
                     group_origin_wu_id = f"group-origin-{group_count + 1 if self.config.mask_group_id else datahub_corp_group_snapshot.urn}"
@@ -310,10 +306,7 @@ class AzureADSource(Source):
                     yield group_origin_wu
 
                     group_status_mcp = MetadataChangeProposalWrapper(
-                        entityType="corpGroup",
                         entityUrn=datahub_corp_group_snapshot.urn,
-                        changeType=ChangeTypeClass.UPSERT,
-                        aspectName="status",
                         aspect=StatusClass(removed=False),
                     )
                     group_status_wu_id = f"group-status-{group_count + 1 if self.config.mask_group_id else datahub_corp_group_snapshot.urn}"
@@ -426,18 +419,14 @@ class AzureADSource(Source):
         for user_count, datahub_corp_user_snapshot in enumerate(
             datahub_corp_user_snapshots
         ):
-            # Add GroupMembership if applicable
-            if (
-                datahub_corp_user_snapshot.urn
-                in datahub_corp_user_urn_to_group_membership.keys()
-            ):
-                datahub_group_membership = (
-                    datahub_corp_user_urn_to_group_membership.get(
-                        datahub_corp_user_snapshot.urn
-                    )
-                )
-                assert datahub_group_membership
-                datahub_corp_user_snapshot.aspects.append(datahub_group_membership)
+            # TODO: Refactor common code between this and Okta to a common base class or utils
+            # Add group membership aspect
+            datahub_group_membership: GroupMembershipClass = (
+                datahub_corp_user_urn_to_group_membership[
+                    datahub_corp_user_snapshot.urn
+                ]
+            )
+            datahub_corp_user_snapshot.aspects.append(datahub_group_membership)
             mce = MetadataChangeEvent(proposedSnapshot=datahub_corp_user_snapshot)
             wu_id = f"user-snapshot-{user_count + 1 if self.config.mask_user_id else datahub_corp_user_snapshot.urn}"
             wu = MetadataWorkUnit(id=wu_id, mce=mce)
@@ -445,10 +434,7 @@ class AzureADSource(Source):
             yield wu
 
             user_origin_mcp = MetadataChangeProposalWrapper(
-                entityType="corpuser",
                 entityUrn=datahub_corp_user_snapshot.urn,
-                changeType=ChangeTypeClass.UPSERT,
-                aspectName="origin",
                 aspect=OriginClass(OriginTypeClass.EXTERNAL, "AZURE_AD"),
             )
             user_origin_wu_id = f"user-origin-{user_count + 1 if self.config.mask_user_id else datahub_corp_user_snapshot.urn}"
@@ -457,10 +443,7 @@ class AzureADSource(Source):
             yield user_origin_wu
 
             user_status_mcp = MetadataChangeProposalWrapper(
-                entityType="corpuser",
                 entityUrn=datahub_corp_user_snapshot.urn,
-                changeType=ChangeTypeClass.UPSERT,
-                aspectName="status",
                 aspect=StatusClass(removed=False),
             )
             user_status_wu_id = f"user-status-{user_count + 1 if self.config.mask_user_id else datahub_corp_user_snapshot.urn}"
@@ -526,30 +509,36 @@ class AzureADSource(Source):
 
     def _map_azure_ad_groups(self, azure_ad_groups):
         for azure_ad_group in azure_ad_groups:
-            corp_group_urn, error_str = self._map_identity_to_urn(
-                self._map_azure_ad_group_to_urn,
-                azure_ad_group,
-                "azure_ad_group_mapping",
-                "group",
-            )
-            if error_str is not None:
-                continue
-            group_name = self._extract_regex_match_from_dict_value(
-                azure_ad_group,
-                self.config.azure_ad_response_to_groupname_attr,
-                self.config.azure_ad_response_to_groupname_regex,
-            )
-            if not self.config.groups_pattern.allowed(group_name):
-                self.report.report_filtered(f"{corp_group_urn}")
-                continue
-            self.selected_azure_ad_groups.append(azure_ad_group)
-            corp_group_snapshot = CorpGroupSnapshot(
-                urn=corp_group_urn,
-                aspects=[],
-            )
-            corp_group_info = self._map_azure_ad_group_to_corp_group(azure_ad_group)
-            corp_group_snapshot.aspects.append(corp_group_info)
-            yield corp_group_snapshot
+            try:
+                yield from self._map_azure_ad_group(azure_ad_group)
+            except Exception as e:
+                self.report.report_failure("azure_ad_group", str(e))
+
+    def _map_azure_ad_group(self, azure_ad_group):
+        corp_group_urn, error_str = self._map_identity_to_urn(
+            self._map_azure_ad_group_to_urn,
+            azure_ad_group,
+            "azure_ad_group_mapping",
+            "group",
+        )
+        if error_str is not None:
+            return
+        group_name = self._extract_regex_match_from_dict_value(
+            azure_ad_group,
+            self.config.azure_ad_response_to_groupname_attr,
+            self.config.azure_ad_response_to_groupname_regex,
+        )
+        if not self.config.groups_pattern.allowed(group_name):
+            self.report.report_filtered(f"{corp_group_urn}")
+            return
+        self.selected_azure_ad_groups.append(azure_ad_group)
+        corp_group_snapshot = CorpGroupSnapshot(
+            urn=corp_group_urn,
+            aspects=[],
+        )
+        corp_group_info = self._map_azure_ad_group_to_corp_group(azure_ad_group)
+        corp_group_snapshot.aspects.append(corp_group_info)
+        yield corp_group_snapshot
 
     # Converts Azure group profile into DataHub CorpGroupInfoClass Aspect
     def _map_azure_ad_group_to_corp_group(self, group):
