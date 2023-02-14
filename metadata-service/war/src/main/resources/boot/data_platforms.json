@@ -534,5 +534,15 @@
       "type": "OLAP_DATASTORE",
       "logoUrl": "/assets/platforms/verticalogo.png"
     }
+  },
+  {
+    "urn": "urn:li:dataPlatform:infobip-location",
+    "aspect": {
+      "datasetNameDelimiter": ".",
+      "name": "location",
+      "displayName": "Location",
+      "type": "OTHERS",
+      "logoUrl": "/assets/platforms/datahublogo.png"
+    }
   }
 ]

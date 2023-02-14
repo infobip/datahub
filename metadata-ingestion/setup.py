@@ -54,6 +54,7 @@ framework_common = {
     "cached_property",
     "ijson",
     "click-spinner",
+    "prometheus_client>=0.15.0",
     "requests_file",
 }
 
@@ -499,6 +500,11 @@ entry_points = {
     "datahub.ingestion.source.plugins": [
         "csv-enricher = datahub.ingestion.source.csv_enricher:CSVEnricherSource",
         "file = datahub.ingestion.source.file:GenericFileSource",
+        "ib-lineages = datahub.ingestion.source.ib.lineage.ib_lineages:IBLineagesSource",
+        "ib-kafka = datahub.ingestion.source.ib.dataset.ib_kafka:IBKafkaSource",
+        "ib-elasticsearch = datahub.ingestion.source.ib.dataset.ib_elasticsearch:IBElasticsearchSource",
+        "ib-mssql-views = datahub.ingestion.source.ib.dataset.ib_mssql_views:IBMSSQLViewsSource",
+        "ib-mssql-tables = datahub.ingestion.source.ib.dataset.ib_mssql_tables:IBMSSQLTablesSource",
         "sqlalchemy = datahub.ingestion.source.sql.sql_generic:SQLAlchemyGenericSource",
         "athena = datahub.ingestion.source.sql.athena:AthenaSource",
         "azure-ad = datahub.ingestion.source.identity.azure_ad:AzureADSource",

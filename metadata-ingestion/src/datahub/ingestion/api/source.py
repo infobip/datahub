@@ -11,6 +11,10 @@ from datahub.configuration.common import ConfigModel
 from datahub.emitter.mcp_builder import mcps_from_mce
 from datahub.ingestion.api.closeable import Closeable
 from datahub.ingestion.api.common import PipelineContext, RecordEnvelope, WorkUnit
+from datahub.ingestion.api.prometheus_metrics import (
+    report_ingested_workunit_to_prometheus,
+    report_ingestion_issue_to_prometheus,
+)
 from datahub.ingestion.api.report import Report
 from datahub.ingestion.api.workunit import MetadataWorkUnit
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
@@ -71,15 +75,19 @@ class SourceReport(Report):
                 if aspectName is not None:  # usually true
                     self.aspects[entityType][aspectName] += 1
 
+        report_ingested_workunit_to_prometheus(wu)
+
     def report_warning(self, key: str, reason: str) -> None:
         warnings = self.warnings.get(key, LossyList())
         warnings.append(reason)
         self.warnings[key] = warnings
+        report_ingestion_issue_to_prometheus("warning", reason)
 
     def report_failure(self, key: str, reason: str) -> None:
         failures = self.failures.get(key, LossyList())
         failures.append(reason)
         self.failures[key] = failures
+        report_ingestion_issue_to_prometheus("failure", reason)
 
     def __post_init__(self) -> None:
         self.start_time = datetime.datetime.now()
