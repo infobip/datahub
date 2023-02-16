@@ -1,5 +1,6 @@
 buildscript {
   ext.junitJupiterVersion = '5.6.1'
+  // Releases: https://github.com/linkedin/rest.li/blob/master/CHANGELOG.md
   ext.pegasusVersion = '29.22.16'
   ext.mavenVersion = '3.6.3'
   ext.springVersion = '5.3.20'
@@ -8,12 +9,15 @@ buildscript {
   ext.neo4jVersion = '4.4.9'
   ext.graphQLJavaVersion = '19.0'
   ext.testContainersVersion = '1.17.4'
+  ext.elasticsearchVersion = '7.10.2'
   ext.jacksonVersion = '2.13.4'
   ext.jettyVersion = '9.4.46.v20220331'
   ext.playVersion = '2.8.18'
   ext.log4jVersion = '2.19.0'
   ext.slf4jVersion = '1.7.32'
   ext.logbackClassic = '1.2.11'
+
+  ext.docker_registry = 'linkedin'
 
   apply from: './repositories.gradle'
   buildscript.repositories.addAll(project.repositories)
@@ -32,7 +36,12 @@ buildscript {
 plugins {
   id 'com.gorylenko.gradle-git-properties' version '2.4.0-rc2'
   id 'com.github.johnrengelman.shadow' version '6.1.0'
+  id "com.palantir.docker" version "0.34.0"
+  // https://blog.ltgt.net/javax-jakarta-mess-and-gradle-solution/
+  // TODO id "org.gradlex.java-ecosystem-capabilities" version "1.0"
 }
+
+apply from: "gradle/docker/docker.gradle"
 
 project.ext.spec = [
     'product' : [
@@ -77,8 +86,8 @@ project.ext.externalDependency = [
     'dropwizardMetricsJmx': 'io.dropwizard.metrics:metrics-jmx:4.2.3',
     'ebean': 'io.ebean:ebean:11.33.3',
     'ebeanAgent': 'io.ebean:ebean-agent:11.27.1',
-    'elasticSearchRest': 'org.elasticsearch.client:elasticsearch-rest-high-level-client:7.9.3',
-    'elasticSearchTransport': 'org.elasticsearch.client:transport:7.9.3',
+    'elasticSearchRest': 'org.elasticsearch.client:elasticsearch-rest-high-level-client:' + elasticsearchVersion,
+    'elasticSearchTransport': 'org.elasticsearch.client:transport:' + elasticsearchVersion,
     'findbugsAnnotations': 'com.google.code.findbugs:annotations:3.0.1',
     'graphqlJava': 'com.graphql-java:graphql-java:' + graphQLJavaVersion,
     'graphqlJavaScalars': 'com.graphql-java:graphql-java-extended-scalars:' + graphQLJavaVersion,
@@ -90,6 +99,9 @@ project.ext.externalDependency = [
     'hadoopCommon':'org.apache.hadoop:hadoop-common:2.7.2',
     'hadoopMapreduceClient':'org.apache.hadoop:hadoop-mapreduce-client-core:2.7.2',
     'hadoopCommon3':'org.apache.hadoop:hadoop-common:3.3.4',
+    'hazelcast':'com.hazelcast:hazelcast:5.2.1',
+    'hazelcastSpring':'com.hazelcast:hazelcast-spring:5.2.1',
+    'hazelcastTest':'com.hazelcast:hazelcast:5.2.1:tests',
     'hibernateCore': 'org.hibernate:hibernate-core:5.2.16.Final',
     'httpClient': 'org.apache.httpcomponents:httpclient:4.5.9',
     'httpAsyncClient': 'org.apache.httpcomponents:httpasyncclient:4.1.5',
@@ -199,6 +211,7 @@ allprojects {
   apply plugin: 'idea'
   apply plugin: 'eclipse'
   apply plugin: 'checkstyle'
+  // apply plugin: 'org.gradlex.java-ecosystem-capabilities'
 }
 
 configure(subprojects.findAll {! it.name.startsWith('spark-lineage')}) {
@@ -233,7 +246,7 @@ subprojects {
     dependencies {
       testCompile externalDependency.testng
       constraints {
-        implementation('io.netty:netty-all:4.1.85.Final')
+        implementation('io.netty:netty-all:4.1.86.Final')
         implementation('org.apache.commons:commons-compress:1.21')
         implementation('org.apache.velocity:velocity-engine-core:2.3')
         implementation('org.hibernate:hibernate-validator:6.0.20.Final')

@@ -10,12 +10,12 @@ import { PropertiesTab } from '../shared/tabs/Properties/PropertiesTab';
 import { DocumentationTab } from '../shared/tabs/Documentation/DocumentationTab';
 import { SchemaTab } from '../shared/tabs/Dataset/Schema/SchemaTab';
 import QueriesTab from '../shared/tabs/Dataset/Queries/QueriesTab';
-import { SidebarAboutSection } from '../shared/containers/profile/sidebar/SidebarAboutSection';
+import { SidebarAboutSection } from '../shared/containers/profile/sidebar/AboutSection/SidebarAboutSection';
 import { SidebarOwnerSection } from '../shared/containers/profile/sidebar/Ownership/SidebarOwnerSection';
 import { SidebarTagsSection } from '../shared/containers/profile/sidebar/SidebarTagsSection';
 import StatsTab from '../shared/tabs/Dataset/Stats/StatsTab';
 import { LineageTab } from '../shared/tabs/Lineage/LineageTab';
-import { capitalizeFirstLetter } from '../../shared/textUtil';
+import { capitalizeFirstLetterOnly } from '../../shared/textUtil';
 import ViewDefinitionTab from '../shared/tabs/Dataset/View/ViewDefinitionTab';
 import { SidebarViewDefinitionSection } from '../shared/containers/profile/sidebar/Dataset/View/SidebarViewDefinitionSection';
 import { SidebarRecommendationsSection } from '../shared/containers/profile/sidebar/Recommendations/SidebarRecommendationsSection';
@@ -27,6 +27,8 @@ import { EntityMenuItems } from '../shared/EntityDropdown/EntityDropdown';
 import { SidebarSiblingsSection } from '../shared/containers/profile/sidebar/SidebarSiblingsSection';
 import { DatasetStatsSummarySubHeader } from './profile/stats/stats/DatasetStatsSummarySubHeader';
 import { DatasetSearchSnippet } from './DatasetSearchSnippet';
+import { EmbedTab } from '../shared/tabs/Embed/EmbedTab';
+import EmbeddedProfile from '../shared/embed/EmbeddedProfile';
 
 const SUBTYPES = {
     VIEW: 'view',
@@ -108,12 +110,20 @@ export class DatasetEntity implements Entity<Dataset> {
                     component: DocumentationTab,
                 },
                 {
-                    name: 'Properties',
-                    component: PropertiesTab,
+                    name: 'Preview',
+                    component: EmbedTab,
+                    display: {
+                        visible: (_, dataset: GetDatasetQuery) => !!dataset?.dataset?.embed?.renderUrl,
+                        enabled: (_, dataset: GetDatasetQuery) => !!dataset?.dataset?.embed?.renderUrl,
+                    },
                 },
                 {
                     name: 'Lineage',
                     component: LineageTab,
+                },
+                {
+                    name: 'Properties',
+                    component: PropertiesTab,
                 },
                 {
                     name: 'Queries',
@@ -210,12 +220,12 @@ export class DatasetEntity implements Entity<Dataset> {
         const subTypes = dataset?.subTypes;
         const extendedProperties: DatasetProperties | undefined | null = dataset?.properties && {
             ...dataset?.properties,
-            qualifiedName: dataset?.properties?.qualifiedName || dataset?.name,
+            qualifiedName: dataset?.properties?.qualifiedName || this.displayName(dataset),
         };
         return {
-            name: dataset?.properties?.name || dataset?.name,
+            name: dataset && this.displayName(dataset),
             externalUrl: dataset?.properties?.externalUrl,
-            entityTypeOverride: subTypes ? capitalizeFirstLetter(subTypes.typeNames?.[0]) : '',
+            entityTypeOverride: subTypes ? capitalizeFirstLetterOnly(subTypes.typeNames?.[0]) : '',
             properties: extendedProperties,
         };
     };
@@ -228,7 +238,9 @@ export class DatasetEntity implements Entity<Dataset> {
                 origin={data.origin}
                 subtype={data.subTypes?.typeNames?.[0]}
                 description={data.editableProperties?.description || data.properties?.description}
-                platformName={data.platform.properties?.displayName || data.platform.name}
+                platformName={
+                    data?.platform?.properties?.displayName || capitalizeFirstLetterOnly(data?.platform?.name)
+                }
                 platformLogo={data.platform.properties?.logoUrl}
                 platformInstanceId={data.dataPlatformInstance?.instanceId}
                 owners={data.ownership?.owners}
@@ -251,11 +263,13 @@ export class DatasetEntity implements Entity<Dataset> {
                 name={data.properties?.name || data.name}
                 origin={data.origin}
                 description={data.editableProperties?.description || data.properties?.description}
-                platformName={data.platform.properties?.displayName || data.platform.name}
+                platformName={
+                    data?.platform?.properties?.displayName || capitalizeFirstLetterOnly(data?.platform?.name)
+                }
                 platformLogo={data.platform.properties?.logoUrl}
                 platformInstanceId={data.dataPlatformInstance?.instanceId}
                 platformNames={genericProperties?.siblingPlatforms?.map(
-                    (platform) => platform.properties?.displayName || platform.name,
+                    (platform) => platform.properties?.displayName || capitalizeFirstLetterOnly(platform.name),
                 )}
                 platformLogos={genericProperties?.siblingPlatforms?.map((platform) => platform.properties?.logoUrl)}
                 owners={data.ownership?.owners}
@@ -271,6 +285,8 @@ export class DatasetEntity implements Entity<Dataset> {
                 externalUrl={data.properties?.externalUrl}
                 statsSummary={data.statsSummary}
                 rowCount={(data as any).lastProfile?.length && (data as any).lastProfile[0].rowCount}
+                columnCount={(data as any).lastProfile?.length && (data as any).lastProfile[0].columnCount}
+                sizeInBytes={(data as any).lastProfile?.length && (data as any).lastProfile[0].sizeInBytes}
                 lastUpdatedMs={
                     (data as any).lastOperation?.length && (data as any).lastOperation[0].lastUpdatedTimestamp
                 }
@@ -316,4 +332,13 @@ export class DatasetEntity implements Entity<Dataset> {
             EntityCapabilityType.SOFT_DELETE,
         ]);
     };
+
+    renderEmbeddedProfile = (urn: string) => (
+        <EmbeddedProfile
+            urn={urn}
+            entityType={EntityType.Dataset}
+            useEntityQuery={useGetDatasetQuery}
+            getOverrideProperties={this.getOverridePropertiesFromEntity}
+        />
+    );
 }
