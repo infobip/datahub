@@ -50,6 +50,7 @@ class IBPathElementInfo:
 
 
 class DatasetUtils:
+
     @staticmethod
     def map_path(
         platform: str, object_subtype: str, generic_path: IBGenericPathElements
@@ -61,6 +62,8 @@ class DatasetUtils:
             path = DatasetUtils._map_elasticsearch_path(object_subtype, generic_path)
         elif platform == "mssql":
             path = DatasetUtils._map_mssql_path(object_subtype, generic_path)
+        elif platform == "postgres":
+            path = DatasetUtils._map_postgresql_path(object_subtype, generic_path)
         else:
             raise ValueError(f"Unknown platform {platform}")
 
@@ -137,6 +140,39 @@ class DatasetUtils:
     @staticmethod
     def _map_mssql_path(
         object_subtype: str, generic_path: IBGenericPathElements
+    ) -> List[IBPathElementInfo]:
+        subtype = object_subtype if pd.notna(object_subtype) else "Table"
+        return [
+            IBPathElementInfo(
+                IBPathElementType.LOCATION,
+                "DataCenter",
+                generic_path.location_code,
+            ),
+            IBPathElementInfo(
+                IBPathElementType.LOCATION,
+                "Server",
+                generic_path.parent1,
+            ),
+            IBPathElementInfo(
+                IBPathElementType.CLUSTER,
+                "Database",
+                generic_path.parent2,
+            ),
+            IBPathElementInfo(
+                IBPathElementType.CLUSTER,
+                "Schema",
+                generic_path.parent3,
+            ),
+            IBPathElementInfo(
+                IBPathElementType.OBJECT,
+                subtype,
+                generic_path.object_name,
+            ),
+        ]
+
+    @staticmethod
+    def _map_postgresql_path(
+            object_subtype: str, generic_path: IBGenericPathElements
     ) -> List[IBPathElementInfo]:
         subtype = object_subtype if pd.notna(object_subtype) else "Table"
         return [
