@@ -232,7 +232,7 @@ class IBRedashDatasetSource(IBRedashSource):
                 type=IBRedashDatasetSource._get_type_class(data_type)
             ),
             nativeDataType=data_type,
-            nullable=bool(int(parts[2])),
+            nullable=(parts[2].lower() in ["true", "1"]),
         )
 
     @staticmethod
