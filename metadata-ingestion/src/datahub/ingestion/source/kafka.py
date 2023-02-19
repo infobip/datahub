@@ -12,7 +12,6 @@ from confluent_kafka.admin import (
     AdminClient,
     ConfigEntry,
     ConfigResource,
-    ResourceType,
     TopicMetadata,
 )
 
@@ -20,7 +19,6 @@ from datahub.configuration.common import AllowDenyPattern, ConfigurationError
 from datahub.configuration.kafka import KafkaConsumerConnectionConfig
 from datahub.configuration.source_common import DatasetSourceConfigBase
 from datahub.emitter.mce_builder import (
-    DEFAULT_ENV,
     make_data_platform_urn,
     make_dataplatform_instance_urn,
     make_dataset_urn_with_platform_instance,
@@ -53,12 +51,15 @@ from datahub.metadata.com.linkedin.pegasus2avro.metadata.snapshot import Dataset
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
 from datahub.metadata.schema_classes import (
     BrowsePathsClass,
-    ChangeTypeClass,
     DataPlatformInstanceClass,
     DatasetPropertiesClass,
     SubTypesClass,
 )
 from datahub.utilities.registries.domain_registry import DomainRegistry
+from datahub.utilities.source_helpers import (
+    auto_stale_entity_removal,
+    auto_status_aspect,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +74,6 @@ class KafkaTopicConfigKeys(str, Enum):
 
 
 class KafkaSourceConfig(StatefulIngestionConfigBase, DatasetSourceConfigBase):
-    env: str = DEFAULT_ENV
-    # TODO: inline the connection config
     connection: KafkaConsumerConnectionConfig = KafkaConsumerConnectionConfig()
 
     topic_patterns: AllowDenyPattern = AllowDenyPattern(allow=[".*"], deny=["^_.*"])
@@ -200,6 +199,12 @@ class KafkaSource(StatefulIngestionSourceBase):
         return cls(config, ctx)
 
     def get_workunits(self) -> Iterable[MetadataWorkUnit]:
+        return auto_stale_entity_removal(
+            self.stale_entity_removal_handler,
+            auto_status_aspect(self.get_workunits_internal()),
+        )
+
+    def get_workunits_internal(self) -> Iterable[MetadataWorkUnit]:
         topics = self.consumer.list_topics(
             timeout=self.source_config.connection.client_timeout_seconds
         ).topics
@@ -209,20 +214,8 @@ class KafkaSource(StatefulIngestionSourceBase):
             self.report.report_topic_scanned(t)
             if self.source_config.topic_patterns.allowed(t):
                 yield from self._extract_record(t, t_detail, extra_topic_details.get(t))
-                # add topic to checkpoint
-                topic_urn = make_dataset_urn_with_platform_instance(
-                    platform=self.platform,
-                    name=t,
-                    platform_instance=self.source_config.platform_instance,
-                    env=self.source_config.env,
-                )
-                self.stale_entity_removal_handler.add_entity_to_state(
-                    type="topic", urn=topic_urn
-                )
             else:
                 self.report.report_dropped(t)
-        # Clean up stale entities.
-        yield from self.stale_entity_removal_handler.gen_removed_entity_workunits()
 
     def _extract_record(
         self,
@@ -295,10 +288,7 @@ class KafkaSource(StatefulIngestionSourceBase):
         subtype_wu = MetadataWorkUnit(
             id=f"{topic}-subtype",
             mcp=MetadataChangeProposalWrapper(
-                entityType="dataset",
-                changeType=ChangeTypeClass.UPSERT,
                 entityUrn=dataset_urn,
-                aspectName="subTypes",
                 aspect=SubTypesClass(typeNames=["topic"]),
             ),
         )
@@ -316,7 +306,6 @@ class KafkaSource(StatefulIngestionSourceBase):
 
         if domain_urn:
             wus = add_domain_to_entity_wu(
-                entity_type="dataset",
                 entity_urn=dataset_urn,
                 domain_urn=domain_urn,
             )
@@ -330,7 +319,6 @@ class KafkaSource(StatefulIngestionSourceBase):
         topic_detail: Optional[TopicMetadata],
         extra_topic_config: Optional[Dict[str, ConfigEntry]],
     ) -> Dict[str, str]:
-
         custom_props: Dict[str, str] = {}
         self.update_custom_props_with_topic_details(topic, topic_detail, custom_props)
         self.update_custom_props_with_topic_config(
@@ -413,11 +401,11 @@ class KafkaSource(StatefulIngestionSourceBase):
 
     def fetch_topic_configurations(self, topics: List[str]) -> Dict[str, dict]:
         logger.info("Fetching config details for all topics")
-
         configs: Dict[
             ConfigResource, concurrent.futures.Future
         ] = self.admin_client.describe_configs(
-            resources=[ConfigResource(ResourceType.TOPIC, t) for t in topics]
+            resources=[ConfigResource(ConfigResource.Type.TOPIC, t) for t in topics],
+            request_timeout=self.source_config.connection.client_timeout_seconds,
         )
         logger.debug("Waiting for config details futures to complete")
         concurrent.futures.wait(configs.values())

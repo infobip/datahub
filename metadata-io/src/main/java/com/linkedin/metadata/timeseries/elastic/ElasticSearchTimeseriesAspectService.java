@@ -15,9 +15,11 @@ import com.linkedin.metadata.models.registry.EntityRegistry;
 import com.linkedin.metadata.query.filter.Condition;
 import com.linkedin.metadata.query.filter.Criterion;
 import com.linkedin.metadata.query.filter.Filter;
+import com.linkedin.metadata.search.elasticsearch.indexbuilder.ReindexConfig;
 import com.linkedin.metadata.search.elasticsearch.update.ESBulkProcessor;
 import com.linkedin.metadata.search.utils.ESUtils;
 import com.linkedin.metadata.search.utils.QueryUtils;
+import com.linkedin.metadata.shared.ElasticSearchIndexed;
 import com.linkedin.metadata.timeseries.TimeseriesAspectService;
 import com.linkedin.metadata.timeseries.elastic.indexbuilder.MappingsBuilder;
 import com.linkedin.metadata.timeseries.elastic.indexbuilder.TimeseriesAspectIndexBuilders;
@@ -30,6 +32,7 @@ import com.linkedin.timeseries.AggregationSpec;
 import com.linkedin.timeseries.DeleteAspectValuesResult;
 import com.linkedin.timeseries.GenericTable;
 import com.linkedin.timeseries.GroupingBucket;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
@@ -39,7 +42,6 @@ import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import lombok.extern.slf4j.Slf4j;
-import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.update.UpdateRequest;
@@ -57,7 +59,7 @@ import org.elasticsearch.search.sort.SortOrder;
 
 
 @Slf4j
-public class ElasticSearchTimeseriesAspectService implements TimeseriesAspectService {
+public class ElasticSearchTimeseriesAspectService implements TimeseriesAspectService, ElasticSearchIndexed {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String TIMESTAMP_FIELD = "timestampMillis";
   private static final String EVENT_FIELD = "event";
@@ -112,19 +114,29 @@ public class ElasticSearchTimeseriesAspectService implements TimeseriesAspectSer
 
   @Override
   public void configure() {
-    _indexBuilders.buildAll();
+    _indexBuilders.reindexAll();
+  }
+
+  @Override
+  public List<ReindexConfig> getReindexConfigs() {
+    return _indexBuilders.getReindexConfigs();
+  }
+
+  @Override
+  public void reindexAll() {
+    configure();
   }
 
   @Override
   public void upsertDocument(@Nonnull String entityName, @Nonnull String aspectName, @Nonnull String docId,
       @Nonnull JsonNode document) {
     String indexName = _indexConvention.getTimeseriesAspectIndexName(entityName, aspectName);
-    final IndexRequest indexRequest =
-        new IndexRequest(indexName).id(docId).source(document.toString(), XContentType.JSON);
-    final UpdateRequest updateRequest = new UpdateRequest(indexName, docId).doc(document.toString(), XContentType.JSON)
+    final UpdateRequest updateRequest = new UpdateRequest(
+            indexName, docId)
             .detectNoop(false)
-            .retryOnConflict(_numRetries)
-            .upsert(indexRequest);
+            .docAsUpsert(true)
+            .doc(document.toString(), XContentType.JSON)
+            .retryOnConflict(_numRetries);
     _bulkProcessor.add(updateRequest);
   }
 

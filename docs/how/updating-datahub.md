@@ -6,13 +6,31 @@ This file documents any backwards-incompatible changes in DataHub and assists pe
 
 ### Breaking Changes
 
+- #7103 This should only impact users who have configured explicit non-default names for DataHub's Kafka topics. The environment variables used to configure Kafka topics for DataHub used in the `kafka-setup` docker image have been updated to be in-line with other DataHub components, for more info see our docs on [Configuring Kafka in DataHub
+](https://datahubproject.io/docs/how/kafka-config). They have been suffixed with `_TOPIC` where as now the correct suffix is `_TOPIC_NAME`. This change should not affect any user who is using default Kafka names.
+
 ### Potential Downtime
+
+- #6894 Search improvements requires reindexing indices. A `system-update` job will run which will set indices to read-only and create a backup/clone of each index. During the reindexing new components will be prevented from start-up until the reindex completes. The logs of this job will indicate a % complete per index. Depending on index sizes and infrastructure this process can take 5 minutes to hours however as a rough estimate 1 hour for every 2.3 million entities. 
 
 ### Deprecations
 
-### Other notable Changes
+## 0.9.6
 
-## 0.9.4
+### Breaking Changes
+
+- #6742 The metadata file sink's output format no longer contains nested JSON strings for MCP aspects, but instead unpacks the stringified JSON into a real JSON object. The previous sink behavior can be recovered using the `legacy_nested_json_string` option. The file source is backwards compatible and supports both formats.
+- #6901 The `env` and `database_alias` fields have been marked deprecated across all sources. We recommend using `platform_instance` where possible instead.
+
+### Potential Downtime
+
+### Deprecations
+#6851 - Sources bigquery-legacy and bigquery-usage-legacy have been removed.
+
+### Other notable Changes
+- If anyone faces issues with login please clear your cookies. Some security updates are part of this release. That may cause login issues until cookies are cleared.
+
+## 0.9.4 / 0.9.5
 
 ### Breaking Changes
 

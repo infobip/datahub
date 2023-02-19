@@ -37,7 +37,8 @@ Cypress.Commands.add('deleteUrn', (urn) => {
 })
 
 Cypress.Commands.add("logout", () => {
-  cy.visit("/logOut")
+  cy.get(selectorWithtestId("manage-account-menu")).click();
+  cy.get(selectorWithtestId("log-out-menu-item")).click({ force: true });
   cy.waitTextVisible("Username");
   cy.waitTextVisible("Password");
 });
@@ -68,6 +69,18 @@ Cypress.Commands.add("goToDataset", (urn, dataset_name) => {
     "/dataset/" + urn
   );
   cy.waitTextVisible(dataset_name);
+});
+
+Cypress.Commands.add("goToEntityLineageGraph", (entity_type, urn) => {
+  cy.visit(
+    `/${entity_type}/${urn}?is_lineage_mode=true`
+  );
+})
+
+Cypress.Commands.add("goToEntityLineageGraph", (entity_type, urn, start_time_millis, end_time_millis) => {
+  cy.visit(
+    `/${entity_type}/${urn}?is_lineage_mode=true&start_time_millis=${start_time_millis}&end_time_millis=${end_time_millis}`
+  );
 })
 
 Cypress.Commands.add("goToChart", (urn) => {
@@ -90,7 +103,7 @@ Cypress.Commands.add("goToDomain", (urn) => {
 
 Cypress.Commands.add("goToAnalytics", () => {
   cy.visit("/analytics");
-  cy.waitTextVisible("Data Landscape Summary");
+  cy.contains("Data Landscape Summary", {timeout: 10000});
 });
 
 Cypress.Commands.add("goToUserList", () => {
@@ -118,9 +131,15 @@ Cypress.Commands.add("deleteFromDropdown", () => {
   cy.clickOptionWithText("Yes");
 });
 
-Cypress.Commands.add("addViaModel", (text, modelHeader) => {
+Cypress.Commands.add("addViaFormModal", (text, modelHeader) => {
   cy.waitTextVisible(modelHeader);
   cy.get(".ant-form-item-control-input-content > input[type='text']").first().type(text);
+  cy.get(".ant-modal-footer > button:nth-child(2)").click();
+});
+
+Cypress.Commands.add("addViaModal", (text, modelHeader) => {
+  cy.waitTextVisible(modelHeader);
+  cy.get(".ant-input-affix-wrapper > input[type='text']").first().type(text);
   cy.get(".ant-modal-footer > button:nth-child(2)").click();
 });
 
@@ -157,7 +176,7 @@ Cypress.Commands.add("enterTextInTestId", (id, text) => {
 })
 
 Cypress.Commands.add("clickOptionWithTestId", (id) => {
-  cy.get(selectorWithtestId(id)).click({
+  cy.get(selectorWithtestId(id)).first().click({
     force: true,
   });
 })

@@ -18,6 +18,7 @@ from datahub.configuration.common import (
     ConfigurationError,
     LineageConfig,
 )
+from datahub.configuration.pydantic_field_deprecation import pydantic_field_deprecated
 from datahub.emitter import mce_builder
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import PipelineContext
@@ -85,7 +86,6 @@ from datahub.metadata.schema_classes import (
     AssertionStdParametersClass,
     AssertionStdParameterTypeClass,
     AssertionTypeClass,
-    ChangeTypeClass,
     DataPlatformInstanceClass,
     DatasetAssertionInfoClass,
     DatasetAssertionScopeClass,
@@ -104,6 +104,10 @@ from datahub.metadata.schema_classes import (
 )
 from datahub.specific.dataset import DatasetPatchBuilder
 from datahub.utilities.mapping import Constants, OperationProcessor
+from datahub.utilities.source_helpers import (
+    auto_stale_entity_removal,
+    auto_status_aspect,
+)
 from datahub.utilities.time import datetime_to_ts_millis
 
 logger = logging.getLogger(__name__)
@@ -138,6 +142,10 @@ class DBTEntitiesEnabled(ConfigModel):
         EmitDirective.YES,
         description="Emit metadata for dbt seeds when set to Yes or Only",
     )
+    snapshots: EmitDirective = Field(
+        EmitDirective.YES,
+        description="Emit metadata for dbt snapshots when set to Yes or Only",
+    )
     test_definitions: EmitDirective = Field(
         EmitDirective.YES,
         description="Emit metadata for test definitions when enabled when set to Yes or Only",
@@ -168,17 +176,18 @@ class DBTEntitiesEnabled(ConfigModel):
     def can_emit_node_type(self, node_type: str) -> bool:
         # Node type comes from dbt's node types.
 
-        field_to_node_type_map = {
-            "model": "models",
-            "source": "sources",
-            "seed": "seeds",
-            "test": "test_definitions",
+        node_type_allow_map = {
+            "model": self.models,
+            "source": self.sources,
+            "seed": self.seeds,
+            "snapshot": self.snapshots,
+            "test": self.test_definitions,
         }
-        field = field_to_node_type_map.get(node_type)
-        if not field:
+        allowed = node_type_allow_map.get(node_type)
+        if allowed is None:
             return False
 
-        return self.__getattribute__(field) == EmitDirective.YES
+        return allowed == EmitDirective.YES
 
     @property
     def can_emit_test_results(self) -> bool:
@@ -201,6 +210,8 @@ class DBTCommonConfig(StatefulIngestionConfigBase, LineageConfig):
         default=False,
         description="Use model identifier instead of model name if defined (if not, default to model name).",
     )
+    _deprecate_use_identifiers = pydantic_field_deprecated("use_identifiers")
+
     entities_enabled: DBTEntitiesEnabled = Field(
         DBTEntitiesEnabled(),
         description="Controls for enabling / disabling metadata emission for different dbt entities (models, test definitions, test results, etc.)",
@@ -251,13 +262,21 @@ class DBTCommonConfig(StatefulIngestionConfigBase, LineageConfig):
     )
     backcompat_skip_source_on_lineage_edge: bool = Field(
         False,
-        description="Prior to version 0.8.41, lineage edges to sources were directed to the target platform node rather than the dbt source node. This contradicted the established pattern for other lineage edges to point to upstream dbt nodes. To revert lineage logic to this legacy approach, set this flag to true.",
+        description="[deprecated] Prior to version 0.8.41, lineage edges to sources were directed to the target platform node rather than the dbt source node. This contradicted the established pattern for other lineage edges to point to upstream dbt nodes. To revert lineage logic to this legacy approach, set this flag to true.",
+    )
+    _deprecate_skip_source_on_lineage_edge = pydantic_field_deprecated(
+        "backcompat_skip_source_on_lineage_edge"
     )
 
     incremental_lineage: bool = Field(
         # Copied from LineageConfig, and changed the default.
         default=False,
         description="When enabled, emits lineage as incremental to existing lineage already in DataHub. When disabled, re-states lineage on each run.",
+    )
+    include_env_in_assertion_guid: bool = Field(
+        default=False,
+        description="Prior to version 0.9.4.2, the assertion GUIDs did not include the environment. If you're using multiple dbt ingestion "
+        "that are only distinguished by env, then you should set this flag to True.",
     )
     stateful_ingestion: Optional[StatefulStaleMetadataRemovalConfig] = pydantic.Field(
         default=None, description="DBT Stateful Ingestion Config."
@@ -345,7 +364,7 @@ class DBTNode:
 
     node_type: str  # source, model
     max_loaded_at: Optional[datetime]
-    materialization: Optional[str]  # table, view, ephemeral, incremental
+    materialization: Optional[str]  # table, view, ephemeral, incremental, snapshot
     # see https://docs.getdbt.com/reference/artifacts/manifest-json
     catalog_type: Optional[str]
 
@@ -415,7 +434,6 @@ def get_custom_properties(node: DBTNode) -> Dict[str, str]:
 def get_upstreams(
     upstreams: List[str],
     all_nodes: Dict[str, DBTNode],
-    use_identifiers: bool,
     target_platform: str,
     target_platform_instance: Optional[str],
     environment: str,
@@ -424,7 +442,7 @@ def get_upstreams(
 ) -> List[str]:
     upstream_urns = []
 
-    for upstream in upstreams:
+    for upstream in sorted(upstreams):
         if upstream not in all_nodes:
             logger.debug(
                 f"Upstream node - {upstream} not found in all manifest entities."
@@ -440,7 +458,7 @@ def get_upstreams(
         materialized = upstream_manifest_node.materialization
 
         resource_type = upstream_manifest_node.node_type
-        if materialized in {"view", "table", "incremental"} or (
+        if materialized in {"view", "table", "incremental", "snapshot"} or (
             resource_type == "source" and legacy_skip_source_lineage
         ):
             # upstream urns point to the target platform
@@ -677,19 +695,24 @@ class DBTSourceBase(StatefulIngestionSourceBase):
         custom_props: Dict[str, str],
         all_nodes_map: Dict[str, DBTNode],
     ) -> Iterable[MetadataWorkUnit]:
-        for node in test_nodes:
+        for node in sorted(test_nodes, key=lambda n: n.dbt_name):
             assertion_urn = mce_builder.make_assertion_urn(
                 mce_builder.datahub_guid(
                     {
                         "platform": DBT_PLATFORM,
                         "name": node.dbt_name,
                         "instance": self.config.platform_instance,
+                        **(
+                            # Ideally we'd include the env unconditionally. However, we started out
+                            # not including env in the guid, so we need to maintain backwards compatibility
+                            # with existing PROD assertions.
+                            {"env": self.config.env}
+                            if self.config.env != mce_builder.DEFAULT_ENV
+                            and self.config.include_env_in_assertion_guid
+                            else {}
+                        ),
                     }
                 )
-            )
-            self.stale_entity_removal_handler.add_entity_to_state(
-                type="assertion",
-                urn=assertion_urn,
             )
 
             if self.config.entities_enabled.can_emit_node_type("test"):
@@ -705,7 +728,6 @@ class DBTSourceBase(StatefulIngestionSourceBase):
             upstream_urns = get_upstreams(
                 upstreams=node.upstream_nodes,
                 all_nodes=all_nodes_map,
-                use_identifiers=self.config.use_identifiers,
                 target_platform=self.config.target_platform,
                 target_platform_instance=self.config.target_platform_instance,
                 environment=self.config.env,
@@ -713,7 +735,7 @@ class DBTSourceBase(StatefulIngestionSourceBase):
                 legacy_skip_source_lineage=self.config.backcompat_skip_source_on_lineage_edge,
             )
 
-            for upstream_urn in upstream_urns:
+            for upstream_urn in sorted(upstream_urns):
                 if self.config.entities_enabled.can_emit_node_type("test"):
                     wu = self._make_assertion_from_test(
                         custom_props,
@@ -856,8 +878,13 @@ class DBTSourceBase(StatefulIngestionSourceBase):
         # return dbt nodes + global custom properties
         raise NotImplementedError()
 
-    # create workunits from dbt nodes
     def get_workunits(self) -> Iterable[MetadataWorkUnit]:
+        return auto_stale_entity_removal(
+            self.stale_entity_removal_handler,
+            auto_status_aspect(self.get_workunits_internal()),
+        )
+
+    def get_workunits_internal(self) -> Iterable[MetadataWorkUnit]:
         if self.config.write_semantics == "PATCH" and not self.ctx.graph:
             raise ConfigurationError(
                 "With PATCH semantics, dbt source requires a datahub_api to connect to. "
@@ -902,8 +929,6 @@ class DBTSourceBase(StatefulIngestionSourceBase):
             all_nodes_map,
         )
 
-        yield from self.stale_entity_removal_handler.gen_removed_entity_workunits()
-
     def filter_nodes(self, all_nodes: List[DBTNode]) -> List[DBTNode]:
         nodes = []
         for node in all_nodes:
@@ -943,7 +968,9 @@ class DBTSourceBase(StatefulIngestionSourceBase):
             "SOURCE_CONTROL",
             self.config.strip_user_ids_from_email,
         )
-        for node in dbt_nodes:
+        for node in sorted(dbt_nodes, key=lambda n: n.dbt_name):
+
+            is_primary_source = mce_platform == DBT_PLATFORM
             node_datahub_urn = node.get_urn(
                 mce_platform,
                 self.config.env,
@@ -954,16 +981,20 @@ class DBTSourceBase(StatefulIngestionSourceBase):
                     f"Skipping emission of node {node_datahub_urn} because node_type {node.node_type} is disabled"
                 )
                 continue
-            self.stale_entity_removal_handler.add_entity_to_state(
-                "dataset", node_datahub_urn
-            )
+            if not is_primary_source:
+                # We previously, erroneously added non-dbt nodes to the state object.
+                # This call ensures that we don't try to soft-delete them after an
+                # upgrade of acryl-datahub.
+                self.stale_entity_removal_handler.add_urn_to_skip(node_datahub_urn)
 
             meta_aspects: Dict[str, Any] = {}
             if self.config.enable_meta_mapping and node.meta:
                 meta_aspects = action_processor.process(node.meta)
 
             if self.config.enable_query_tag_mapping and node.query_tag:
-                self.extract_query_tag_aspects(action_processor_tag, meta_aspects, node)
+                self.extract_query_tag_aspects(
+                    action_processor_tag, meta_aspects, node
+                )  # mutates meta_aspects
 
             if mce_platform == DBT_PLATFORM:
                 aspects = self._generate_base_aspects(
@@ -1015,6 +1046,7 @@ class DBTSourceBase(StatefulIngestionSourceBase):
                             MetadataWorkUnit(
                                 id=f"upstreamLineage-for-{node_datahub_urn}",
                                 mcp_raw=mcp,
+                                is_primary_source=is_primary_source,
                             )
                             for mcp in patch_builder.build()
                         ]
@@ -1030,7 +1062,9 @@ class DBTSourceBase(StatefulIngestionSourceBase):
             mce = MetadataChangeEvent(proposedSnapshot=dataset_snapshot)
             if self.config.write_semantics == "PATCH":
                 mce = self.get_patched_mce(mce)
-            wu = MetadataWorkUnit(id=dataset_snapshot.urn, mce=mce)
+            wu = MetadataWorkUnit(
+                id=dataset_snapshot.urn, mce=mce, is_primary_source=is_primary_source
+            )
             self.report.report_workunit(wu)
             yield wu
 
@@ -1110,7 +1144,7 @@ class DBTSourceBase(StatefulIngestionSourceBase):
         pass
 
     def _create_view_properties_aspect(self, node: DBTNode) -> ViewPropertiesClass:
-        materialized = node.materialization in {"table", "incremental"}
+        materialized = node.materialization in {"table", "incremental", "snapshot"}
         # this function is only called when raw sql is present. assert is added to satisfy lint checks
         assert node.raw_code is not None
         view_properties = ViewPropertiesClass(
@@ -1305,24 +1339,17 @@ class DBTSourceBase(StatefulIngestionSourceBase):
         if not node.node_type:
             return None
         subtypes: Optional[List[str]]
-        if node.node_type == "model":
+        if node.node_type in {"model", "snapshot"}:
             if node.materialization:
                 subtypes = [node.materialization, "view"]
             else:
                 subtypes = ["model", "view"]
         else:
             subtypes = [node.node_type]
-        subtype_mcp = MetadataChangeProposalWrapper(
-            entityType="dataset",
-            changeType=ChangeTypeClass.UPSERT,
+        subtype_wu = MetadataChangeProposalWrapper(
             entityUrn=node_datahub_urn,
-            aspectName="subTypes",
             aspect=SubTypesClass(typeNames=subtypes),
-        )
-        subtype_wu = MetadataWorkUnit(
-            id=f"{subtype_mcp.entityUrn}-{subtype_mcp.aspectName}",
-            mcp=subtype_mcp,
-        )
+        ).as_workunit()
         return subtype_wu
 
     def _create_lineage_aspect_for_dbt_node(
@@ -1336,7 +1363,6 @@ class DBTSourceBase(StatefulIngestionSourceBase):
         upstream_urns = get_upstreams(
             node.upstream_nodes,
             all_nodes_map,
-            self.config.use_identifiers,
             self.config.target_platform,
             self.config.target_platform_instance,
             self.config.env,

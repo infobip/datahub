@@ -37,7 +37,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.cache.Cache;
 
 
@@ -79,16 +78,22 @@ public class LineageSearchService {
   @WithSpan
   public LineageSearchResult searchAcrossLineage(@Nonnull Urn sourceUrn, @Nonnull LineageDirection direction,
       @Nonnull List<String> entities, @Nullable String input, @Nullable Integer maxHops, @Nullable Filter inputFilters,
-      @Nullable SortCriterion sortCriterion, int from, int size) {
+      @Nullable SortCriterion sortCriterion, int from, int size, @Nullable Long startTimeMillis,
+      @Nullable Long endTimeMillis) {
     // Cache multihop result for faster performance
+    final EntityLineageResultCacheKey cacheKey =
+        new EntityLineageResultCacheKey(sourceUrn, direction, startTimeMillis, endTimeMillis);
     CachedEntityLineageResult cachedLineageResult = cacheEnabled
-        ? cache.get(Pair.of(sourceUrn, direction), CachedEntityLineageResult.class) : null;
+        ? cache.get(cacheKey, CachedEntityLineageResult.class) : null;
     EntityLineageResult lineageResult;
     if (cachedLineageResult == null) {
       maxHops = maxHops != null ? maxHops : 1000;
-      lineageResult = _graphService.getLineage(sourceUrn, direction, 0, MAX_RELATIONSHIPS, maxHops);
+      lineageResult =
+          _graphService.getLineage(sourceUrn, direction, 0, MAX_RELATIONSHIPS, maxHops, startTimeMillis,
+              endTimeMillis);
       if (cacheEnabled) {
-        cache.put(Pair.of(sourceUrn, direction), new CachedEntityLineageResult(lineageResult, System.currentTimeMillis()));
+        cache.put(cacheKey,
+            new CachedEntityLineageResult(lineageResult, System.currentTimeMillis()));
       }
     } else {
       lineageResult = cachedLineageResult.getEntityLineageResult();
@@ -263,9 +268,9 @@ public class LineageSearchService {
       Map<Urn, LineageRelationship> urnToRelationship) {
     AggregationMetadataArray aggregations = new AggregationMetadataArray(searchResult.getMetadata().getAggregations());
     return new LineageSearchResult().setEntities(new LineageSearchEntityArray(searchResult.getEntities()
-        .stream()
-        .map(searchEntity -> buildLineageSearchEntity(searchEntity, urnToRelationship.get(searchEntity.getEntity())))
-        .collect(Collectors.toList())))
+            .stream()
+            .map(searchEntity -> buildLineageSearchEntity(searchEntity, urnToRelationship.get(searchEntity.getEntity())))
+            .collect(Collectors.toList())))
         .setMetadata(new SearchResultMetadata().setAggregations(aggregations))
         .setFrom(searchResult.getFrom())
         .setPageSize(searchResult.getPageSize())
