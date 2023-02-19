@@ -225,7 +225,6 @@ class IBRedashDatasetSource(IBRedashSource):
     def _map_column(field) -> SchemaFieldClass:
         parts = field.split("|:|")
         data_type = parts[1]
-
         return SchemaFieldClass(
             fieldPath=parts[0],
             description=parts[3],
