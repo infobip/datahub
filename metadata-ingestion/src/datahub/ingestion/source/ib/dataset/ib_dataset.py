@@ -105,8 +105,7 @@ class IBRedashDatasetSource(IBRedashSource):
                     row.columns.split("|;|"),
                 )
             )
-            if pd.notna(row.columns)
-            else []
+            if row.columns else []
         )
         schema = SchemaMetadataClass(
             schemaName=self.platform,
