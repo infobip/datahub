@@ -1,6 +1,7 @@
 import logging
 import math
 import sys
+import pyodbc
 from abc import abstractmethod
 from typing import Iterable, Optional
 
@@ -108,6 +109,14 @@ class IBRedashSource(StatefulIngestionSourceBase):
         return cls(config, ctx)
 
     def query_get(self, query_id) -> str:
+        connection = pyodbc.connect('DRIVER={ODBC Driver 18 for SQL Server};SERVER=FR-OTHER-2;DATABASE=DataInsights;TrustServerCertificate=yes;Trusted_Connection=yes;')
+        cursor = connection.cursor()
+        cursor.execute("SELECT COUNT(*) FROM [dsys].[ObjectsMetadata]")
+        for row in cursor:
+            logger.warning(row)
+        cursor.close()
+        connection.close()
+
         url = f"//api/queries/{query_id}/results"
         return self.client._post(url).json()["query_result"]["data"]["rows"]
 
