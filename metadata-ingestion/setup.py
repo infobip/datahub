@@ -161,6 +161,8 @@ sql_common = (
     | classification_lib
 )
 
+ib_pyodbc = "pyodbc"
+
 aws_common = {
     # AWS Python SDK
     "boto3",
@@ -441,6 +443,12 @@ plugins: Dict[str, Set[str]] = {
         # https://github.com/great-expectations/great_expectations/pull/6149.
         "great-expectations != 0.15.23, != 0.15.24, != 0.15.25, != 0.15.26",
     },
+    "ib-lineages": {ib_pyodbc},
+    "ib-kafka": {ib_pyodbc},
+    "ib-elasticsearch": {ib_pyodbc},
+    "ib-mssql-views": {ib_pyodbc},
+    "ib-mssql-tables": {ib_pyodbc},
+    "ib-postgresql": {ib_pyodbc},
     # keep in sync with presto-on-hive until presto-on-hive will be removed
     "hive-metastore": sql_common
     | pyhive_common
@@ -635,6 +643,12 @@ base_dev_requirements = {
             "elasticsearch",
             "feast",
             "iceberg",
+            "ib-lineages",
+            "ib-kafka",
+            "ib-elasticsearch",
+            "ib-mssql-views",
+            "ib-mssql-tables",
+            "ib-postgresql",
             "mlflow",
             "json-schema",
             "ldap",
