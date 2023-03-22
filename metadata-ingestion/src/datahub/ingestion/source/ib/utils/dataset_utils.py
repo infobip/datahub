@@ -60,6 +60,8 @@ class DatasetUtils:
             path = DatasetUtils._map_kafka_path(object_subtype, generic_path)
         elif platform == "elasticsearch":
             path = DatasetUtils._map_elasticsearch_path(object_subtype, generic_path)
+        elif platform == "clickhouse":
+            path = DatasetUtils._map_clickhouse_path(object_subtype, generic_path)
         elif platform == "mssql":
             path = DatasetUtils._map_mssql_path(object_subtype, generic_path)
         elif platform == "postgres":
@@ -129,6 +131,34 @@ class DatasetUtils:
                 IBPathElementType.CLUSTER,
                 "Elasticsearch Cluster",
                 generic_path.parent1,
+            ),
+            IBPathElementInfo(
+                IBPathElementType.OBJECT,
+                subtype,
+                generic_path.object_name,
+            ),
+        ]
+
+    @staticmethod
+    def _map_clickhouse_path(
+            object_subtype: str, generic_path: IBGenericPathElements
+    ) -> List[IBPathElementInfo]:
+        subtype = object_subtype if pd.notna(object_subtype) else "Table"
+        return [
+            IBPathElementInfo(
+                IBPathElementType.LOCATION,
+                "DataCenter",
+                generic_path.location_code,
+            ),
+            IBPathElementInfo(
+                IBPathElementType.CLUSTER,
+                "Cluster",
+                generic_path.parent1,
+            ),
+            IBPathElementInfo(
+                IBPathElementType.CLUSTER,
+                "Database",
+                generic_path.parent2,
             ),
             IBPathElementInfo(
                 IBPathElementType.OBJECT,

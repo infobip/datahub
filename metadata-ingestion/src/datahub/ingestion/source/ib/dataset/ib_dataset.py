@@ -1,3 +1,4 @@
+import logging
 import json
 from abc import abstractmethod
 from typing import Iterable, List, Optional, Union
@@ -40,6 +41,9 @@ from datahub.metadata.schema_classes import (
     StringTypeClass,
     SubTypesClass,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class IBRedashDatasetSource(IBRedashSource):
@@ -224,6 +228,7 @@ class IBRedashDatasetSource(IBRedashSource):
     def _map_column(field) -> SchemaFieldClass:
         parts = field.split("|:|")
         data_type = parts[1]
+
         return SchemaFieldClass(
             fieldPath=parts[0],
             description=parts[3],
