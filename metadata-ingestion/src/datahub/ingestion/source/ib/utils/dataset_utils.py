@@ -50,7 +50,6 @@ class IBPathElementInfo:
 
 
 class DatasetUtils:
-
     @staticmethod
     def map_path(
         platform: str, object_subtype: str, generic_path: IBGenericPathElements
@@ -141,7 +140,7 @@ class DatasetUtils:
 
     @staticmethod
     def _map_clickhouse_path(
-            object_subtype: str, generic_path: IBGenericPathElements
+        object_subtype: str, generic_path: IBGenericPathElements
     ) -> List[IBPathElementInfo]:
         subtype = object_subtype if pd.notna(object_subtype) else "Table"
         return [
@@ -202,7 +201,7 @@ class DatasetUtils:
 
     @staticmethod
     def _map_postgresql_path(
-            object_subtype: str, generic_path: IBGenericPathElements
+        object_subtype: str, generic_path: IBGenericPathElements
     ) -> List[IBPathElementInfo]:
         subtype = object_subtype if pd.notna(object_subtype) else "Table"
         return [

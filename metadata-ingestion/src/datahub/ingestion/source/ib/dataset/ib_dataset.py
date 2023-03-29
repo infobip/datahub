@@ -1,15 +1,18 @@
 import logging
-import json
 from abc import abstractmethod
 from typing import Iterable, List, Optional, Union
 
 import pandas as pd
+from pandas import DataFrame
 
 import datahub.emitter.mce_builder as builder
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
-from datahub.ingestion.source.ib.ib_common import IBRedashSource, IBRedashSourceConfig
+from datahub.ingestion.source.ib.ib_stateful_ingestion_source import (
+    IBSourceConfig,
+    IBStatefulIngestionSource,
+)
 from datahub.ingestion.source.ib.utils.dataset_utils import (
     DatasetUtils,
     IBGenericPathElements,
@@ -42,11 +45,10 @@ from datahub.metadata.schema_classes import (
     SubTypesClass,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
-class IBRedashDatasetSource(IBRedashSource):
+class IBDatasetSource(IBStatefulIngestionSource):
     containers_cache = []
 
     @property
@@ -63,14 +65,16 @@ class IBRedashDatasetSource(IBRedashSource):
     def get_default_ingestion_job_id_prefix(self) -> JobId:
         pass
 
-    def __init__(self, config: IBRedashSourceConfig, ctx: PipelineContext):
+    @abstractmethod
+    def load_data(self) -> DataFrame:
+        pass
+
+    def __init__(self, config: IBSourceConfig, ctx: PipelineContext):
         super().__init__(config, ctx)
-        self.source_config: IBRedashSourceConfig = config
+        self.source_config: IBSourceConfig = config
 
     def fetch_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
-        json_data = pd.read_json(json.dumps(self.query_get(self.config.query_id)))
-
-        for i, row in json_data.iterrows():
+        for i, row in self.load_data().iterrows():
             yield from self._fetch_object_workunits(row)
 
     def _fetch_object_workunits(self, row: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
@@ -93,9 +97,7 @@ class IBRedashDatasetSource(IBRedashSource):
             description=row.description
             if pd.notna(row.description)
             else None,  # pandas maps empty description as nan
-            qualifiedName=IBRedashDatasetSource._build_dataset_qualified_name(
-                *dataset_path
-            ),
+            qualifiedName=IBDatasetSource._build_dataset_qualified_name(*dataset_path),
         )
 
         browse_paths = BrowsePathsClass(
@@ -105,11 +107,12 @@ class IBRedashDatasetSource(IBRedashSource):
         columns = (
             list(
                 map(
-                    lambda col: IBRedashDatasetSource._map_column(col),
+                    lambda col: IBDatasetSource._map_column(col),
                     row.columns.split("|;|"),
                 )
             )
-            if row.columns else []
+            if row.columns
+            else []
         )
         schema = SchemaMetadataClass(
             schemaName=self.platform,
@@ -166,7 +169,7 @@ class IBRedashDatasetSource(IBRedashSource):
                 entityUrn=snapshot.urn,
                 aspectName="container",
                 aspect=ContainerClass(
-                    container=IBRedashDatasetSource._build_container_urn(
+                    container=IBDatasetSource._build_container_urn(
                         *container_parent_path
                     )
                 ),
@@ -179,25 +182,25 @@ class IBRedashDatasetSource(IBRedashSource):
         container_info: IBPathElementInfo,
         parent_path: Optional[List[IBPathElementInfo]] = None,
     ) -> Iterable[MetadataWorkUnit]:
-        qualified_name = IBRedashDatasetSource._build_dataset_qualified_name(*path)
+        qualified_name = IBDatasetSource._build_dataset_qualified_name(*path)
         container_urn = builder.make_container_urn(qualified_name)
         if container_urn in self.containers_cache:
             return
 
         self.containers_cache.append(container_urn)
 
-        yield IBRedashDatasetSource._build_container_workunit_with_aspect(
+        yield IBDatasetSource._build_container_workunit_with_aspect(
             container_urn,
             aspect=ContainerProperties(
                 name=path[-1].value, qualifiedName=qualified_name
             ),
         )
 
-        yield IBRedashDatasetSource._build_container_workunit_with_aspect(
+        yield IBDatasetSource._build_container_workunit_with_aspect(
             container_urn, SubTypesClass(typeNames=[container_info.name])
         )
 
-        yield IBRedashDatasetSource._build_container_workunit_with_aspect(
+        yield IBDatasetSource._build_container_workunit_with_aspect(
             container_urn,
             aspect=DataPlatformInstance(
                 platform=builder.make_data_platform_urn("infobip-location")
@@ -207,10 +210,10 @@ class IBRedashDatasetSource(IBRedashSource):
         )
 
         if parent_path is not None:
-            yield IBRedashDatasetSource._build_container_workunit_with_aspect(
+            yield IBDatasetSource._build_container_workunit_with_aspect(
                 container_urn,
                 ContainerClass(
-                    container=IBRedashDatasetSource._build_container_urn(*parent_path)
+                    container=IBDatasetSource._build_container_urn(*parent_path)
                 ),
             )
 
@@ -233,7 +236,7 @@ class IBRedashDatasetSource(IBRedashSource):
             fieldPath=parts[0],
             description=parts[3],
             type=SchemaFieldDataTypeClass(
-                type=IBRedashDatasetSource._get_type_class(data_type)
+                type=IBDatasetSource._get_type_class(data_type)
             ),
             nativeDataType=data_type,
             nullable=(parts[2].lower() in ["true", "1"]),
@@ -242,7 +245,7 @@ class IBRedashDatasetSource(IBRedashSource):
     @staticmethod
     def _build_container_urn(*path: str):
         return builder.make_container_urn(
-            IBRedashDatasetSource._build_dataset_qualified_name(*path)
+            IBDatasetSource._build_dataset_qualified_name(*path)
         )
 
     @staticmethod

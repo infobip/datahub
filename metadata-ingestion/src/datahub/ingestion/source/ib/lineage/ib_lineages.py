@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Dict, Iterable, List, Set, Union
 
@@ -9,7 +8,11 @@ from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.decorators import config_class, platform_name
 from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
-from datahub.ingestion.source.ib.ib_common import IBRedashSource, IBRedashSourceConfig
+from datahub.ingestion.source.ib.dao.ib_dao import IBDao
+from datahub.ingestion.source.ib.dao.ib_dao_config import IBRedashSourceConfig
+from datahub.ingestion.source.ib.ib_stateful_ingestion_source import (
+    IBStatefulIngestionSource,
+)
 from datahub.ingestion.source.ib.utils.dataset_utils import (
     DatasetUtils,
     IBGenericPathElements,
@@ -36,14 +39,17 @@ class IBLineagesSourceConfig(IBRedashSourceConfig):
 
 @platform_name("IBLineages")
 @config_class(IBLineagesSourceConfig)
-class IBLineagesSource(IBRedashSource):
+class IBLineagesSource(IBStatefulIngestionSource):
+    @classmethod
+    def create(cls, config_dict, ctx):
+        config = IBLineagesSourceConfig.parse_obj(config_dict)
+        return cls(config, ctx)
+
     def __init__(self, config: IBLineagesSourceConfig, ctx: PipelineContext):
         super().__init__(config, ctx)
 
     def fetch_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
-        lineages_grouped = pd.read_json(
-            json.dumps(self.query_get(self.config.query_id))
-        ).groupby(
+        lineages_grouped = IBDao.load_redash_data(self.config).groupby(
             [
                 "dstType",
                 "dstLocationCode",

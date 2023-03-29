@@ -123,7 +123,10 @@ sql_common = {
 
 sqllineage_lib = "sqllineage==1.3.6"
 
-ib_pyodbc = "pyodbc"
+ib_mssql = {
+    "pyodbc",
+    "krbcontext"
+}
 
 aws_common = {
     # AWS Python SDK
@@ -312,13 +315,13 @@ plugins: Dict[str, Set[str]] = {
         # https://github.com/great-expectations/great_expectations/pull/6149.
         "great-expectations != 0.15.23, != 0.15.24, != 0.15.25, != 0.15.26",
     },
-    "ib-lineages": {ib_pyodbc},
-    "ib-kafka": {ib_pyodbc},
-    "ib-elasticsearch": {ib_pyodbc},
-    "ib-clickhouse": {ib_pyodbc},
-    "ib-mssql-views": {ib_pyodbc},
-    "ib-mssql-tables": {ib_pyodbc},
-    "ib-postgresql": {ib_pyodbc},
+    "ib-lineages": ib_mssql,
+    "ib-kafka": ib_mssql,
+    "ib-elasticsearch": ib_mssql,
+    "ib-clickhouse": ib_mssql,
+    "ib-mssql-views": ib_mssql,
+    "ib-mssql-tables": ib_mssql,
+    "ib-postgresql": ib_mssql,
     "iceberg": iceberg_common,
     "kafka": {*kafka_common, *kafka_protobuf},
     "kafka-connect": sql_common | {"requests", "JPype1"},
