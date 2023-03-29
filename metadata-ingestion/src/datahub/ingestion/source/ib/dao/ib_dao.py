@@ -75,6 +75,7 @@ class IBDao:
             using_keytab=True,
             principal=database.username,
             keytab_file=database.keytab_file,
+            ccache_file=f'/tmp/{database.username}'
         ):
             with pyodbc.connect(database.connection_string) as conn:
                 for file_name in database.sql_files:
