@@ -264,20 +264,20 @@ plugins: Dict[str, Set[str]] = {
     "athena": sql_common | {"PyAthena[SQLAlchemy]==2.4.1"},
     "azure-ad": set(),
     "bigquery": sql_common
-    | bigquery_common
-    | {
-        sqllineage_lib,
-        "sql_metadata",
-        "sqlalchemy-bigquery>=1.4.1",
-        "google-cloud-datacatalog-lineage==0.2.0",
-    },
+                | bigquery_common
+                | {
+                    sqllineage_lib,
+                    "sql_metadata",
+                    "sqlalchemy-bigquery>=1.4.1",
+                    "google-cloud-datacatalog-lineage==0.2.0",
+                },
     "bigquery-beta": sql_common
-    | bigquery_common
-    | {
-        sqllineage_lib,
-        "sql_metadata",
-        "sqlalchemy-bigquery>=1.4.1",
-    },  # deprecated, but keeping the extra for backwards compatibility
+                     | bigquery_common
+                     | {
+                         sqllineage_lib,
+                         "sql_metadata",
+                         "sqlalchemy-bigquery>=1.4.1",
+                     },  # deprecated, but keeping the extra for backwards compatibility
     "clickhouse": sql_common | clickhouse_common,
     "clickhouse-usage": sql_common | usage_common | clickhouse_common,
     "datahub-lineage-file": set(),
@@ -295,23 +295,23 @@ plugins: Dict[str, Set[str]] = {
     "glue": aws_common,
     # hdbcli is supported officially by SAP, sqlalchemy-hana is built on top but not officially supported
     "hana": sql_common
-    | {
-        "sqlalchemy-hana>=0.5.0; platform_machine != 'aarch64' and platform_machine != 'arm64'",
-        "hdbcli>=2.11.20; platform_machine != 'aarch64' and platform_machine != 'arm64'",
-    },
+            | {
+                "sqlalchemy-hana>=0.5.0; platform_machine != 'aarch64' and platform_machine != 'arm64'",
+                "hdbcli>=2.11.20; platform_machine != 'aarch64' and platform_machine != 'arm64'",
+            },
     "hive": sql_common
-    | {
-        # Acryl Data maintains a fork of PyHive
-        # - 0.6.11 adds support for table comments and column comments,
-        #   and also releases HTTP and HTTPS transport schemes
-        # - 0.6.12 adds support for Spark Thrift Server
-        "acryl-pyhive[hive]>=0.6.13",
-        "databricks-dbapi",
-        # Due to https://github.com/great-expectations/great_expectations/issues/6146,
-        # we cannot allow 0.15.{23-26}. This was fixed in 0.15.27 by
-        # https://github.com/great-expectations/great_expectations/pull/6149.
-        "great-expectations != 0.15.23, != 0.15.24, != 0.15.25, != 0.15.26",
-    },
+            | {
+                # Acryl Data maintains a fork of PyHive
+                # - 0.6.11 adds support for table comments and column comments,
+                #   and also releases HTTP and HTTPS transport schemes
+                # - 0.6.12 adds support for Spark Thrift Server
+                "acryl-pyhive[hive]>=0.6.13",
+                "databricks-dbapi",
+                # Due to https://github.com/great-expectations/great_expectations/issues/6146,
+                # we cannot allow 0.15.{23-26}. This was fixed in 0.15.27 by
+                # https://github.com/great-expectations/great_expectations/pull/6149.
+                "great-expectations != 0.15.23, != 0.15.24, != 0.15.25, != 0.15.26",
+            },
     "ib-lineages": {ib_pyodbc},
     "ib-kafka": {ib_pyodbc},
     "ib-elasticsearch": {ib_pyodbc},
@@ -338,7 +338,7 @@ plugins: Dict[str, Set[str]] = {
     "postgres": sql_common | {"psycopg2-binary", "GeoAlchemy2"},
     "presto": sql_common | trino | {"acryl-pyhive[hive]>=0.6.12"},
     "presto-on-hive": sql_common
-    | {"psycopg2-binary", "acryl-pyhive[hive]>=0.6.12", "pymysql>=1.0.2"},
+                      | {"psycopg2-binary", "acryl-pyhive[hive]>=0.6.12", "pymysql>=1.0.2"},
     "pulsar": {"requests"},
     "redash": {"redash-toolbelt", "sql-metadata", sqllineage_lib},
     "redshift": sql_common | redshift_common,
@@ -348,7 +348,7 @@ plugins: Dict[str, Set[str]] = {
     "salesforce": {"simple-salesforce"},
     "snowflake": snowflake_common | usage_common,
     "snowflake-beta": (
-        snowflake_common | usage_common
+            snowflake_common | usage_common
     ),  # deprecated, but keeping the extra for backwards compatibility
     "sqlalchemy": sql_common,
     "superset": {
@@ -523,6 +523,7 @@ entry_points = {
         "ib-mssql-views = datahub.ingestion.source.ib.dataset.ib_mssql_views:IBMSSQLViewsSource",
         "ib-mssql-tables = datahub.ingestion.source.ib.dataset.ib_mssql_tables:IBMSSQLTablesSource",
         "ib-postgresql = datahub.ingestion.source.ib.dataset.ib_postgresql:IBPostgreSQLSource",
+        "ib-extended-properties = datahub.ingestion.source.ib.extended_properties.ib_extended_properties.IBExtendedPropertiesSource",
         "sqlalchemy = datahub.ingestion.source.sql.sql_generic:SQLAlchemyGenericSource",
         "athena = datahub.ingestion.source.sql.athena:AthenaSource",
         "azure-ad = datahub.ingestion.source.identity.azure_ad:AzureADSource",
@@ -614,7 +615,6 @@ entry_points = {
     ],
     "apache_airflow_provider": ["provider_info=datahub_provider:get_provider_info"],
 }
-
 
 setuptools.setup(
     # Package metadata.
