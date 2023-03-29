@@ -1,13 +1,6 @@
 import logging
-import math
-import sys
 from abc import abstractmethod
 from typing import Iterable, Optional
-
-from pydantic.fields import Field
-from redash_toolbelt import Redash
-from requests.adapters import HTTPAdapter
-from urllib3 import Retry
 
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import PipelineContext, WorkUnit
@@ -29,43 +22,28 @@ from datahub.utilities.urns.urn import Urn
 logger = logging.getLogger(__name__)
 
 
-class IBRedashSourceStatefulIngestionConfig(StatefulIngestionConfig):
+class IBSourceStatefulIngestionConfig(StatefulIngestionConfig):
     remove_stale_metadata: bool = True
 
 
-class RedashSourceReport(StatefulIngestionReport):
+class IBSourceConfig(StatefulIngestionConfigBase):
+    stateful_ingestion: Optional[IBSourceStatefulIngestionConfig] = None
+
+
+class IBSourceReport(StatefulIngestionReport):
     events_skipped: int = 0
     events_deleted: int = 0
 
 
-class IBRedashSourceConfig(StatefulIngestionConfigBase):
-    connect_uri: str = Field(
-        default="http://localhost:5000", description="Redash base URL."
-    )
-    api_key: str = Field(default="REDASH_API_KEY", description="Redash user API key.")
-    query_id: str = Field(
-        default="QUERY_ID",
-        description="Target redash query",
-    )
-    api_page_limit: int = Field(
-        default=sys.maxsize,
-        description="Limit on number of pages queried for ingesting dashboards and charts API "
-        "during pagination. ",
-    )
-    stateful_ingestion: Optional[IBRedashSourceStatefulIngestionConfig] = None
-
-
-class IBRedashSource(StatefulIngestionSourceBase):
-    batch_size = 1000
-    config: IBRedashSourceConfig
-    client: Redash
+class IBStatefulIngestionSource(StatefulIngestionSourceBase):
+    config: IBSourceConfig
     state_manager: StateManager
-    report: RedashSourceReport
+    report: IBSourceReport
 
-    def __init__(self, config: IBRedashSourceConfig, ctx: PipelineContext):
+    def __init__(self, config: IBSourceConfig, ctx: PipelineContext):
         super().__init__(config, ctx)
-        self.config: IBRedashSourceConfig = config
-        self.report: RedashSourceReport = RedashSourceReport()
+        self.config: IBSourceConfig = config
+        self.report: IBSourceReport = IBSourceReport()
         self.state_manager = StateManager(
             config,
             ctx,
@@ -73,43 +51,6 @@ class IBRedashSource(StatefulIngestionSourceBase):
             self.get_last_checkpoint,
             self.get_current_checkpoint,
         )
-
-        self.config.connect_uri = self.config.connect_uri.strip("/")
-        self.client = Redash(self.config.connect_uri, self.config.api_key)
-        self.client.session.headers.update(
-            {
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            }
-        )
-
-        # Handling retry and backoff
-        retries = 3
-
-        backoff_factor = 10
-        status_forcelist = (500, 503, 502, 504)
-        retry = Retry(
-            total=retries,
-            read=retries,
-            connect=retries,
-            backoff_factor=backoff_factor,
-            status_forcelist=status_forcelist,
-        )
-
-        adapter = HTTPAdapter(max_retries=retry)
-        self.client.session.mount("http://", adapter)
-        self.client.session.mount("https://", adapter)
-
-        self.api_page_limit = self.config.api_page_limit or math.inf
-
-    @classmethod
-    def create(cls, config_dict, ctx):
-        config = IBRedashSourceConfig.parse_obj(config_dict)
-        return cls(config, ctx)
-
-    def query_get(self, query_id) -> str:
-        url = f"//api/queries/{query_id}/results"
-        return self.client._post(url).json()["query_result"]["data"]["rows"]
 
     @abstractmethod
     def fetch_workunits(self) -> Iterable[WorkUnit]:
@@ -166,9 +107,8 @@ class IBRedashSource(StatefulIngestionSourceBase):
 
     def close(self):
         self.prepare_for_commit()
-        self.client.session.close()
 
-    def get_report(self) -> RedashSourceReport:
+    def get_report(self) -> IBSourceReport:
         return self.report
 
     def is_checkpointing_enabled(self, job_id: JobId) -> bool:
