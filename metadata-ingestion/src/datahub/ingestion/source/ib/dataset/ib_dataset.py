@@ -95,6 +95,7 @@ class IBRedashDatasetSource(IBRedashSource):
                 else IBRedashDatasetSource._build_container_urn(*path)
             props = exp.set_index('property_key')['property_value'].to_dict()
             result[urn] = props
+        print(result)
         return result
 
     def _fetch_object_workunits(self, row: pd.DataFrame, extended_properties: dict) -> Iterable[MetadataWorkUnit]:
