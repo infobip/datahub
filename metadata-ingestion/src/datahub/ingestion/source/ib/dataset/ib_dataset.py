@@ -211,8 +211,6 @@ class IBRedashDatasetSource(IBRedashSource):
 
         self.containers_cache.append(container_urn)
 
-        # TODO REMOVE
-        container_properties = extended_properties.get(container_urn)
         yield IBRedashDatasetSource._build_container_workunit_with_aspect(
             container_urn,
             aspect=ContainerProperties(
