@@ -114,7 +114,6 @@ class IBRedashDatasetSource(IBRedashSource):
         )
 
         conttest_urn = IBRedashDatasetSource._build_container_urn(*container_path)
-        print(conttest_urn)
         if conttest_urn not in extended_properties:
             return
         # ====================================================
