@@ -100,6 +100,24 @@ class IBRedashDatasetSource(IBRedashSource):
 
     def _fetch_object_workunits(self, row: pd.DataFrame, extended_properties: dict) -> Iterable[MetadataWorkUnit]:
         object_name = row.objectName
+        # ====================================================
+        container_path = DatasetUtils.map_path(
+            self.platform,
+            None,
+            IBGenericPathElements(
+                location_code=row.locationCode,
+                parent1=row.parent1,
+                parent2=row.parent2,
+                parent3="",
+                object_name="",
+            ),
+        )
+
+        conttest_urn = IBRedashDatasetSource._build_container_urn(*container_path)
+        print(conttest_urn)
+        if conttest_urn not in extended_properties:
+            return
+        # ====================================================
 
         dataset_path = DatasetUtils.map_path(
             self.platform,
@@ -122,17 +140,6 @@ class IBRedashDatasetSource(IBRedashSource):
             ),
             customProperties=extended_properties.get(dataset_urn)
         )
-        if properties.customProperties:
-            print("========================================================================================")
-            print("========================================================================================")
-            print("========================================================================================")
-            print("========================================================================================")
-            print(f"Got custom properties for dataset, urn:{dataset_urn}")
-            print("value:", print(properties.customProperties))
-            print("========================================================================================")
-            print("========================================================================================")
-            print("========================================================================================")
-            print("========================================================================================")
 
         browse_paths = BrowsePathsClass(
             [f"/prod/{DatasetUtils.join_path('/', *dataset_path)}"]
@@ -189,7 +196,8 @@ class IBRedashDatasetSource(IBRedashSource):
             container_path = dataset_path[:i]
             if pd.isna(container_path[-1]):
                 break
-            yield from self._fetch_container_workunits(container_path, dataset_path[i - 1], extended_properties, container_parent_path)
+            yield from self._fetch_container_workunits(container_path, dataset_path[i - 1], extended_properties,
+                                                       container_parent_path)
             container_parent_path = container_path
 
         yield MetadataWorkUnit(
