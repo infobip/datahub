@@ -121,6 +121,17 @@ class IBRedashDatasetSource(IBRedashSource):
             ),
             customProperties=extended_properties.get(dataset_urn)
         )
+        if properties.customProperties:
+            print("========================================================================================")
+            print("========================================================================================")
+            print("========================================================================================")
+            print("========================================================================================")
+            print(f"Got custom properties for dataset, urn:{dataset_urn}")
+            print("value:", print(properties.customProperties))
+            print("========================================================================================")
+            print("========================================================================================")
+            print("========================================================================================")
+            print("========================================================================================")
 
         browse_paths = BrowsePathsClass(
             [f"/prod/{DatasetUtils.join_path('/', *dataset_path)}"]
@@ -209,6 +220,8 @@ class IBRedashDatasetSource(IBRedashSource):
 
         self.containers_cache.append(container_urn)
 
+        # TODO REMOVE
+        container_properties = extended_properties.get(container_urn)
         yield IBRedashDatasetSource._build_container_workunit_with_aspect(
             container_urn,
             aspect=ContainerProperties(
@@ -217,6 +230,18 @@ class IBRedashDatasetSource(IBRedashSource):
                 customProperties=extended_properties.get(container_urn)
             ),
         )
+
+        if container_properties:
+            print("========================================================================================")
+            print("========================================================================================")
+            print("========================================================================================")
+            print("========================================================================================")
+            print(f"Got custom properties for container, urn:{container_urn}")
+            print("value:", print(container_properties))
+            print("========================================================================================")
+            print("========================================================================================")
+            print("========================================================================================")
+            print("========================================================================================")
 
         yield IBRedashDatasetSource._build_container_workunit_with_aspect(
             container_urn, SubTypesClass(typeNames=[container_info.name])
