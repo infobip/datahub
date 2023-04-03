@@ -100,23 +100,6 @@ class IBRedashDatasetSource(IBRedashSource):
 
     def _fetch_object_workunits(self, row: pd.DataFrame, extended_properties: dict) -> Iterable[MetadataWorkUnit]:
         object_name = row.objectName
-        # ====================================================
-        container_path = DatasetUtils.map_path(
-            self.platform,
-            None,
-            IBGenericPathElements(
-                location_code=row.locationCode,
-                parent1=row.parent1,
-                parent2=row.parent2,
-                parent3="",
-                object_name="",
-            ),
-        )
-
-        conttest_urn = IBRedashDatasetSource._build_container_urn(*container_path)
-        if conttest_urn not in extended_properties:
-            return
-        # ====================================================
 
         dataset_path = DatasetUtils.map_path(
             self.platform,
@@ -238,18 +221,6 @@ class IBRedashDatasetSource(IBRedashSource):
                 customProperties=extended_properties.get(container_urn)
             ),
         )
-
-        if container_properties:
-            print("========================================================================================")
-            print("========================================================================================")
-            print("========================================================================================")
-            print("========================================================================================")
-            print(f"Got custom properties for container, urn:{container_urn}")
-            print("value:", print(container_properties))
-            print("========================================================================================")
-            print("========================================================================================")
-            print("========================================================================================")
-            print("========================================================================================")
 
         yield IBRedashDatasetSource._build_container_workunit_with_aspect(
             container_urn, SubTypesClass(typeNames=[container_info.name])
