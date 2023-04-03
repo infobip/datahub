@@ -1,5 +1,4 @@
 import logging
-import math
 import sys
 from abc import abstractmethod
 from typing import Iterable, Optional
@@ -47,6 +46,11 @@ class IBRedashSourceConfig(StatefulIngestionConfigBase):
         default="QUERY_ID",
         description="Target redash query",
     )
+    exp_api_key: str = Field(default=None, description="Redash user API key.")
+    exp_query_id: str = Field(
+        default=None,
+        description="Extended properties redash query",
+    )
     api_page_limit: int = Field(
         default=sys.maxsize,
         description="Limit on number of pages queried for ingesting dashboards and charts API "
@@ -59,6 +63,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
     batch_size = 1000
     config: IBRedashSourceConfig
     client: Redash
+    exp_client: Redash
     state_manager: StateManager
     report: RedashSourceReport
 
@@ -75,8 +80,14 @@ class IBRedashSource(StatefulIngestionSourceBase):
         )
 
         self.config.connect_uri = self.config.connect_uri.strip("/")
-        self.client = Redash(self.config.connect_uri, self.config.api_key)
-        self.client.session.headers.update(
+        self.client = self.create_redash_client(self.config.connect_uri, self.config.api_key)
+        if self.config.exp_api_key and self.config.exp_query_id:
+            self.exp_client = self.create_redash_client(self.config.connect_uri, self.config.exp_api_key)
+
+    @staticmethod
+    def create_redash_client(connect_uri, api_key):
+        client = Redash(connect_uri, api_key)
+        client.session.headers.update(
             {
                 "Content-Type": "application/json",
                 "Accept": "application/json",
@@ -97,10 +108,9 @@ class IBRedashSource(StatefulIngestionSourceBase):
         )
 
         adapter = HTTPAdapter(max_retries=retry)
-        self.client.session.mount("http://", adapter)
-        self.client.session.mount("https://", adapter)
-
-        self.api_page_limit = self.config.api_page_limit or math.inf
+        client.session.mount("http://", adapter)
+        client.session.mount("https://", adapter)
+        return client
 
     @classmethod
     def create(cls, config_dict, ctx):
@@ -108,8 +118,15 @@ class IBRedashSource(StatefulIngestionSourceBase):
         return cls(config, ctx)
 
     def query_get(self, query_id) -> str:
+        return self.__query_get(self.client, query_id)
+
+    def query_exp_get(self, query_id) -> str:
+        return self.__query_get(self.exp_client, query_id)
+
+    @staticmethod
+    def __query_get(client, query_id) -> str:
         url = f"//api/queries/{query_id}/results"
-        return self.client._post(url).json()["query_result"]["data"]["rows"]
+        return client._post(url).json()["query_result"]["data"]["rows"]
 
     @abstractmethod
     def fetch_workunits(self) -> Iterable[WorkUnit]:
