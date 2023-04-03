@@ -15,12 +15,12 @@ class IBGenericPathElements:
     object_name: str
 
     def __init__(
-        self,
-        location_code: str,
-        parent1: str,
-        parent2: str,
-        parent3: str,
-        object_name: str,
+            self,
+            location_code: str,
+            parent1: str,
+            parent2: str,
+            parent3: str,
+            object_name: str,
     ):
         self.location_code = location_code
         self.parent1 = parent1
@@ -53,7 +53,7 @@ class DatasetUtils:
 
     @staticmethod
     def map_path(
-        platform: str, object_subtype: str, generic_path: IBGenericPathElements
+            platform: str, object_subtype: str, generic_path: IBGenericPathElements
     ) -> List[IBPathElementInfo]:
         path: List[IBPathElementInfo]
         if platform == "kafka":
@@ -90,12 +90,13 @@ class DatasetUtils:
     def join_path(separator: str, *path: IBPathElementInfo):
         replace_chars_regex = re.compile("[/\\\\&?*=]")
         return separator.join(
-            map(lambda p: replace_chars_regex.sub("-", p.value), path)
+            map(lambda p: replace_chars_regex.sub("-", p.value),
+                filter(lambda p: p.value and p.value is not None, path))
         )
 
     @staticmethod
     def _map_kafka_path(
-        object_subtype: str, generic_path: IBGenericPathElements
+            object_subtype: str, generic_path: IBGenericPathElements
     ) -> List[IBPathElementInfo]:
         subtype = object_subtype if pd.notna(object_subtype) else "Kafka Topic"
         return [
@@ -118,7 +119,7 @@ class DatasetUtils:
 
     @staticmethod
     def _map_elasticsearch_path(
-        object_subtype: str, generic_path: IBGenericPathElements
+            object_subtype: str, generic_path: IBGenericPathElements
     ) -> List[IBPathElementInfo]:
         subtype = object_subtype if pd.notna(object_subtype) else "Index"
         return [
@@ -169,7 +170,7 @@ class DatasetUtils:
 
     @staticmethod
     def _map_mssql_path(
-        object_subtype: str, generic_path: IBGenericPathElements
+            object_subtype: str, generic_path: IBGenericPathElements
     ) -> List[IBPathElementInfo]:
         subtype = object_subtype if pd.notna(object_subtype) else "Table"
         return [

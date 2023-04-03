@@ -42,7 +42,6 @@ from datahub.metadata.schema_classes import (
     SubTypesClass,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -68,12 +67,37 @@ class IBRedashDatasetSource(IBRedashSource):
         self.source_config: IBRedashSourceConfig = config
 
     def fetch_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
-        json_data = pd.read_json(json.dumps(self.query_get(self.config.query_id)))
+        exp_df = pd.read_json(json.dumps(self.query_exp_get(self.config.exp_query_id)))
+        extended_properties = self.prepare_extended_properties(exp_df)
+        df = pd.read_json(json.dumps(self.query_get(self.config.query_id)))
 
-        for i, row in json_data.iterrows():
-            yield from self._fetch_object_workunits(row)
+        for i, row in df.iterrows():
+            yield from self._fetch_object_workunits(row, extended_properties)
 
-    def _fetch_object_workunits(self, row: pd.DataFrame) -> Iterable[MetadataWorkUnit]:
+    def prepare_extended_properties(self, exp_df):
+        result = {}
+        exp_grouped = exp_df.groupby(["locationCode", "parent1", "parent2", "parent3", "object_name", "platform"])
+        for key_tuple, exp in exp_grouped:
+            row = exp.iloc[0]
+            object_name = row.object_name
+            path = DatasetUtils.map_path(
+                row.platform,
+                None,
+                IBGenericPathElements(
+                    location_code=row.locationCode,
+                    parent1=row.parent1,
+                    parent2=row.parent2,
+                    parent3=row.parent3,
+                    object_name=object_name,
+                ),
+            )
+            urn = DatasetUtils.build_dataset_urn(self.platform, *path) if row.object_name \
+                else IBRedashDatasetSource._build_container_urn(*path)
+            props = exp.set_index('property_key')['property_value'].to_dict()
+            result[urn] = props
+        return result
+
+    def _fetch_object_workunits(self, row: pd.DataFrame, extended_properties: dict) -> Iterable[MetadataWorkUnit]:
         object_name = row.objectName
 
         dataset_path = DatasetUtils.map_path(
@@ -87,15 +111,15 @@ class IBRedashDatasetSource(IBRedashSource):
                 object_name=object_name,
             ),
         )
+        dataset_urn = DatasetUtils.build_dataset_urn(self.platform, *dataset_path)
 
         properties = DatasetPropertiesClass(
             name=object_name,
-            description=row.description
-            if pd.notna(row.description)
-            else None,  # pandas maps empty description as nan
+            description=row.description if pd.notna(row.description) else None,  # pandas maps empty description as nan
             qualifiedName=IBRedashDatasetSource._build_dataset_qualified_name(
                 *dataset_path
             ),
+            customProperties=extended_properties.get(dataset_urn)
         )
 
         browse_paths = BrowsePathsClass(
@@ -131,7 +155,7 @@ class IBRedashDatasetSource(IBRedashSource):
         )
         aspects = [properties, browse_paths, schema, ownership]
         snapshot = DatasetSnapshot(
-            urn=DatasetUtils.build_dataset_urn(self.platform, *dataset_path),
+            urn=dataset_urn,
             aspects=aspects,
         )
         mce = MetadataChangeEvent(proposedSnapshot=snapshot)
@@ -142,7 +166,7 @@ class IBRedashDatasetSource(IBRedashSource):
             mcp=MetadataChangeProposalWrapper(
                 entityType="dataset",
                 changeType=ChangeTypeClass.UPSERT,
-                entityUrn=snapshot.urn,
+                entityUrn=dataset_urn,
                 aspectName="subTypes",
                 aspect=SubTypesClass(typeNames=[self.object_subtype]),
             ),
@@ -153,9 +177,8 @@ class IBRedashDatasetSource(IBRedashSource):
             container_path = dataset_path[:i]
             if pd.isna(container_path[-1]):
                 break
-            yield from self._fetch_container_workunits(
-                container_path, dataset_path[i - 1], container_parent_path
-            )
+            yield from self._fetch_container_workunits(container_path, dataset_path[i - 1], extended_properties,
+                                                       container_parent_path)
             container_parent_path = container_path
 
         yield MetadataWorkUnit(
@@ -174,10 +197,11 @@ class IBRedashDatasetSource(IBRedashSource):
         )
 
     def _fetch_container_workunits(
-        self,
-        path: List[IBPathElementInfo],
-        container_info: IBPathElementInfo,
-        parent_path: Optional[List[IBPathElementInfo]] = None,
+            self,
+            path: List[IBPathElementInfo],
+            container_info: IBPathElementInfo,
+            extended_properties: dict,
+            parent_path: Optional[List[IBPathElementInfo]] = None
     ) -> Iterable[MetadataWorkUnit]:
         qualified_name = IBRedashDatasetSource._build_dataset_qualified_name(*path)
         container_urn = builder.make_container_urn(qualified_name)
@@ -189,7 +213,9 @@ class IBRedashDatasetSource(IBRedashSource):
         yield IBRedashDatasetSource._build_container_workunit_with_aspect(
             container_urn,
             aspect=ContainerProperties(
-                name=path[-1].value, qualifiedName=qualified_name
+                name=path[-1].value,
+                qualifiedName=qualified_name,
+                customProperties=extended_properties.get(container_urn)
             ),
         )
 
