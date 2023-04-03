@@ -523,7 +523,6 @@ entry_points = {
         "ib-mssql-views = datahub.ingestion.source.ib.dataset.ib_mssql_views:IBMSSQLViewsSource",
         "ib-mssql-tables = datahub.ingestion.source.ib.dataset.ib_mssql_tables:IBMSSQLTablesSource",
         "ib-postgresql = datahub.ingestion.source.ib.dataset.ib_postgresql:IBPostgreSQLSource",
-        "ib-extended-properties = datahub.ingestion.source.ib.extended_properties.ib_extended_properties.IBExtendedPropertiesSource",
         "sqlalchemy = datahub.ingestion.source.sql.sql_generic:SQLAlchemyGenericSource",
         "athena = datahub.ingestion.source.sql.athena:AthenaSource",
         "azure-ad = datahub.ingestion.source.identity.azure_ad:AzureADSource",
