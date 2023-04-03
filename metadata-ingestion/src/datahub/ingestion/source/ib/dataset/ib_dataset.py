@@ -9,8 +9,8 @@ import datahub.emitter.mce_builder as builder
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
-from src.datahub.ingestion.source.ib.ib_common import IBRedashSource, IBRedashSourceConfig
-from src.datahub.ingestion.source.ib.utils.dataset_utils import (
+from datahub.ingestion.source.ib.ib_common import IBRedashSource, IBRedashSourceConfig
+from datahub.ingestion.source.ib.utils.dataset_utils import (
     DatasetUtils,
     IBGenericPathElements,
     IBPathElementInfo,
