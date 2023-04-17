@@ -1,9 +1,11 @@
 import random
 import string
 from datetime import datetime, timezone
+from typing import cast
 from unittest import mock
 
 import pandas as pd
+import pytest
 from freezegun import freeze_time
 
 from datahub.configuration.common import AllowDenyPattern, DynamicTypedConfig
@@ -23,6 +25,7 @@ from datahub.ingestion.source.snowflake.snowflake_config import (
     SnowflakeV2Config,
     TagOption,
 )
+from datahub.ingestion.source.snowflake.snowflake_report import SnowflakeV2Report
 from tests.integration.snowflake.common import FROZEN_TIME, default_query_results
 from tests.test_helpers import mce_helpers
 
@@ -40,6 +43,7 @@ def random_email():
 
 
 @freeze_time(FROZEN_TIME)
+@pytest.mark.integration
 def test_snowflake_basic(pytestconfig, tmp_path, mock_time, mock_datahub_graph):
     test_resources_dir = pytestconfig.rootpath / "tests/integration/snowflake"
 
@@ -87,6 +91,7 @@ def test_snowflake_basic(pytestconfig, tmp_path, mock_time, mock_datahub_graph):
                         include_table_lineage=True,
                         include_view_lineage=True,
                         include_usage_stats=False,
+                        use_legacy_lineage_method=False,
                         include_operational_stats=True,
                         start_time=datetime(2022, 6, 6, 7, 17, 0, 0).replace(
                             tzinfo=timezone.utc
@@ -132,9 +137,16 @@ def test_snowflake_basic(pytestconfig, tmp_path, mock_time, mock_datahub_graph):
             golden_path=golden_file,
             ignore_paths=[],
         )
+        report = cast(SnowflakeV2Report, pipeline.source.get_report())
+        assert report.lru_cache_info["get_tables_for_database"]["misses"] == 1
+        assert report.lru_cache_info["get_views_for_database"]["misses"] == 1
+        assert report.lru_cache_info["get_columns_for_schema"]["misses"] == 1
+        assert report.lru_cache_info["get_pk_constraints_for_schema"]["misses"] == 1
+        assert report.lru_cache_info["get_fk_constraints_for_schema"]["misses"] == 1
 
 
 @freeze_time(FROZEN_TIME)
+@pytest.mark.integration
 def test_snowflake_private_link(pytestconfig, tmp_path, mock_time, mock_datahub_graph):
     test_resources_dir = pytestconfig.rootpath / "tests/integration/snowflake"
 
@@ -163,6 +175,7 @@ def test_snowflake_private_link(pytestconfig, tmp_path, mock_time, mock_datahub_
                         include_column_lineage=False,
                         include_views=False,
                         include_view_lineage=False,
+                        use_legacy_lineage_method=False,
                         include_usage_stats=False,
                         include_operational_stats=False,
                         start_time=datetime(2022, 6, 6, 7, 17, 0, 0).replace(

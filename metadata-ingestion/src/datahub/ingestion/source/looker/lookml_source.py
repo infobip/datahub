@@ -12,26 +12,30 @@ import lkml
 import lkml.simple
 import pydantic
 from looker_sdk.error import SDKError
-from looker_sdk.sdk.api31.models import DBConnection
+from looker_sdk.sdk.api40.models import DBConnection
 from pydantic import root_validator, validator
 from pydantic.fields import Field
 
 import datahub.emitter.mce_builder as builder
 from datahub.configuration import ConfigModel
 from datahub.configuration.common import AllowDenyPattern, ConfigurationError
-from datahub.configuration.github import GitHubInfo
-from datahub.configuration.source_common import EnvBasedSourceConfigBase
+from datahub.configuration.git import GitInfo
+from datahub.configuration.source_common import EnvConfigMixin
+from datahub.configuration.validate_field_rename import pydantic_renamed_field
 from datahub.emitter.mce_builder import make_schema_field_urn
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.decorators import (
     SupportStatus,
+    capability,
     config_class,
     platform_name,
     support_status,
 )
 from datahub.ingestion.api.registry import import_path
+from datahub.ingestion.api.source import SourceCapability
 from datahub.ingestion.api.workunit import MetadataWorkUnit
+from datahub.ingestion.source.common.subtypes import DatasetSubTypes
 from datahub.ingestion.source.git.git_import import GitClone
 from datahub.ingestion.source.looker.looker_common import (
     LookerCommonConfig,
@@ -68,7 +72,6 @@ from datahub.metadata.com.linkedin.pegasus2avro.dataset import (
 from datahub.metadata.com.linkedin.pegasus2avro.metadata.snapshot import DatasetSnapshot
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
 from datahub.metadata.schema_classes import (
-    ChangeTypeClass,
     DatasetPropertiesClass,
     FineGrainedLineageClass,
     FineGrainedLineageUpstreamTypeClass,
@@ -91,6 +94,10 @@ lkml.simple.PLURAL_KEYS = (
     "local_dependency",
     "remote_dependency",
 )
+
+_EXPLORE_FILE_EXTENSION = ".explore.lkml"
+_VIEW_FILE_EXTENSION = ".view.lkml"
+_MODEL_FILE_EXTENSION = ".model.lkml"
 
 
 def _get_bigquery_definition(
@@ -136,7 +143,7 @@ class LookerConnectionDefinition(ConfigModel):
     @validator("platform_env")
     def platform_env_must_be_one_of(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
-            return EnvBasedSourceConfigBase.env_must_be_one_of(v)
+            return EnvConfigMixin.env_must_be_one_of(v)
         return v
 
     @validator("platform", "default_db", "default_schema")
@@ -168,16 +175,19 @@ class LookerConnectionDefinition(ConfigModel):
         )
 
 
-class LookMLSourceConfig(LookerCommonConfig, StatefulIngestionConfigBase):
-    github_info: Optional[GitHubInfo] = Field(
+class LookMLSourceConfig(
+    LookerCommonConfig, StatefulIngestionConfigBase, EnvConfigMixin
+):
+    git_info: Optional[GitInfo] = Field(
         None,
-        description="Reference to your github location. If present, supplies handy links to your lookml on the dataset entity page.",
+        description="Reference to your git location. If present, supplies handy links to your lookml on the dataset entity page.",
     )
+    _github_info_deprecated = pydantic_renamed_field("github_info", "git_info")
     base_folder: Optional[pydantic.DirectoryPath] = Field(
         None,
         description="Required if not providing github configuration and deploy keys. A pointer to a local directory (accessible to the ingestion system) where the root of the LookML repo has been checked out (typically via a git clone). This is typically the root folder where the `*.model.lkml` and `*.view.lkml` files are stored. e.g. If you have checked out your LookML repo under `/Users/jdoe/workspace/my-lookml-repo`, then set `base_folder` to `/Users/jdoe/workspace/my-lookml-repo`.",
     )
-    project_dependencies: Dict[str, Union[pydantic.DirectoryPath, GitHubInfo]] = Field(
+    project_dependencies: Dict[str, Union[pydantic.DirectoryPath, GitInfo]] = Field(
         {},
         description="A map of project_name to local directory (accessible to the ingestion system) or Git credentials. "
         "Every local_dependencies or private remote_dependency listed in the main project's manifest.lkml file should have a corresponding entry here. "
@@ -228,14 +238,6 @@ class LookMLSourceConfig(LookerCommonConfig, StatefulIngestionConfigBase):
         default=None, description=""
     )
 
-    @validator("platform_instance")
-    def platform_instance_not_supported(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
-            raise ConfigurationError(
-                "LookML Source doesn't support platform instance at the top level. However connection-specific platform instances are supported for generating lineage edges. Read the documentation to find out more."
-            )
-        return v
-
     @validator("connection_to_platform_map", pre=True)
     def convert_string_to_connection_def(cls, conn_map):
         # Previous version of config supported strings in connection map. This upconverts strings to ConnectionMap
@@ -284,9 +286,9 @@ class LookMLSourceConfig(LookerCommonConfig, StatefulIngestionConfigBase):
         cls, v: Optional[pydantic.DirectoryPath], values: Dict[str, Any]
     ) -> Optional[pydantic.DirectoryPath]:
         if v is None:
-            github_info: Optional[GitHubInfo] = values.get("github_info", None)
-            if github_info and github_info.deploy_key:
-                # We have github_info populated correctly, base folder is not needed
+            git_info: Optional[GitInfo] = values.get("git_info")
+            if git_info and git_info.deploy_key:
+                # We have git_info populated correctly, base folder is not needed
                 pass
             else:
                 raise ValueError(
@@ -340,7 +342,7 @@ class LookerModel:
     def from_looker_dict(
         looker_model_dict: dict,
         base_project_name: str,
-        base_folder: str,
+        root_project_name: Optional[str],
         base_projects_folders: Dict[str, pathlib.Path],
         path: str,
         reporter: LookMLSourceReport,
@@ -351,7 +353,7 @@ class LookerModel:
         resolved_includes = LookerModel.resolve_includes(
             includes,
             base_project_name,
-            base_folder,
+            root_project_name,
             base_projects_folders,
             path,
             reporter,
@@ -360,6 +362,23 @@ class LookerModel:
         )
         logger.debug(f"{path} has resolved_includes: {resolved_includes}")
         explores = looker_model_dict.get("explores", [])
+
+        explore_files = [
+            x.include
+            for x in resolved_includes
+            if x.include.endswith(_EXPLORE_FILE_EXTENSION)
+        ]
+        for included_file in explore_files:
+            try:
+                with open(included_file, "r") as file:
+                    parsed = lkml.load(file)
+                    included_explores = parsed.get("explores", [])
+                    explores.extend(included_explores)
+            except Exception as e:
+                reporter.report_warning(
+                    path, f"Failed to load {included_file} due to {e}"
+                )
+                # continue in this case, as it might be better to load and resolve whatever we can
 
         return LookerModel(
             connection=connection,
@@ -372,7 +391,7 @@ class LookerModel:
     def resolve_includes(
         includes: List[str],
         project_name: str,
-        base_folder: str,
+        root_project_name: Optional[str],
         base_projects_folder: Dict[str, pathlib.Path],
         path: str,
         reporter: LookMLSourceReport,
@@ -384,9 +403,9 @@ class LookerModel:
         For rules on how LookML ``include`` statements are written, see
             https://docs.looker.com/data-modeling/getting-started/ide-folders#wildcard_examples
         """
+
         resolved = []
         for inc in includes:
-            resolved_project_name = project_name
             # Filter out dashboards - we get those through the looker source.
             if (
                 inc.endswith(".dashboard")
@@ -396,14 +415,16 @@ class LookerModel:
                 logger.debug(f"include '{inc}' is a dashboard, skipping it")
                 continue
 
+            resolved_project_name = project_name
+            resolved_project_folder = str(base_projects_folder[project_name])
+
             # Massage the looker include into a valid glob wildcard expression
             if inc.startswith("//"):
                 # remote include, let's see if we have the project checked out locally
                 (remote_project, project_local_path) = inc[2:].split("/", maxsplit=1)
                 if remote_project in base_projects_folder:
-                    glob_expr = (
-                        f"{base_projects_folder[remote_project]}/{project_local_path}"
-                    )
+                    resolved_project_folder = str(base_projects_folder[remote_project])
+                    glob_expr = f"{resolved_project_folder}/{project_local_path}"
                     resolved_project_name = remote_project
                 else:
                     logger.warning(
@@ -411,7 +432,29 @@ class LookerModel:
                     )
                     continue
             elif inc.startswith("/"):
-                glob_expr = f"{base_folder}{inc}"
+                glob_expr = f"{resolved_project_folder}{inc}"
+
+                # The include path is sometimes '/{project_name}/{path_within_project}'
+                # instead of '//{project_name}/{path_within_project}' or '/{path_within_project}'.
+                #
+                # TODO: I can't seem to find any documentation on this pattern, but we definitely
+                # have seen it in the wild. Example from Mozilla's public looker-hub repo:
+                # https://github.com/mozilla/looker-hub/blob/f491ca51ce1add87c338e6723fd49bc6ae4015ca/fenix/explores/activation.explore.lkml#L7
+                # As such, we try to handle it but are as defensive as possible.
+
+                non_base_project_name = project_name
+                if project_name == _BASE_PROJECT_NAME and root_project_name is not None:
+                    non_base_project_name = root_project_name
+                if non_base_project_name != _BASE_PROJECT_NAME and inc.startswith(
+                    f"/{non_base_project_name}/"
+                ):
+                    # This might be a local include. Let's make sure that '/{project_name}' doesn't
+                    # exist as normal include in the project.
+                    if not pathlib.Path(
+                        f"{resolved_project_folder}/{non_base_project_name}"
+                    ).exists():
+                        path_within_project = pathlib.Path(*pathlib.Path(inc).parts[2:])
+                        glob_expr = f"{resolved_project_folder}/{path_within_project}"
             else:
                 # Need to handle a relative path.
                 glob_expr = str(pathlib.Path(path).parent / inc)
@@ -465,7 +508,7 @@ class LookerModel:
                                 LookerModel.resolve_includes(
                                     parsed["includes"],
                                     resolved_project_name,
-                                    base_folder,
+                                    root_project_name,
                                     base_projects_folder,
                                     included_file,
                                     reporter,
@@ -480,7 +523,6 @@ class LookerModel:
                         path, f"Failed to load {included_file} due to {e}"
                     )
                     # continue in this case, as it might be better to load and resolve whatever we can
-                    pass
 
             resolved.extend(
                 [
@@ -506,7 +548,7 @@ class LookerViewFile:
         absolute_file_path: str,
         looker_view_file_dict: dict,
         project_name: str,
-        base_folder: str,
+        root_project_name: Optional[str],
         base_projects_folder: Dict[str, pathlib.Path],
         raw_file_content: str,
         reporter: LookMLSourceReport,
@@ -519,7 +561,7 @@ class LookerViewFile:
         resolved_includes = LookerModel.resolve_includes(
             includes,
             project_name,
-            base_folder,
+            root_project_name,
             base_projects_folder,
             absolute_file_path,
             reporter,
@@ -554,12 +596,12 @@ class LookerViewFileLoader:
 
     def __init__(
         self,
-        base_folder: str,
+        root_project_name: Optional[str],
         base_projects_folder: Dict[str, pathlib.Path],
         reporter: LookMLSourceReport,
     ) -> None:
         self.viewfile_cache: Dict[str, LookerViewFile] = {}
-        self._base_folder = base_folder
+        self._root_project_name = root_project_name
         self._base_projects_folder = base_projects_folder
         self.reporter = reporter
 
@@ -571,10 +613,14 @@ class LookerViewFileLoader:
     ) -> Optional[LookerViewFile]:
         # always fully resolve paths to simplify de-dup
         path = str(pathlib.Path(path).resolve())
-        if not path.endswith(".view.lkml"):
+        allowed_extensions = [_VIEW_FILE_EXTENSION, _EXPLORE_FILE_EXTENSION]
+        matched_any_extension = [
+            match for match in [path.endswith(x) for x in allowed_extensions] if match
+        ]
+        if not matched_any_extension:
             # not a view file
             logger.debug(
-                f"Skipping file {path} because it doesn't appear to be a view file"
+                f"Skipping file {path} because it doesn't appear to be a view file. Matched extensions {allowed_extensions}"
             )
             return None
 
@@ -595,7 +641,7 @@ class LookerViewFileLoader:
                     absolute_file_path=path,
                     looker_view_file_dict=parsed,
                     project_name=project_name,
-                    base_folder=self._base_folder,
+                    root_project_name=self._root_project_name,
                     base_projects_folder=self._base_projects_folder,
                     raw_file_content=raw_file_content,
                     reporter=reporter,
@@ -660,6 +706,7 @@ class LookerView:
     absolute_file_path: str
     connection: LookerConnectionDefinition
     sql_table_names: List[str]
+    upstream_explores: List[str]
     fields: List[ViewField]
     raw_file_content: str
     view_details: Optional[ViewProperties] = None
@@ -746,6 +793,11 @@ class LookerView:
                             matched_field.replace('"', "").replace("`", "").lower()
                         )
                         upstream_fields.append(matched_field)
+                else:
+                    # If no SQL is specified, we assume this is referencing an upstream field
+                    # with the same name. This commonly happens for extends and derived tables.
+                    upstream_fields.append(name)
+
             upstream_fields = sorted(list(set(upstream_fields)))
 
             field = ViewField(
@@ -827,27 +879,51 @@ class LookerView:
         )
         fields: List[ViewField] = dimensions + dimension_groups + measures
 
-        # also store the view logic and materialization
+        # Prep "default" values for the view, which will be overridden by the logic below.
         view_logic = looker_viewfile.raw_file_content[:max_file_snippet_length]
+        sql_table_names: List[str] = []
+        upstream_explores: List[str] = []
 
-        # Parse SQL from derived tables to extract dependencies
         if derived_table is not None:
-            fields, sql_table_names = cls._extract_metadata_from_sql_query(
-                reporter,
-                parse_table_names_from_sql,
-                sql_parser_path,
-                view_name,
-                sql_table_name,
-                derived_table,
-                fields,
-                use_external_process=process_isolation_for_sql_parsing,
-            )
+            # Derived tables can either be a SQL query or a LookML explore.
+            # See https://cloud.google.com/looker/docs/derived-tables.
+
             if "sql" in derived_table:
                 view_logic = derived_table["sql"]
                 view_lang = VIEW_LANGUAGE_SQL
-            if "explore_source" in derived_table:
-                view_logic = str(derived_table["explore_source"])
+
+                # Parse SQL to extract dependencies.
+                if parse_table_names_from_sql:
+                    (
+                        fields,
+                        sql_table_names,
+                    ) = cls._extract_metadata_from_derived_table_sql(
+                        reporter,
+                        sql_parser_path,
+                        view_name,
+                        sql_table_name,
+                        view_logic,
+                        fields,
+                        use_external_process=process_isolation_for_sql_parsing,
+                    )
+
+            elif "explore_source" in derived_table:
+                # This is called a "native derived table".
+                # See https://cloud.google.com/looker/docs/creating-ndts.
+                explore_source = derived_table["explore_source"]
+
+                # We want this to render the full lkml block
+                # e.g. explore_source: source_name { ... }
+                # As such, we use the full derived_table instead of the explore_source.
+                view_logic = str(lkml.dump(derived_table))[:max_file_snippet_length]
                 view_lang = VIEW_LANGUAGE_LOOKML
+
+                (
+                    fields,
+                    upstream_explores,
+                ) = cls._extract_metadata_from_derived_table_explore(
+                    reporter, view_name, explore_source, fields
+                )
 
             materialized = False
             for k in derived_table:
@@ -859,121 +935,145 @@ class LookerView:
             view_details = ViewProperties(
                 materialized=materialized, viewLogic=view_logic, viewLanguage=view_lang
             )
-
-            return LookerView(
-                id=LookerViewId(
-                    project_name=project_name,
-                    model_name=model_name,
-                    view_name=view_name,
-                ),
-                absolute_file_path=looker_viewfile.absolute_file_path,
-                connection=connection,
-                sql_table_names=sql_table_names,
-                fields=fields,
-                raw_file_content=looker_viewfile.raw_file_content,
-                view_details=view_details,
+        else:
+            # If not a derived table, then this view essentially wraps an existing
+            # object in the database. If sql_table_name is set, there is a single
+            # dependency in the view, on the sql_table_name.
+            # Otherwise, default to the view name as per the docs:
+            # https://docs.looker.com/reference/view-params/sql_table_name-for-view
+            sql_table_names = (
+                [view_name] if sql_table_name is None else [sql_table_name]
+            )
+            view_details = ViewProperties(
+                materialized=False,
+                viewLogic=view_logic,
+                viewLanguage=VIEW_LANGUAGE_LOOKML,
             )
 
-        # If not a derived table, then this view essentially wraps an existing
-        # object in the database. If sql_table_name is set, there is a single
-        # dependency in the view, on the sql_table_name.
-        # Otherwise, default to the view name as per the docs:
-        # https://docs.looker.com/reference/view-params/sql_table_name-for-view
-        sql_table_names = [view_name] if sql_table_name is None else [sql_table_name]
-        output_looker_view = LookerView(
+        return LookerView(
             id=LookerViewId(
                 project_name=project_name, model_name=model_name, view_name=view_name
             ),
             absolute_file_path=looker_viewfile.absolute_file_path,
-            sql_table_names=sql_table_names,
             connection=connection,
+            sql_table_names=sql_table_names,
+            upstream_explores=upstream_explores,
             fields=fields,
             raw_file_content=looker_viewfile.raw_file_content,
-            view_details=ViewProperties(
-                materialized=False,
-                viewLogic=view_logic,
-                viewLanguage=VIEW_LANGUAGE_LOOKML,
-            ),
+            view_details=view_details,
         )
-        return output_looker_view
 
     @classmethod
-    def _extract_metadata_from_sql_query(
-        cls: Type,
+    def _extract_metadata_from_derived_table_sql(
+        cls,
         reporter: LookMLSourceReport,
-        parse_table_names_from_sql: bool,
         sql_parser_path: str,
         view_name: str,
         sql_table_name: Optional[str],
-        derived_table: dict,
+        sql_query: str,
         fields: List[ViewField],
         use_external_process: bool,
     ) -> Tuple[List[ViewField], List[str]]:
         sql_table_names: List[str] = []
-        if parse_table_names_from_sql and "sql" in derived_table:
-            logger.debug(f"Parsing sql from derived table section of view: {view_name}")
-            sql_query = derived_table["sql"]
-            reporter.query_parse_attempts += 1
 
-            # Skip queries that contain liquid variables. We currently don't parse them correctly.
-            # Docs: https://cloud.google.com/looker/docs/liquid-variable-reference.
-            # TODO: also support ${EXTENDS} and ${TABLE}
-            if "{%" in sql_query:
-                try:
-                    # test if parsing works
-                    sql_info: SQLInfo = cls._get_sql_info(
-                        sql_query, sql_parser_path, use_external_process
-                    )
-                    if not sql_info.table_names:
-                        raise Exception("Failed to find any tables")
-                except Exception:
-                    logger.debug(
-                        f"{view_name}: SQL Parsing didn't return any tables, trying a hail-mary"
-                    )
-                    # A hail-mary simple parse.
-                    for maybe_table_match in re.finditer(
-                        r"FROM\s*([a-zA-Z0-9_.`]+)", sql_query
-                    ):
-                        if maybe_table_match.group(1) not in sql_table_names:
-                            sql_table_names.append(maybe_table_match.group(1))
-                    return fields, sql_table_names
-            # Looker supports sql fragments that omit the SELECT and FROM parts of the query
-            # Add those in if we detect that it is missing
-            if not re.search(r"SELECT\s", sql_query, flags=re.I):
-                # add a SELECT clause at the beginning
-                sql_query = f"SELECT {sql_query}"
-            if not re.search(r"FROM\s", sql_query, flags=re.I):
-                # add a FROM clause at the end
-                sql_query = f"{sql_query} FROM {sql_table_name if sql_table_name is not None else view_name}"
-                # Get the list of tables in the query
+        logger.debug(f"Parsing sql from derived table section of view: {view_name}")
+        reporter.query_parse_attempts += 1
+
+        # Skip queries that contain liquid variables. We currently don't parse them correctly.
+        # Docs: https://cloud.google.com/looker/docs/liquid-variable-reference.
+        # TODO: also support ${EXTENDS} and ${TABLE}
+        if "{%" in sql_query:
             try:
-                sql_info = cls._get_sql_info(
+                # test if parsing works
+                sql_info: SQLInfo = cls._get_sql_info(
                     sql_query, sql_parser_path, use_external_process
                 )
-                sql_table_names = sql_info.table_names
-                column_names = sql_info.column_names
-                if not fields:
-                    # it seems like the view is defined purely as sql, let's try using the column names to populate the schema
-                    fields = [
-                        # set types to unknown for now as our sql parser doesn't give us column types yet
-                        ViewField(c, "", "unknown", "", ViewFieldType.UNKNOWN)
-                        for c in sorted(column_names)
-                    ]
                 if not sql_info.table_names:
-                    reporter.query_parse_failures += 1
-                    reporter.query_parse_failure_views.append(view_name)
-            except Exception as e:
-                reporter.query_parse_failures += 1
-                reporter.report_warning(
-                    f"looker-view-{view_name}",
-                    f"Failed to parse sql query, lineage will not be accurate. Exception: {e}",
+                    raise Exception("Failed to find any tables")
+            except Exception:
+                logger.debug(
+                    f"{view_name}: SQL Parsing didn't return any tables, trying a hail-mary"
                 )
+                # A hail-mary simple parse.
+                for maybe_table_match in re.finditer(
+                    r"FROM\s*([a-zA-Z0-9_.`]+)", sql_query
+                ):
+                    if maybe_table_match.group(1) not in sql_table_names:
+                        sql_table_names.append(maybe_table_match.group(1))
+                return fields, sql_table_names
 
-        # remove fields or sql tables that contain liquid variables
-        fields = [f for f in fields if "{%" not in f.name]
+        # Looker supports sql fragments that omit the SELECT and FROM parts of the query
+        # Add those in if we detect that it is missing
+        if not re.search(r"SELECT\s", sql_query, flags=re.I):
+            # add a SELECT clause at the beginning
+            sql_query = f"SELECT {sql_query}"
+        if not re.search(r"FROM\s", sql_query, flags=re.I):
+            # add a FROM clause at the end
+            sql_query = f"{sql_query} FROM {sql_table_name if sql_table_name is not None else view_name}"
+            # Get the list of tables in the query
+        try:
+            sql_info = cls._get_sql_info(
+                sql_query, sql_parser_path, use_external_process
+            )
+            sql_table_names = sql_info.table_names
+            column_names = sql_info.column_names
+
+            if not fields:
+                # it seems like the view is defined purely as sql, let's try using the column names to populate the schema
+                fields = [
+                    # set types to unknown for now as our sql parser doesn't give us column types yet
+                    ViewField(c, "", "unknown", "", ViewFieldType.UNKNOWN)
+                    for c in sorted(column_names)
+                ]
+                # remove fields or sql tables that contain liquid variables
+                fields = [f for f in fields if "{%" not in f.name]
+
+            if not sql_info.table_names:
+                reporter.query_parse_failures += 1
+                reporter.query_parse_failure_views.append(view_name)
+        except Exception as e:
+            reporter.query_parse_failures += 1
+            reporter.report_warning(
+                f"looker-view-{view_name}",
+                f"Failed to parse sql query, lineage will not be accurate. Exception: {e}",
+            )
+
         sql_table_names = [table for table in sql_table_names if "{%" not in table]
 
         return fields, sql_table_names
+
+    @classmethod
+    def _extract_metadata_from_derived_table_explore(
+        cls,
+        reporter: LookMLSourceReport,
+        view_name: str,
+        explore_source: dict,
+        fields: List[ViewField],
+    ) -> Tuple[List[ViewField], List[str]]:
+        logger.debug(
+            f"Parsing explore_source from derived table section of view: {view_name}"
+        )
+
+        upstream_explores = [explore_source["name"]]
+
+        explore_columns = explore_source.get("columns", [])
+        # TODO: We currently don't support column-level lineage for derived_column.
+        # In order to support it, we'd need to parse the `sql` field of the derived_column.
+
+        # The fields in the view are actually references to the fields in the explore.
+        # As such, we need to perform an extra mapping step to update
+        # the upstream column names.
+        for field in fields:
+            for i, upstream_field in enumerate(field.upstream_fields):
+                # Find the matching column in the explore.
+                for explore_column in explore_columns:
+                    if explore_column["name"] == upstream_field:
+                        field.upstream_fields[i] = explore_column.get(
+                            "field", explore_column["name"]
+                        )
+                        break
+
+        return fields, upstream_explores
 
     @classmethod
     def resolve_extends_view_name(
@@ -1063,6 +1163,15 @@ class LookerManifest:
 @platform_name("Looker")
 @config_class(LookMLSourceConfig)
 @support_status(SupportStatus.CERTIFIED)
+@capability(
+    SourceCapability.PLATFORM_INSTANCE,
+    "Supported using the `connection_to_platform_map`",
+)
+@capability(SourceCapability.LINEAGE_COARSE, "Supported by default")
+@capability(
+    SourceCapability.LINEAGE_FINE,
+    "Enabled by default, configured using `extract_column_level_lineage`",
+)
 class LookMLSource(StatefulIngestionSourceBase):
     """
     This plugin extracts the following:
@@ -1082,7 +1191,7 @@ class LookMLSource(StatefulIngestionSourceBase):
 
     # This is populated during the git clone step.
     base_projects_folder: Dict[str, pathlib.Path] = {}
-    remote_projects_github_info: Dict[str, GitHubInfo] = {}
+    remote_projects_git_info: Dict[str, GitInfo] = {}
 
     def __init__(self, config: LookMLSourceConfig, ctx: PipelineContext):
         super().__init__(config, ctx)
@@ -1113,7 +1222,7 @@ class LookMLSource(StatefulIngestionSourceBase):
             looker_model = LookerModel.from_looker_dict(
                 parsed,
                 _BASE_PROJECT_NAME,
-                str(self.source_config.base_folder),
+                self.source_config.project_name,
                 self.base_projects_folder,
                 path,
                 self.reporter,
@@ -1204,13 +1313,15 @@ class LookMLSource(StatefulIngestionSourceBase):
         if connection in self.source_config.connection_to_platform_map:
             return self.source_config.connection_to_platform_map[connection]
         elif self.looker_client:
-            looker_connection: Optional[DBConnection] = None
             try:
-                looker_connection = self.looker_client.connection(connection)
+                looker_connection: DBConnection = self.looker_client.connection(
+                    connection
+                )
             except SDKError:
-                logger.error(f"Failed to retrieve connection {connection} from Looker")
-
-            if looker_connection:
+                logger.error(
+                    f"Failed to retrieve connection {connection} from Looker. This usually happens when the credentials provided are not admin credentials."
+                )
+            else:
                 try:
                     connection_def: LookerConnectionDefinition = (
                         LookerConnectionDefinition.from_looker_connection(
@@ -1234,13 +1345,31 @@ class LookMLSource(StatefulIngestionSourceBase):
     def _get_upstream_lineage(
         self, looker_view: LookerView
     ) -> Optional[UpstreamLineage]:
-        upstreams = []
+        # Merge dataset upstreams with sql table upstreams.
+        upstream_dataset_urns = []
+        for upstream_explore in looker_view.upstream_explores:
+            # We're creating a "LookerExplore" just to use the urn generator.
+            upstream_dataset_urn = LookerExplore(
+                name=upstream_explore, model_name=looker_view.id.model_name
+            ).get_explore_urn(self.source_config)
+            upstream_dataset_urns.append(upstream_dataset_urn)
         for sql_table_name in looker_view.sql_table_names:
             sql_table_name = sql_table_name.replace('"', "").replace("`", "")
-            upstream_dataset_urn: str = self._construct_datalineage_urn(
+            upstream_dataset_urn = self._construct_datalineage_urn(
                 sql_table_name, looker_view
             )
-            fine_grained_lineages: List[FineGrainedLineageClass] = []
+            upstream_dataset_urns.append(upstream_dataset_urn)
+
+        # Generate the upstream + fine grained lineage objects.
+        upstreams = []
+        fine_grained_lineages: List[FineGrainedLineageClass] = []
+        for upstream_dataset_urn in upstream_dataset_urns:
+            upstream = UpstreamClass(
+                dataset=upstream_dataset_urn,
+                type=DatasetLineageTypeClass.VIEW,
+            )
+            upstreams.append(upstream)
+
             if self.source_config.extract_column_level_lineage and (
                 looker_view.view_details is not None
                 and looker_view.view_details.viewLanguage
@@ -1266,12 +1395,6 @@ class LookMLSource(StatefulIngestionSourceBase):
                         )
                         fine_grained_lineages.append(fine_grained_lineage)
 
-            upstream = UpstreamClass(
-                dataset=upstream_dataset_urn,
-                type=DatasetLineageTypeClass.VIEW,
-            )
-            upstreams.append(upstream)
-
         if upstreams != []:
             return UpstreamLineage(
                 upstreams=upstreams, fineGrainedLineages=fine_grained_lineages or None
@@ -1281,12 +1404,9 @@ class LookMLSource(StatefulIngestionSourceBase):
 
     def _get_custom_properties(self, looker_view: LookerView) -> DatasetPropertiesClass:
         assert self.source_config.base_folder  # this is always filled out
-        if looker_view.id.project_name == _BASE_PROJECT_NAME:
-            base_folder = self.source_config.base_folder
-        else:
-            base_folder = self.base_projects_folder.get(
-                looker_view.id.project_name, self.source_config.base_folder
-            )
+        base_folder = self.base_projects_folder.get(
+            looker_view.id.project_name, self.source_config.base_folder
+        )
         try:
             file_path = str(
                 pathlib.Path(looker_view.absolute_file_path).relative_to(
@@ -1306,17 +1426,17 @@ class LookMLSource(StatefulIngestionSourceBase):
             name=looker_view.id.view_name, customProperties=custom_properties
         )
 
-        maybe_github_info = self.source_config.project_dependencies.get(
+        maybe_git_info = self.source_config.project_dependencies.get(
             looker_view.id.project_name,
-            self.remote_projects_github_info.get(looker_view.id.project_name),
+            self.remote_projects_git_info.get(looker_view.id.project_name),
         )
-        if isinstance(maybe_github_info, GitHubInfo):
-            github_info: Optional[GitHubInfo] = maybe_github_info
+        if isinstance(maybe_git_info, GitInfo):
+            git_info: Optional[GitInfo] = maybe_git_info
         else:
-            github_info = self.source_config.github_info
-        if github_info is not None and file_path:
+            git_info = self.source_config.git_info
+        if git_info is not None and file_path:
             # It should be that looker_view.id.project_name is the base project.
-            github_file_url = github_info.get_url_for_file_path(file_path)
+            github_file_url = git_info.get_url_for_file_path(file_path)
             dataset_props.externalUrl = github_file_url
 
         return dataset_props
@@ -1325,19 +1445,13 @@ class LookMLSource(StatefulIngestionSourceBase):
         self, looker_view: LookerView
     ) -> List[MetadataChangeProposalWrapper]:
         subTypeEvent = MetadataChangeProposalWrapper(
-            entityType="dataset",
-            changeType=ChangeTypeClass.UPSERT,
             entityUrn=looker_view.id.get_urn(self.source_config),
-            aspectName="subTypes",
-            aspect=SubTypesClass(typeNames=["view"]),
+            aspect=SubTypesClass(typeNames=[DatasetSubTypes.VIEW]),
         )
         events = [subTypeEvent]
         if looker_view.view_details is not None:
             viewEvent = MetadataChangeProposalWrapper(
-                entityType="dataset",
-                changeType=ChangeTypeClass.UPSERT,
                 entityUrn=looker_view.id.get_urn(self.source_config),
-                aspectName="viewProperties",
                 aspect=looker_view.view_details,
             )
             events.append(viewEvent)
@@ -1424,17 +1538,17 @@ class LookMLSource(StatefulIngestionSourceBase):
         with tempfile.TemporaryDirectory("lookml_tmp") as tmp_dir:
             # Clone the base_folder if necessary.
             if not self.source_config.base_folder:
-                assert self.source_config.github_info
+                assert self.source_config.git_info
                 # we don't have a base_folder, so we need to clone the repo and process it locally
                 start_time = datetime.now()
                 git_clone = GitClone(tmp_dir)
                 # github info deploy key is always populated
-                assert self.source_config.github_info.deploy_key
-                assert self.source_config.github_info.repo_ssh_locator
+                assert self.source_config.git_info.deploy_key
+                assert self.source_config.git_info.repo_ssh_locator
                 checkout_dir = git_clone.clone(
-                    ssh_key=self.source_config.github_info.deploy_key,
-                    repo_url=self.source_config.github_info.repo_ssh_locator,
-                    branch=self.source_config.github_info.branch_for_clone,
+                    ssh_key=self.source_config.git_info.deploy_key,
+                    repo_url=self.source_config.git_info.repo_ssh_locator,
+                    branch=self.source_config.git_info.branch_for_clone,
                 )
                 self.reporter.git_clone_latency = datetime.now() - start_time
                 self.source_config.base_folder = checkout_dir.resolve()
@@ -1442,12 +1556,13 @@ class LookMLSource(StatefulIngestionSourceBase):
             self.base_projects_folder[
                 _BASE_PROJECT_NAME
             ] = self.source_config.base_folder
+
             visited_projects: Set[str] = set()
 
             # We clone everything that we're pointed at.
             for project, p_ref in self.source_config.project_dependencies.items():
                 # If we were given GitHub info, we need to clone the project.
-                if isinstance(p_ref, GitHubInfo):
+                if isinstance(p_ref, GitInfo):
                     assert p_ref.repo_ssh_locator
 
                     p_cloner = GitClone(f"{tmp_dir}/_included_/{project}")
@@ -1458,8 +1573,8 @@ class LookMLSource(StatefulIngestionSourceBase):
                                 # to the main project deploy key.
                                 p_ref.deploy_key
                                 or (
-                                    self.source_config.github_info.deploy_key
-                                    if self.source_config.github_info
+                                    self.source_config.git_info.deploy_key
+                                    if self.source_config.git_info
                                     else None
                                 )
                             ),
@@ -1470,8 +1585,7 @@ class LookMLSource(StatefulIngestionSourceBase):
                         p_ref = p_checkout_dir.resolve()
                     except Exception as e:
                         logger.warning(
-                            f"Failed to clone remote project {project}. This can lead to failures in parsing lookml files later on",
-                            e,
+                            f"Failed to clone remote project {project}. This can lead to failures in parsing lookml files later on: {e}",
                         )
                         visited_projects.add(project)
                         continue
@@ -1500,6 +1614,20 @@ class LookMLSource(StatefulIngestionSourceBase):
 
         manifest = self.get_manifest_if_present(project_path)
         if manifest:
+            # Special case handling if the root project has a name in the manifest file.
+            if project_name == _BASE_PROJECT_NAME and manifest.project_name:
+                if (
+                    self.source_config.project_name is not None
+                    and manifest.project_name != self.source_config.project_name
+                ):
+                    logger.warning(
+                        f"The project name in the manifest file '{manifest.project_name}'"
+                        f"does not match the configured project name '{self.source_config.project_name}'. "
+                        "This can lead to failures in LookML include resolution and lineage generation."
+                    )
+                elif self.source_config.project_name is None:
+                    self.source_config.project_name = manifest.project_name
+
             # Clone the remote project dependencies.
             for remote_project in manifest.remote_dependencies:
                 if remote_project.name in project_visited:
@@ -1512,8 +1640,8 @@ class LookMLSource(StatefulIngestionSourceBase):
 
                     p_checkout_dir = p_cloner.clone(
                         ssh_key=(
-                            self.source_config.github_info.deploy_key
-                            if self.source_config.github_info
+                            self.source_config.git_info.deploy_key
+                            if self.source_config.git_info
                             else None
                         ),
                         repo_url=remote_project.url,
@@ -1524,17 +1652,15 @@ class LookMLSource(StatefulIngestionSourceBase):
                     ] = p_checkout_dir.resolve()
                     repo = p_cloner.get_last_repo_cloned()
                     assert repo
-                    remote_github_info = GitHubInfo(
+                    remote_git_info = GitInfo(
                         url_template=remote_project.url,
                         repo="dummy/dummy",  # set to dummy values to bypass validation
                         branch=repo.active_branch.name,
                     )
-                    remote_github_info.repo = (
+                    remote_git_info.repo = (
                         ""  # set to empty because url already contains the full path
                     )
-                    self.remote_projects_github_info[
-                        remote_project.name
-                    ] = remote_github_info
+                    self.remote_projects_git_info[remote_project.name] = remote_git_info
 
                 except Exception as e:
                     logger.warning(
@@ -1554,7 +1680,7 @@ class LookMLSource(StatefulIngestionSourceBase):
         assert self.source_config.base_folder
 
         viewfile_loader = LookerViewFileLoader(
-            str(self.source_config.base_folder),
+            self.source_config.project_name,
             self.base_projects_folder,
             self.reporter,
         )
@@ -1566,7 +1692,9 @@ class LookMLSource(StatefulIngestionSourceBase):
 
         # The ** means "this directory and all subdirectories", and hence should
         # include all the files we want.
-        model_files = sorted(self.source_config.base_folder.glob("**/*.model.lkml"))
+        model_files = sorted(
+            self.source_config.base_folder.glob(f"**/*{_MODEL_FILE_EXTENSION}")
+        )
         model_suffix_len = len(".model")
 
         for file_path in model_files:
@@ -1600,6 +1728,7 @@ class LookMLSource(StatefulIngestionSourceBase):
 
             explore_reachable_views: Set[ProjectInclude] = set()
             if self.source_config.emit_reachable_views_only:
+                model_explores_map = {d["name"]: d for d in model.explores}
                 for explore_dict in model.explores:
                     try:
                         explore: LookerExplore = LookerExplore.from_dict(
@@ -1608,6 +1737,7 @@ class LookMLSource(StatefulIngestionSourceBase):
                             model.resolved_includes,
                             viewfile_loader,
                             self.reporter,
+                            model_explores_map,
                         )
                         if explore.upstream_views:
                             for view_name in explore.upstream_views:
@@ -1745,9 +1875,6 @@ class LookMLSource(StatefulIngestionSourceBase):
 
     def get_report(self):
         return self.reporter
-
-    def get_platform_instance_id(self) -> str:
-        return self.source_config.platform_instance or self.platform
 
     def close(self):
         self.prepare_for_commit()

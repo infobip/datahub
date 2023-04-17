@@ -57,7 +57,13 @@ public enum DataHubUsageEventType {
   MANUALLY_CREATE_LINEAGE_EVENT("ManuallyCreateLineageEvent"),
   MANUALLY_DELETE_LINEAGE_EVENT("ManuallyDeleteLineageEvent"),
   LINEAGE_GRAPH_TIME_RANGE_SELECTION_EVENT("LineageGraphTimeRangeSelectionEvent"),
-  LINEAGE_TAB_TIME_RANGE_SELECTION_EVENT("LineageTabTimeRangeSelectionEvent");
+  LINEAGE_TAB_TIME_RANGE_SELECTION_EVENT("LineageTabTimeRangeSelectionEvent"),
+  CREATE_QUERY_EVENT("CreateQueryEvent"),
+  DELETE_QUERY_EVENT("DeleteQueryEvent"),
+  UPDATE_QUERY_EVENT("UpdateQueryEvent"),
+  SELECT_AUTO_COMPLETE_OPTION("SelectAutoCompleteOption"),
+  SELECT_QUICK_FILTER_EVENT("SelectQuickFilterEvent"),
+  DESELECT_QUICK_FILTER_EVENT("DeselectQuickFilterEvent");
 
   private final String type;
 

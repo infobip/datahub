@@ -1,12 +1,13 @@
 import logging
 import re
-from typing import Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 from datahub.emitter.mce_builder import (
     make_data_platform_urn,
     make_dataset_urn_with_platform_instance,
     make_domain_urn,
     make_schema_field_urn,
+    make_user_urn,
 )
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.emitter.mcp_builder import (
@@ -32,6 +33,10 @@ from datahub.ingestion.api.source import (
     TestConnectionReport,
 )
 from datahub.ingestion.api.workunit import MetadataWorkUnit
+from datahub.ingestion.source.common.subtypes import (
+    DatasetContainerSubTypes,
+    DatasetSubTypes,
+)
 from datahub.ingestion.source.state.entity_removal_state import GenericCheckpointState
 from datahub.ingestion.source.state.stale_entity_removal_handler import (
     StaleEntityRemovalHandler,
@@ -53,6 +58,9 @@ from datahub.metadata.schema_classes import (
     DatasetPropertiesClass,
     DomainsClass,
     MySqlDDLClass,
+    OwnerClass,
+    OwnershipClass,
+    OwnershipTypeClass,
     SchemaFieldClass,
     SchemaMetadataClass,
     SubTypesClass,
@@ -79,6 +87,9 @@ logger: logging.Logger = logging.getLogger(__name__)
 @capability(SourceCapability.PLATFORM_INSTANCE, "Enabled by default")
 @capability(SourceCapability.DOMAINS, "Supported via the `domain` config field")
 @capability(SourceCapability.CONTAINERS, "Enabled by default")
+@capability(
+    SourceCapability.OWNERSHIP, "Supported via the `include_table_ownership` config"
+)
 @capability(
     SourceCapability.DELETION_DETECTION,
     "Optionally enabled via `stateful_ingestion.remove_stale_metadata`",
@@ -156,9 +167,6 @@ class UnityCatalogSource(StatefulIngestionSourceBase, TestableSource):
         config = UnityCatalogSourceConfig.parse_obj(config_dict)
         return cls(ctx=ctx, config=config)
 
-    def get_platform_instance_id(self) -> str:
-        return self.config.platform_instance or self.platform
-
     def get_workunits(self) -> Iterable[MetadataWorkUnit]:
         return auto_stale_entity_removal(
             self.stale_entity_removal_handler,
@@ -172,7 +180,14 @@ class UnityCatalogSource(StatefulIngestionSourceBase, TestableSource):
         yield from self.process_metastores()
 
     def process_metastores(self) -> Iterable[MetadataWorkUnit]:
+        metastores: Dict[str, Metastore] = {}
+        assigned_metastore = self.unity_catalog_api_proxy.assigned_metastore()
+        if assigned_metastore:
+            metastores[assigned_metastore.metastore_id] = assigned_metastore
         for metastore in self.unity_catalog_api_proxy.metastores():
+            metastores[metastore.metastore_id] = metastore
+
+        for metastore in metastores.values():
             if not self.config.metastore_id_pattern.allowed(metastore.metastore_id):
                 self.report.metastores.dropped(metastore.metastore_id)
                 continue
@@ -246,6 +261,8 @@ class UnityCatalogSource(StatefulIngestionSourceBase, TestableSource):
             )
         )
 
+        ownership = self._create_table_ownership_aspect(table)
+
         if self.config.include_column_lineage:
             self.unity_catalog_api_proxy.get_column_lineage(table)
             lineage = self._generate_column_lineage_aspect(dataset_urn, table)
@@ -263,6 +280,7 @@ class UnityCatalogSource(StatefulIngestionSourceBase, TestableSource):
                     sub_type,
                     schema_metadata,
                     domain,
+                    ownership,
                     lineage,
                 ],
             )
@@ -340,7 +358,7 @@ class UnityCatalogSource(StatefulIngestionSourceBase, TestableSource):
         yield from gen_containers(
             container_key=schema_container_key,
             name=schema.name,
-            sub_types=["Schema"],
+            sub_types=[DatasetContainerSubTypes.SCHEMA],
             parent_container_key=self.gen_catalog_key(catalog=schema.catalog),
             domain_urn=domain_urn,
             description=schema.comment,
@@ -356,7 +374,7 @@ class UnityCatalogSource(StatefulIngestionSourceBase, TestableSource):
         yield from gen_containers(
             container_key=metastore_container_key,
             name=metastore.name,
-            sub_types=["Metastore"],
+            sub_types=[DatasetContainerSubTypes.DATABRICKS_METASTORE],
             domain_urn=domain_urn,
             description=metastore.comment,
         )
@@ -371,7 +389,7 @@ class UnityCatalogSource(StatefulIngestionSourceBase, TestableSource):
         yield from gen_containers(
             container_key=catalog_container_key,
             name=catalog.name,
-            sub_types=["Catalog"],
+            sub_types=[DatasetContainerSubTypes.PRESTO_CATALOG],
             domain_urn=domain_urn,
             parent_container_key=metastore_container_key,
             description=catalog.comment,
@@ -448,9 +466,27 @@ class UnityCatalogSource(StatefulIngestionSourceBase, TestableSource):
             customProperties=custom_properties,
         )
 
+    def _create_table_ownership_aspect(
+        self, table: proxy.Table
+    ) -> Optional[OwnershipClass]:
+        if self.config.include_table_ownership and table.owner:
+            return OwnershipClass(
+                owners=[
+                    OwnerClass(
+                        owner=make_user_urn(table.owner),
+                        type=OwnershipTypeClass.DATAOWNER,
+                    )
+                ]
+            )
+        return None
+
     def _create_table_sub_type_aspect(self, table: proxy.Table) -> SubTypesClass:
         return SubTypesClass(
-            typeNames=["View" if table.table_type.lower() == "view" else "Table"]
+            typeNames=[
+                DatasetSubTypes.VIEW
+                if table.table_type.lower() == "view"
+                else DatasetSubTypes.TABLE
+            ]
         )
 
     def _create_view_property_aspect(self, table: proxy.Table) -> ViewProperties:
