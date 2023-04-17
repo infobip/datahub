@@ -106,7 +106,16 @@ def ingest() -> None:
     help="Port which prometheus_client's Prometheus Exporter will listen on, will not start prometheus_client if port < 0",
 )
 @click.pass_context
-@telemetry.with_telemetry()
+@telemetry.with_telemetry(
+    capture_kwargs=[
+        "dry_run",
+        "preview",
+        "strict_warnings",
+        "test_source_connection",
+        "no_default_report",
+        "no_spinner",
+    ]
+)
 @memory_leak_detector.with_leak_detection
 def run(
     ctx: click.Context,
@@ -184,7 +193,6 @@ def run(
                 logger.debug(
                     f"timed out with {e} waiting for version stats to be computed... skipping ahead."
                 )
-
         sys.exit(ret)
 
     # main function begins
