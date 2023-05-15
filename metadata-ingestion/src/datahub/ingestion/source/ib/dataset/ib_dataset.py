@@ -16,6 +16,7 @@ from datahub.ingestion.source.ib.utils.dataset_utils import (
     IBPathElementInfo,
     IBPathElementType,
 )
+from datahub.metadata.com.linkedin.pegasus2avro.schema import OtherSchema
 from datahub.ingestion.source.state.stateful_ingestion_base import JobId
 from datahub.metadata.com.linkedin.pegasus2avro.common import DataPlatformInstance
 from datahub.metadata.com.linkedin.pegasus2avro.container import ContainerProperties
@@ -140,7 +141,7 @@ class IBRedashDatasetSource(IBRedashSource):
             version=1,
             hash="",
             platform=builder.make_data_platform_urn(self.platform),
-            platformSchema=KafkaSchemaClass.construct_with_defaults(),
+            platformSchema=OtherSchema(rawSchema=""),
             fields=columns,
         )
 
