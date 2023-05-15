@@ -1,5 +1,5 @@
-import logging
 import json
+import logging
 from abc import abstractmethod
 from typing import Iterable, List, Optional, Union
 
@@ -16,12 +16,12 @@ from datahub.ingestion.source.ib.utils.dataset_utils import (
     IBPathElementInfo,
     IBPathElementType,
 )
-from datahub.metadata.com.linkedin.pegasus2avro.schema import OtherSchema
 from datahub.ingestion.source.state.stateful_ingestion_base import JobId
 from datahub.metadata.com.linkedin.pegasus2avro.common import DataPlatformInstance
 from datahub.metadata.com.linkedin.pegasus2avro.container import ContainerProperties
 from datahub.metadata.com.linkedin.pegasus2avro.metadata.snapshot import DatasetSnapshot
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
+from datahub.metadata.com.linkedin.pegasus2avro.schema import OtherSchema
 from datahub.metadata.schema_classes import (
     ArrayTypeClass,
     BooleanTypeClass,
@@ -31,7 +31,6 @@ from datahub.metadata.schema_classes import (
     ContainerClass,
     DatasetPropertiesClass,
     DateTypeClass,
-    KafkaSchemaClass,
     NullTypeClass,
     NumberTypeClass,
     OwnershipSourceTypeClass,
