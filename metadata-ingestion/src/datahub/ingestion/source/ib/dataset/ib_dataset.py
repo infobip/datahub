@@ -1,5 +1,5 @@
-import logging
 import json
+import logging
 from abc import abstractmethod
 from typing import Iterable, List, Optional, Union
 
@@ -21,6 +21,7 @@ from datahub.metadata.com.linkedin.pegasus2avro.common import DataPlatformInstan
 from datahub.metadata.com.linkedin.pegasus2avro.container import ContainerProperties
 from datahub.metadata.com.linkedin.pegasus2avro.metadata.snapshot import DatasetSnapshot
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
+from datahub.metadata.com.linkedin.pegasus2avro.schema import OtherSchema
 from datahub.metadata.schema_classes import (
     ArrayTypeClass,
     BooleanTypeClass,
@@ -30,7 +31,6 @@ from datahub.metadata.schema_classes import (
     ContainerClass,
     DatasetPropertiesClass,
     DateTypeClass,
-    KafkaSchemaClass,
     NullTypeClass,
     NumberTypeClass,
     OwnershipSourceTypeClass,
@@ -140,7 +140,7 @@ class IBRedashDatasetSource(IBRedashSource):
             version=1,
             hash="",
             platform=builder.make_data_platform_urn(self.platform),
-            platformSchema=KafkaSchemaClass.construct_with_defaults(),
+            platformSchema=OtherSchema(rawSchema=""),
             fields=columns,
         )
 
