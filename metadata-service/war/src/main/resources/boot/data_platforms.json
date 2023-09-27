@@ -427,7 +427,7 @@
     }
   },
   {
-    "urn": "urn:li:dataPlatform:presto_on_hive",
+    "urn": "urn:li:dataPlatform:presto-on-hive",
     "aspect": {
       "datasetNameDelimiter": ".",
       "name": "presto-on-hive",
@@ -543,6 +543,16 @@
       "displayName": "Location",
       "type": "OTHERS",
       "logoUrl": "/assets/platforms/datahublogo.png"
+    }
+  },
+  {
+    "urn": "urn:li:dataPlatform:gcs",
+    "aspect": {
+      "datasetNameDelimiter": "/",
+      "name": "gcs",
+      "displayName": "Google Cloud Storage",
+      "type": "FILE_SYSTEM",
+      "logoUrl": "/assets/platforms/gcslogo.svg"
     }
   }
 ]

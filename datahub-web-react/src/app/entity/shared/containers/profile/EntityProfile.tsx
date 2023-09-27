@@ -8,6 +8,7 @@ import { Message } from '../../../../shared/Message';
 import {
     getEntityPath,
     getOnboardingStepIdsForEntityType,
+    sortEntityProfileTabs,
     useRoutedTab,
     useUpdateGlossaryEntityDataOnChange,
 } from './utils';
@@ -43,6 +44,7 @@ import {
     LINEAGE_GRAPH_INTRO_ID,
     LINEAGE_GRAPH_TIME_FILTER_ID,
 } from '../../../../onboarding/config/LineageGraphOnboardingConfig';
+import { useAppConfig } from '../../../../useAppConfig';
 
 type Props<T, U> = {
     urn: string;
@@ -82,6 +84,7 @@ const ContentContainer = styled.div`
     height: auto;
     min-height: 100%;
     flex: 1;
+    min-width: 0;
 `;
 
 const HeaderAndTabs = styled.div`
@@ -117,6 +120,7 @@ const Sidebar = styled.div<{ $width: number }>`
     min-width: ${(props) => props.$width}px;
     padding-left: 20px;
     padding-right: 20px;
+    padding-bottom: 20px;
 `;
 
 const Header = styled.div`
@@ -166,13 +170,16 @@ export const EntityProfile = <T, U>({
     const isHideSiblingMode = useIsSeparateSiblingsMode();
     const entityRegistry = useEntityRegistry();
     const history = useHistory();
+    const appConfig = useAppConfig();
     const isCompact = React.useContext(CompactContext);
     const tabsWithDefaults = tabs.map((tab) => ({ ...tab, display: { ...defaultTabDisplayConfig, ...tab.display } }));
+    const sortedTabs = sortEntityProfileTabs(appConfig.config, entityType, tabsWithDefaults);
     const sideBarSectionsWithDefaults = sidebarSections.map((sidebarSection) => ({
         ...sidebarSection,
         display: { ...defaultSidebarSection, ...sidebarSection.display },
     }));
 
+    const [shouldRefetchEmbeddedListSearch, setShouldRefetchEmbeddedListSearch] = useState(false);
     const [sidebarWidth, setSidebarWidth] = useState(window.innerWidth * 0.25);
     const entityStepIds: string[] = getOnboardingStepIdsForEntityType(entityType);
     const lineageGraphStepIds: string[] = [LINEAGE_GRAPH_INTRO_ID, LINEAGE_GRAPH_TIME_FILTER_ID];
@@ -232,7 +239,7 @@ export const EntityProfile = <T, U>({
             },
         })) || [];
 
-    const visibleTabs = [...tabsWithDefaults, ...autoRenderTabs].filter((tab) =>
+    const visibleTabs = [...sortedTabs, ...autoRenderTabs].filter((tab) =>
         tab.display?.visible(entityData, dataPossiblyCombinedWithSiblings),
     );
 
@@ -260,6 +267,8 @@ export const EntityProfile = <T, U>({
                     routeToTab,
                     refetch,
                     lineage,
+                    shouldRefetchEmbeddedListSearch,
+                    setShouldRefetchEmbeddedListSearch,
                 }}
             >
                 <>
@@ -298,6 +307,8 @@ export const EntityProfile = <T, U>({
                 routeToTab,
                 refetch,
                 lineage,
+                shouldRefetchEmbeddedListSearch,
+                setShouldRefetchEmbeddedListSearch,
             }}
         >
             <>

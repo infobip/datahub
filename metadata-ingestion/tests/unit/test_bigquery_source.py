@@ -1,16 +1,19 @@
 import json
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any, Dict, Optional, cast
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from google.api_core.exceptions import GoogleAPICallError
 from google.cloud.bigquery.table import Row, TableListItem
 
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.source.bigquery_v2.bigquery import BigqueryV2Source
 from datahub.ingestion.source.bigquery_v2.bigquery_audit import (
+    _BIGQUERY_DEFAULT_SHARDED_TABLE_REGEX,
     BigqueryTableIdentifier,
     BigQueryTableRef,
 )
@@ -20,7 +23,10 @@ from datahub.ingestion.source.bigquery_v2.bigquery_schema import (
     BigqueryProject,
     BigqueryView,
 )
-from datahub.ingestion.source.bigquery_v2.lineage import LineageEdge
+from datahub.ingestion.source.bigquery_v2.lineage import (
+    LineageEdge,
+    LineageEdgeColumnMapping,
+)
 from datahub.metadata.com.linkedin.pegasus2avro.dataset import ViewProperties
 from datahub.metadata.schema_classes import MetadataChangeProposalClass
 
@@ -111,6 +117,65 @@ def test_get_projects_with_project_ids(client_mock):
     assert client_mock.list_projects.call_count == 0
 
 
+def test_get_projects_with_project_ids_overrides_project_id_pattern():
+    config = BigQueryV2Config.parse_obj(
+        {
+            "project_ids": ["test-project", "test-project-2"],
+            "project_id_pattern": {"deny": ["^test-project$"]},
+        }
+    )
+    source = BigqueryV2Source(config=config, ctx=PipelineContext(run_id="test"))
+    projects = source._get_projects(MagicMock())
+    assert projects == [
+        BigqueryProject(id="test-project", name="test-project"),
+        BigqueryProject(id="test-project-2", name="test-project-2"),
+    ]
+
+
+def test_platform_instance_config_always_none():
+    config = BigQueryV2Config.parse_obj(
+        {"include_data_platform_instance": True, "platform_instance": "something"}
+    )
+    assert config.platform_instance is None
+
+    config = BigQueryV2Config(platform_instance="something", project_id="project_id")
+    assert config.project_id == "project_id"
+    assert config.platform_instance is None
+
+
+def test_get_dataplatform_instance_aspect_returns_project_id():
+    project_id = "project_id"
+    expected_instance = (
+        f"urn:li:dataPlatformInstance:(urn:li:dataPlatform:bigquery,{project_id})"
+    )
+
+    config = BigQueryV2Config.parse_obj({"include_data_platform_instance": True})
+    source = BigqueryV2Source(config=config, ctx=PipelineContext(run_id="test"))
+
+    data_platform_instance = source.get_dataplatform_instance_aspect(
+        "urn:li:test", project_id
+    )
+    metadata = data_platform_instance.get_metadata()["metadata"]
+
+    assert data_platform_instance is not None
+    assert metadata.aspectName == "dataPlatformInstance"
+    assert metadata.aspect.instance == expected_instance
+
+
+def test_get_dataplatform_instance_default_no_instance():
+    config = BigQueryV2Config.parse_obj({})
+    source = BigqueryV2Source(config=config, ctx=PipelineContext(run_id="test"))
+
+    data_platform_instance = source.get_dataplatform_instance_aspect(
+        "urn:li:test", "project_id"
+    )
+    metadata = data_platform_instance.get_metadata()["metadata"]
+
+    assert data_platform_instance is not None
+    assert metadata.aspectName == "dataPlatformInstance"
+    assert metadata.aspect.instance is None
+
+
 @patch("google.cloud.bigquery.client.Client")
 def test_get_projects_with_single_project_id(client_mock):
     config = BigQueryV2Config.parse_obj({"project_id": "test-3"})
@@ -122,7 +187,7 @@ def test_get_projects_with_single_project_id(client_mock):
 
 
 @patch("google.cloud.bigquery.client.Client")
-def test_get_projects(client_mock):
+def test_get_projects_by_list(client_mock):
     client_mock.list_projects.return_value = [
         SimpleNamespace(
             project_id="test-1",
@@ -143,6 +208,69 @@ def test_get_projects(client_mock):
     assert client_mock.list_projects.call_count == 1
 
 
+@patch.object(BigQueryDataDictionary, "get_projects")
+def test_get_projects_filter_by_pattern(get_projects_mock):
+    get_projects_mock.return_value = [
+        BigqueryProject("test-project", "Test Project"),
+        BigqueryProject("test-project-2", "Test Project 2"),
+    ]
+
+    config = BigQueryV2Config.parse_obj(
+        {"project_id_pattern": {"deny": ["^test-project$"]}}
+    )
+    source = BigqueryV2Source(config=config, ctx=PipelineContext(run_id="test"))
+    projects = source._get_projects(MagicMock())
+    assert projects == [
+        BigqueryProject(id="test-project-2", name="Test Project 2"),
+    ]
+
+
+@patch.object(BigQueryDataDictionary, "get_projects")
+def test_get_projects_list_empty(get_projects_mock):
+    get_projects_mock.return_value = []
+
+    config = BigQueryV2Config.parse_obj(
+        {"project_id_pattern": {"deny": ["^test-project$"]}}
+    )
+    source = BigqueryV2Source(config=config, ctx=PipelineContext(run_id="test"))
+    projects = source._get_projects(MagicMock())
+    assert len(source.report.failures) == 1
+    assert projects == []
+
+
+@patch.object(BigQueryDataDictionary, "get_projects")
+def test_get_projects_list_failure(
+    get_projects_mock: MagicMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    error_str = "my error"
+    get_projects_mock.side_effect = GoogleAPICallError(error_str)
+
+    config = BigQueryV2Config.parse_obj(
+        {"project_id_pattern": {"deny": ["^test-project$"]}}
+    )
+    source = BigqueryV2Source(config=config, ctx=PipelineContext(run_id="test"))
+    caplog.records.clear()
+    with caplog.at_level(logging.ERROR):
+        projects = source._get_projects(MagicMock())
+        assert len(caplog.records) == 1
+        assert error_str in caplog.records[0].msg
+    assert len(source.report.failures) == 1
+    assert projects == []
+
+
+@patch.object(BigQueryDataDictionary, "get_projects")
+def test_get_projects_list_fully_filtered(get_projects_mock):
+    get_projects_mock.return_value = [BigqueryProject("test-project", "Test Project")]
+
+    config = BigQueryV2Config.parse_obj(
+        {"project_id_pattern": {"deny": ["^test-project$"]}}
+    )
+    source = BigqueryV2Source(config=config, ctx=PipelineContext(run_id="test"))
+    projects = source._get_projects(MagicMock())
+    assert len(source.report.failures) == 0
+    assert projects == []
+
+
 def test_simple_upstream_table_generation():
     a: BigQueryTableRef = BigQueryTableRef(
         BigqueryTableIdentifier(
@@ -161,8 +289,14 @@ def test_simple_upstream_table_generation():
         }
     )
     source = BigqueryV2Source(config=config, ctx=PipelineContext(run_id="test"))
-    lineage_metadata = {str(a): {LineageEdge(table=str(b), auditStamp=datetime.now())}}
-    upstreams = source.lineage_extractor.get_upstream_tables(a, lineage_metadata, [])
+    lineage_metadata = {
+        str(a): {
+            LineageEdge(
+                table=str(b), auditStamp=datetime.now(), column_mapping=frozenset()
+            )
+        }
+    }
+    upstreams = source.lineage_extractor.get_upstream_tables(a, lineage_metadata)
 
     assert len(upstreams) == 1
     assert list(upstreams)[0].table == str(b)
@@ -187,12 +321,18 @@ def test_upstream_table_generation_with_temporary_table_without_temp_upstream():
     )
     source = BigqueryV2Source(config=config, ctx=PipelineContext(run_id="test"))
 
-    lineage_metadata = {str(a): {LineageEdge(table=str(b), auditStamp=datetime.now())}}
-    upstreams = source.lineage_extractor.get_upstream_tables(a, lineage_metadata, [])
+    lineage_metadata = {
+        str(a): {
+            LineageEdge(
+                table=str(b), auditStamp=datetime.now(), column_mapping=frozenset()
+            )
+        }
+    }
+    upstreams = source.lineage_extractor.get_upstream_tables(a, lineage_metadata)
     assert list(upstreams) == []
 
 
-def test_upstream_table_generation_with_temporary_table_with_temp_upstream():
+def test_upstream_table_column_lineage_with_temp_table():
     from datahub.ingestion.api.common import PipelineContext
 
     a: BigQueryTableRef = BigQueryTableRef(
@@ -219,12 +359,51 @@ def test_upstream_table_generation_with_temporary_table_with_temp_upstream():
 
     source = BigqueryV2Source(config=config, ctx=PipelineContext(run_id="test"))
     lineage_metadata = {
-        str(a): {LineageEdge(table=str(b), auditStamp=datetime.now())},
-        str(b): {LineageEdge(table=str(c), auditStamp=datetime.now())},
+        str(a): {
+            LineageEdge(
+                table=str(b),
+                auditStamp=datetime.now(),
+                column_mapping=frozenset(
+                    [
+                        LineageEdgeColumnMapping(
+                            "a_col1", in_columns=frozenset(["b_col2", "b_col3"])
+                        )
+                    ]
+                ),
+                column_confidence=0.8,
+            )
+        },
+        str(b): {
+            LineageEdge(
+                table=str(c),
+                auditStamp=datetime.now(),
+                column_mapping=frozenset(
+                    [
+                        LineageEdgeColumnMapping(
+                            "b_col2", in_columns=frozenset(["c_col1", "c_col2"])
+                        ),
+                        LineageEdgeColumnMapping(
+                            "b_col3", in_columns=frozenset(["c_col2", "c_col3"])
+                        ),
+                    ]
+                ),
+                column_confidence=0.7,
+            )
+        },
     }
-    upstreams = source.lineage_extractor.get_upstream_tables(a, lineage_metadata, [])
+    upstreams = source.lineage_extractor.get_upstream_tables(a, lineage_metadata)
     assert len(upstreams) == 1
-    assert list(upstreams)[0].table == str(c)
+
+    upstream = list(upstreams)[0]
+    assert upstream.table == str(c)
+    assert upstream.column_mapping == frozenset(
+        [
+            LineageEdgeColumnMapping(
+                "a_col1", in_columns=frozenset(["c_col1", "c_col2", "c_col3"])
+            )
+        ]
+    )
+    assert upstream.column_confidence == 0.7
 
 
 def test_upstream_table_generation_with_temporary_table_with_multiple_temp_upstream():
@@ -261,14 +440,26 @@ def test_upstream_table_generation_with_temporary_table_with_multiple_temp_upstr
     )
     source = BigqueryV2Source(config=config, ctx=PipelineContext(run_id="test"))
     lineage_metadata = {
-        str(a): {LineageEdge(table=str(b), auditStamp=datetime.now())},
-        str(b): {
-            LineageEdge(table=str(c), auditStamp=datetime.now()),
-            LineageEdge(table=str(d), auditStamp=datetime.now()),
+        str(a): {
+            LineageEdge(
+                table=str(b), auditStamp=datetime.now(), column_mapping=frozenset()
+            )
         },
-        str(d): {LineageEdge(table=str(e), auditStamp=datetime.now())},
+        str(b): {
+            LineageEdge(
+                table=str(c), auditStamp=datetime.now(), column_mapping=frozenset()
+            ),
+            LineageEdge(
+                table=str(d), auditStamp=datetime.now(), column_mapping=frozenset()
+            ),
+        },
+        str(d): {
+            LineageEdge(
+                table=str(e), auditStamp=datetime.now(), column_mapping=frozenset()
+            )
+        },
     }
-    upstreams = source.lineage_extractor.get_upstream_tables(a, lineage_metadata, [])
+    upstreams = source.lineage_extractor.get_upstream_tables(a, lineage_metadata)
     sorted_list = list(upstreams)
     sorted_list.sort()
     assert sorted_list[0].table == str(c)
@@ -552,7 +743,7 @@ def test_get_table_and_shard_default(
 ) -> None:
     with patch(
         "datahub.ingestion.source.bigquery_v2.bigquery_audit.BigqueryTableIdentifier._BIGQUERY_DEFAULT_SHARDED_TABLE_REGEX",
-        "((.+)[_$])?(\\d{8})$",
+        _BIGQUERY_DEFAULT_SHARDED_TABLE_REGEX,
     ):
         assert BigqueryTableIdentifier.get_table_and_shard(table_name) == (
             expected_table_prefix,
@@ -602,6 +793,12 @@ def test_get_table_and_shard_custom_shard_pattern(
         ("project.dataset.table", "project.dataset.table"),
         ("project.dataset.table_20231215", "project.dataset.table"),
         ("project.dataset.table@1624046611000", "project.dataset.table"),
+        ("project.dataset.table@-9600", "project.dataset.table"),
+        ("project.dataset.table@-3600000", "project.dataset.table"),
+        ("project.dataset.table@-3600000--1800000", "project.dataset.table"),
+        ("project.dataset.table@1624046611000-1612046611000", "project.dataset.table"),
+        ("project.dataset.table@-3600000-", "project.dataset.table"),
+        ("project.dataset.table@1624046611000-", "project.dataset.table"),
         (
             "project.dataset.table_1624046611000_name",
             "project.dataset.table_1624046611000_name",
