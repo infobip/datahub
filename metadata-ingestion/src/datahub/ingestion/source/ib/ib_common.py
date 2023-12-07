@@ -87,8 +87,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
         self.stale_entity_removal_handler = StaleEntityRemovalHandler.create(
             source=self,
             config=self.config,
-            pipeline_name=self.ctx.pipeline_name,
-            run_id=self.ctx.run_id,
+            ctx=self.ctx
         )
 
     @staticmethod
