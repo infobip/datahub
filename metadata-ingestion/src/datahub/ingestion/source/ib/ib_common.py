@@ -24,7 +24,6 @@ from datahub.metadata.com.linkedin.pegasus2avro.common import Status
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
 from datahub.metadata.schema_classes import ChangeTypeClass, StatusClass
 from datahub.utilities.urns.urn import Urn
-from datahub.ingestion.source.state.stale_entity_removal_handler import StaleEntityRemovalHandler
 
 logger = logging.getLogger(__name__)
 
