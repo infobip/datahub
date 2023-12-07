@@ -6,7 +6,6 @@ from typing import Iterable, Optional
 from pydantic.fields import Field
 from redash_toolbelt import Redash
 from requests.adapters import HTTPAdapter
-from src.datahub.ingestion.source.state.entity_removal_state import GenericCheckpointState
 from urllib3 import Retry
 
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
