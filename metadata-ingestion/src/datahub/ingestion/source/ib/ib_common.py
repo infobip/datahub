@@ -85,7 +85,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
         )
         self.stale_entity_removal_handler = StaleEntityRemovalHandler(
             source=self,
-            config=self.source_config,
+            config=self.config,
             state_type_class=KafkaCheckpointState,
             pipeline_name=self.ctx.pipeline_name,
             run_id=self.ctx.run_id,
