@@ -133,7 +133,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
         raise NotImplementedError("Sub-classes must implement this method.")
 
     def get_workunits(self) -> Iterable[WorkUnit]:
-        if not self.is_stateful_ingestion_configured():
+        if not self.state_provider.is_stateful_ingestion_configured():
             for wu in self.fetch_workunits():
                 self.report.report_workunit(wu)
                 yield wu
