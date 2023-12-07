@@ -75,8 +75,8 @@ class IBRedashSource(StatefulIngestionSourceBase):
             config,
             ctx,
             self.get_default_ingestion_job_id_prefix(),
-            self.get_last_checkpoint,
-            self.get_current_checkpoint,
+            self.state_provider.get_last_checkpoint,
+            self.state_provider.get_current_checkpoint,
         )
 
         self.config.connect_uri = self.config.connect_uri.strip("/")
