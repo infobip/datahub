@@ -182,7 +182,7 @@ class IBRedashSource(StatefulIngestionSourceBase):
         self.state_manager.save_state()
 
     def close(self):
-        self.prepare_for_commit()
+        self.state_provider.prepare_for_commit()
         self.client.session.close()
 
     def get_report(self) -> RedashSourceReport:
