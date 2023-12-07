@@ -6,6 +6,7 @@ from typing import Iterable, Optional
 from pydantic.fields import Field
 from redash_toolbelt import Redash
 from requests.adapters import HTTPAdapter
+from src.datahub.ingestion.source.state.entity_removal_state import GenericCheckpointState
 from urllib3 import Retry
 
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
@@ -24,6 +25,7 @@ from datahub.metadata.com.linkedin.pegasus2avro.common import Status
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
 from datahub.metadata.schema_classes import ChangeTypeClass, StatusClass
 from datahub.utilities.urns.urn import Urn
+from datahub.ingestion.source.state.stale_entity_removal_handler import StaleEntityRemovalHandler
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +61,9 @@ class IBRedashSourceConfig(StatefulIngestionConfigBase):
     stateful_ingestion: Optional[IBRedashSourceStatefulIngestionConfig] = None
 
 
+KafkaCheckpointState = GenericCheckpointState
+
+
 class IBRedashSource(StatefulIngestionSourceBase):
     batch_size = 1000
     config: IBRedashSourceConfig
@@ -77,6 +82,13 @@ class IBRedashSource(StatefulIngestionSourceBase):
             self.get_default_ingestion_job_id_prefix(),
             self.state_provider.get_last_checkpoint,
             self.state_provider.get_current_checkpoint,
+        )
+        self.stale_entity_removal_handler = StaleEntityRemovalHandler(
+            source=self,
+            config=self.source_config,
+            state_type_class=KafkaCheckpointState,
+            pipeline_name=self.ctx.pipeline_name,
+            run_id=self.ctx.run_id,
         )
 
         self.config.connect_uri = self.config.connect_uri.strip("/")
