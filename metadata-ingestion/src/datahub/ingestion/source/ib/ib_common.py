@@ -61,9 +61,6 @@ class IBRedashSourceConfig(StatefulIngestionConfigBase):
     stateful_ingestion: Optional[IBRedashSourceStatefulIngestionConfig] = None
 
 
-KafkaCheckpointState = GenericCheckpointState
-
-
 class IBRedashSource(StatefulIngestionSourceBase):
     batch_size = 1000
     config: IBRedashSourceConfig
@@ -83,18 +80,16 @@ class IBRedashSource(StatefulIngestionSourceBase):
             self.state_provider.get_last_checkpoint,
             self.state_provider.get_current_checkpoint,
         )
-        self.stale_entity_removal_handler = StaleEntityRemovalHandler(
-            source=self,
-            config=self.config,
-            state_type_class=KafkaCheckpointState,
-            pipeline_name=self.ctx.pipeline_name,
-            run_id=self.ctx.run_id,
-        )
-
         self.config.connect_uri = self.config.connect_uri.strip("/")
         self.client = self.create_redash_client(self.config.connect_uri, self.config.api_key)
         if self.config.exp_api_key and self.config.exp_query_id:
             self.exp_client = self.create_redash_client(self.config.connect_uri, self.config.exp_api_key)
+        self.stale_entity_removal_handler = StaleEntityRemovalHandler(
+            source=self,
+            config=self.config,
+            pipeline_name=self.ctx.pipeline_name,
+            run_id=self.ctx.run_id,
+        )
 
     @staticmethod
     def create_redash_client(connect_uri, api_key):
