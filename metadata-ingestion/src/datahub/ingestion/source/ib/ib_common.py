@@ -84,12 +84,12 @@ class IBRedashSource(StatefulIngestionSourceBase):
         self.client = self.create_redash_client(self.config.connect_uri, self.config.api_key)
         if self.config.exp_api_key and self.config.exp_query_id:
             self.exp_client = self.create_redash_client(self.config.connect_uri, self.config.exp_api_key)
-        self.stale_entity_removal_handler = StaleEntityRemovalHandler(
-            source=self,
-            config=self.config,
-            pipeline_name=self.ctx.pipeline_name,
-            run_id=self.ctx.run_id,
-        )
+        # self.stale_entity_removal_handler = StaleEntityRemovalHandler(
+        #     source=self,
+        #     config=self.config,
+        #     pipeline_name=self.ctx.pipeline_name,
+        #     run_id=self.ctx.run_id,
+        # )
 
     @staticmethod
     def create_redash_client(connect_uri, api_key):
