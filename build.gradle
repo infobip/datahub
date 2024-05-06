@@ -33,7 +33,7 @@ buildscript {
   ext.pegasusVersion = '29.51.6'
   ext.mavenVersion = '3.6.3'
   ext.springVersion = '6.1.4'
-  ext.springBootVersion = '3.2.3'
+  ext.springBootVersion = '2.7.17'
   ext.springKafkaVersion = '3.1.2'
   ext.openTelemetryVersion = '1.18.0'
   ext.neo4jVersion = '5.14.0'
