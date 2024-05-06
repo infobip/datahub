@@ -9,7 +9,9 @@
             "customProperties": {
                 "_access_control": "None",
                 "catchup": "False",
-                "fileloc": "'/Users/hsheth/projects/datahub/metadata-ingestion-modules/airflow-plugin/tests/integration/dags/sqlite_operator.py'",
+                "description": "None",
+                "doc_md": "None",
+                "fileloc": "<fileloc>",
                 "is_paused_upon_creation": "None",
                 "start_date": "DateTime(2023, 1, 1, 0, 0, 0, tzinfo=Timezone('UTC'))",
                 "tags": "[]",
@@ -191,9 +193,9 @@
         "json": {
             "customProperties": {
                 "run_id": "manual_run_test",
-                "duration": "None",
-                "start_date": "2023-10-15 20:27:26.883178+00:00",
-                "end_date": "None",
+                "duration": "<duration>",
+                "start_date": "<start_date>",
+                "end_date": "<end_date>",
                 "execution_date": "2023-09-27 21:34:38+00:00",
                 "try_number": "0",
                 "max_tries": "0",
@@ -201,13 +203,16 @@
                 "state": "running",
                 "operator": "SqliteOperator",
                 "priority_weight": "5",
-                "log_url": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=create_cost_table&dag_id=sqlite_operator&map_index=-1"
+                "log_url": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=create_cost_table&dag_id=sqlite_operator&map_index=-1",
+                "orchestrator": "airflow",
+                "dag_id": "sqlite_operator",
+                "task_id": "create_cost_table"
             },
             "externalUrl": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=create_cost_table&dag_id=sqlite_operator&map_index=-1",
             "name": "sqlite_operator_create_cost_table_manual_run_test",
             "type": "BATCH_AD_HOC",
             "created": {
-                "time": 1697401646883,
+                "time": 1707253281415,
                 "actor": "urn:li:corpuser:datahub"
             }
         }
@@ -256,7 +261,7 @@
     "aspectName": "dataProcessInstanceRunEvent",
     "aspect": {
         "json": {
-            "timestampMillis": 1697401646883,
+            "timestampMillis": 1707253281415,
             "partitionSpec": {
                 "type": "FULL_TABLE",
                 "partition": "FULL_TABLE_SNAPSHOT"
@@ -437,7 +442,7 @@
     "aspectName": "dataProcessInstanceRunEvent",
     "aspect": {
         "json": {
-            "timestampMillis": 1697401647826,
+            "timestampMillis": 1707253282244,
             "partitionSpec": {
                 "type": "FULL_TABLE",
                 "partition": "FULL_TABLE_SNAPSHOT"
@@ -460,7 +465,9 @@
             "customProperties": {
                 "_access_control": "None",
                 "catchup": "False",
-                "fileloc": "'/Users/hsheth/projects/datahub/metadata-ingestion-modules/airflow-plugin/tests/integration/dags/sqlite_operator.py'",
+                "description": "None",
+                "doc_md": "None",
+                "fileloc": "<fileloc>",
                 "is_paused_upon_creation": "None",
                 "start_date": "DateTime(2023, 1, 1, 0, 0, 0, tzinfo=Timezone('UTC'))",
                 "tags": "[]",
@@ -542,10 +549,10 @@
     "aspectName": "dataJobInputOutput",
     "aspect": {
         "json": {
-            "inputDatasets": [
+            "inputDatasets": [],
+            "outputDatasets": [
                 "urn:li:dataset:(urn:li:dataPlatform:sqlite,public.costs,PROD)"
             ],
-            "outputDatasets": [],
             "inputDatajobs": [
                 "urn:li:dataJob:(urn:li:dataFlow:(airflow,sqlite_operator,prod),create_cost_table)"
             ],
@@ -607,9 +614,9 @@
         "json": {
             "customProperties": {
                 "run_id": "manual_run_test",
-                "duration": "None",
-                "start_date": "2023-10-15 20:27:31.398799+00:00",
-                "end_date": "None",
+                "duration": "<duration>",
+                "start_date": "<start_date>",
+                "end_date": "<end_date>",
                 "execution_date": "2023-09-27 21:34:38+00:00",
                 "try_number": "0",
                 "max_tries": "0",
@@ -617,13 +624,16 @@
                 "state": "running",
                 "operator": "SqliteOperator",
                 "priority_weight": "4",
-                "log_url": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=populate_cost_table&dag_id=sqlite_operator&map_index=-1"
+                "log_url": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=populate_cost_table&dag_id=sqlite_operator&map_index=-1",
+                "orchestrator": "airflow",
+                "dag_id": "sqlite_operator",
+                "task_id": "populate_cost_table"
             },
             "externalUrl": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=populate_cost_table&dag_id=sqlite_operator&map_index=-1",
             "name": "sqlite_operator_populate_cost_table_manual_run_test",
             "type": "BATCH_AD_HOC",
             "created": {
-                "time": 1697401651398,
+                "time": 1707253286225,
                 "actor": "urn:li:corpuser:datahub"
             }
         }
@@ -645,10 +655,10 @@
     "entityType": "dataProcessInstance",
     "entityUrn": "urn:li:dataProcessInstance:04e1badac1eacd1c41123d07f579fa92",
     "changeType": "UPSERT",
-    "aspectName": "dataProcessInstanceInput",
+    "aspectName": "dataProcessInstanceOutput",
     "aspect": {
         "json": {
-            "inputs": [
+            "outputs": [
                 "urn:li:dataset:(urn:li:dataPlatform:sqlite,public.costs,PROD)"
             ]
         }
@@ -672,7 +682,7 @@
     "aspectName": "dataProcessInstanceRunEvent",
     "aspect": {
         "json": {
-            "timestampMillis": 1697401651398,
+            "timestampMillis": 1707253286225,
             "partitionSpec": {
                 "type": "FULL_TABLE",
                 "partition": "FULL_TABLE_SNAPSHOT"
@@ -719,10 +729,10 @@
     "aspectName": "dataJobInputOutput",
     "aspect": {
         "json": {
-            "inputDatasets": [
+            "inputDatasets": [],
+            "outputDatasets": [
                 "urn:li:dataset:(urn:li:dataPlatform:sqlite,public.costs,PROD)"
             ],
-            "outputDatasets": [],
             "inputDatajobs": [
                 "urn:li:dataJob:(urn:li:dataFlow:(airflow,sqlite_operator,prod),create_cost_table)"
             ],
@@ -782,7 +792,7 @@
     "aspectName": "dataProcessInstanceRunEvent",
     "aspect": {
         "json": {
-            "timestampMillis": 1697401652651,
+            "timestampMillis": 1707253287414,
             "partitionSpec": {
                 "type": "FULL_TABLE",
                 "partition": "FULL_TABLE_SNAPSHOT"
@@ -805,7 +815,9 @@
             "customProperties": {
                 "_access_control": "None",
                 "catchup": "False",
-                "fileloc": "'/Users/hsheth/projects/datahub/metadata-ingestion-modules/airflow-plugin/tests/integration/dags/sqlite_operator.py'",
+                "description": "None",
+                "doc_md": "None",
+                "fileloc": "<fileloc>",
                 "is_paused_upon_creation": "None",
                 "start_date": "DateTime(2023, 1, 1, 0, 0, 0, tzinfo=Timezone('UTC'))",
                 "tags": "[]",
@@ -1022,9 +1034,9 @@
         "json": {
             "customProperties": {
                 "run_id": "manual_run_test",
-                "duration": "None",
-                "start_date": "2023-10-15 20:27:37.697995+00:00",
-                "end_date": "None",
+                "duration": "<duration>",
+                "start_date": "<start_date>",
+                "end_date": "<end_date>",
                 "execution_date": "2023-09-27 21:34:38+00:00",
                 "try_number": "0",
                 "max_tries": "0",
@@ -1032,13 +1044,16 @@
                 "state": "running",
                 "operator": "SqliteOperator",
                 "priority_weight": "3",
-                "log_url": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=transform_cost_table&dag_id=sqlite_operator&map_index=-1"
+                "log_url": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=transform_cost_table&dag_id=sqlite_operator&map_index=-1",
+                "orchestrator": "airflow",
+                "dag_id": "sqlite_operator",
+                "task_id": "transform_cost_table"
             },
             "externalUrl": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=transform_cost_table&dag_id=sqlite_operator&map_index=-1",
             "name": "sqlite_operator_transform_cost_table_manual_run_test",
             "type": "BATCH_AD_HOC",
             "created": {
-                "time": 1697401657697,
+                "time": 1707253293513,
                 "actor": "urn:li:corpuser:datahub"
             }
         }
@@ -1111,7 +1126,7 @@
     "aspectName": "dataProcessInstanceRunEvent",
     "aspect": {
         "json": {
-            "timestampMillis": 1697401657697,
+            "timestampMillis": 1707253293513,
             "partitionSpec": {
                 "type": "FULL_TABLE",
                 "partition": "FULL_TABLE_SNAPSHOT"
@@ -1347,7 +1362,7 @@
     "aspectName": "dataProcessInstanceRunEvent",
     "aspect": {
         "json": {
-            "timestampMillis": 1697401659496,
+            "timestampMillis": 1707253295443,
             "partitionSpec": {
                 "type": "FULL_TABLE",
                 "partition": "FULL_TABLE_SNAPSHOT"
@@ -1370,7 +1385,9 @@
             "customProperties": {
                 "_access_control": "None",
                 "catchup": "False",
-                "fileloc": "'/Users/hsheth/projects/datahub/metadata-ingestion-modules/airflow-plugin/tests/integration/dags/sqlite_operator.py'",
+                "description": "None",
+                "doc_md": "None",
+                "fileloc": "<fileloc>",
                 "is_paused_upon_creation": "None",
                 "start_date": "DateTime(2023, 1, 1, 0, 0, 0, tzinfo=Timezone('UTC'))",
                 "tags": "[]",
@@ -1519,9 +1536,9 @@
         "json": {
             "customProperties": {
                 "run_id": "manual_run_test",
-                "duration": "None",
-                "start_date": "2023-10-15 20:27:45.670215+00:00",
-                "end_date": "None",
+                "duration": "<duration>",
+                "start_date": "<start_date>",
+                "end_date": "<end_date>",
                 "execution_date": "2023-09-27 21:34:38+00:00",
                 "try_number": "0",
                 "max_tries": "0",
@@ -1529,13 +1546,16 @@
                 "state": "running",
                 "operator": "SqliteOperator",
                 "priority_weight": "1",
-                "log_url": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=cleanup_costs&dag_id=sqlite_operator&map_index=-1"
+                "log_url": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=cleanup_costs&dag_id=sqlite_operator&map_index=-1",
+                "orchestrator": "airflow",
+                "dag_id": "sqlite_operator",
+                "task_id": "cleanup_costs"
             },
             "externalUrl": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=cleanup_costs&dag_id=sqlite_operator&map_index=-1",
             "name": "sqlite_operator_cleanup_costs_manual_run_test",
             "type": "BATCH_AD_HOC",
             "created": {
-                "time": 1697401665670,
+                "time": 1707253301697,
                 "actor": "urn:li:corpuser:datahub"
             }
         }
@@ -1584,7 +1604,7 @@
     "aspectName": "dataProcessInstanceRunEvent",
     "aspect": {
         "json": {
-            "timestampMillis": 1697401665670,
+            "timestampMillis": 1707253301697,
             "partitionSpec": {
                 "type": "FULL_TABLE",
                 "partition": "FULL_TABLE_SNAPSHOT"
@@ -1696,7 +1716,7 @@
     "aspectName": "dataProcessInstanceRunEvent",
     "aspect": {
         "json": {
-            "timestampMillis": 1697401667670,
+            "timestampMillis": 1707253303779,
             "partitionSpec": {
                 "type": "FULL_TABLE",
                 "partition": "FULL_TABLE_SNAPSHOT"
@@ -1719,7 +1739,9 @@
             "customProperties": {
                 "_access_control": "None",
                 "catchup": "False",
-                "fileloc": "'/Users/hsheth/projects/datahub/metadata-ingestion-modules/airflow-plugin/tests/integration/dags/sqlite_operator.py'",
+                "description": "None",
+                "doc_md": "None",
+                "fileloc": "<fileloc>",
                 "is_paused_upon_creation": "None",
                 "start_date": "DateTime(2023, 1, 1, 0, 0, 0, tzinfo=Timezone('UTC'))",
                 "tags": "[]",
@@ -1868,9 +1890,9 @@
         "json": {
             "customProperties": {
                 "run_id": "manual_run_test",
-                "duration": "None",
-                "start_date": "2023-10-15 20:27:51.559194+00:00",
-                "end_date": "None",
+                "duration": "<duration>",
+                "start_date": "<start_date>",
+                "end_date": "<end_date>",
                 "execution_date": "2023-09-27 21:34:38+00:00",
                 "try_number": "0",
                 "max_tries": "0",
@@ -1878,13 +1900,16 @@
                 "state": "running",
                 "operator": "SqliteOperator",
                 "priority_weight": "1",
-                "log_url": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=cleanup_processed_costs&dag_id=sqlite_operator&map_index=-1"
+                "log_url": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=cleanup_processed_costs&dag_id=sqlite_operator&map_index=-1",
+                "orchestrator": "airflow",
+                "dag_id": "sqlite_operator",
+                "task_id": "cleanup_processed_costs"
             },
             "externalUrl": "http://airflow.example.com/log?execution_date=2023-09-27T21%3A34%3A38%2B00%3A00&task_id=cleanup_processed_costs&dag_id=sqlite_operator&map_index=-1",
             "name": "sqlite_operator_cleanup_processed_costs_manual_run_test",
             "type": "BATCH_AD_HOC",
             "created": {
-                "time": 1697401671559,
+                "time": 1707253308368,
                 "actor": "urn:li:corpuser:datahub"
             }
         }
@@ -1933,7 +1958,7 @@
     "aspectName": "dataProcessInstanceRunEvent",
     "aspect": {
         "json": {
-            "timestampMillis": 1697401671559,
+            "timestampMillis": 1707253308368,
             "partitionSpec": {
                 "type": "FULL_TABLE",
                 "partition": "FULL_TABLE_SNAPSHOT"
@@ -2045,7 +2070,7 @@
     "aspectName": "dataProcessInstanceRunEvent",
     "aspect": {
         "json": {
-            "timestampMillis": 1697401673788,
+            "timestampMillis": 1707253310722,
             "partitionSpec": {
                 "type": "FULL_TABLE",
                 "partition": "FULL_TABLE_SNAPSHOT"

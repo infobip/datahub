@@ -15,7 +15,7 @@ This guide requires the following tools:
 - [kubectl](https://kubernetes.io/docs/tasks/tools/) to manage kubernetes resources
 - [helm](https://helm.sh/docs/intro/install/) to deploy the resources based on helm charts. Note, we only support Helm
     3.
-- [eksctl](https://eksctl.io/introduction/#installation) to create and manage clusters on EKS
+- [eksctl](https://eksctl.io/installation/) to create and manage clusters on EKS
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html) to manage AWS resources
 
 To use the above tools, you need to set up AWS credentials by following
@@ -52,6 +52,8 @@ ip-192-168-49-49.us-west-2.compute.internal   Ready    <none>   3h    v1.18.9-ek
 ip-192-168-64-56.us-west-2.compute.internal   Ready    <none>   3h    v1.18.9-eks-d1db3c
 ip-192-168-8-126.us-west-2.compute.internal   Ready    <none>   3h    v1.18.9-eks-d1db3c
 ```
+
+Once your cluster is running, make sure to install the EBS CSI driver, Core DNS, and VPC CNI plugin for Kubernetes. [add-ons](https://docs.aws.amazon.com/eks/latest/userguide/eks-add-ons.html)
 
 ## Setup DataHub using Helm
 
@@ -135,7 +137,7 @@ file used to deploy datahub). Change datahub-frontend values to the following.
 datahub-frontend:
   enabled: true
   image:
-    repository: linkedin/datahub-frontend-react
+    repository: acryldata/datahub-frontend-react
     tag: "latest"
   ingress:
     enabled: true
@@ -303,7 +305,7 @@ a different way of creating time based indices.
   elasticsearchSetupJob:
     enabled: true
     image:
-      repository: linkedin/datahub-elasticsearch-setup
+      repository: acryldata/datahub-elasticsearch-setup
       tag: "***"
     extraEnvs:
       - name: USE_AWS_ELASTICSEARCH
