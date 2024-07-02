@@ -76,6 +76,8 @@ export const LogIn: React.VFC<LogInProps> = () => {
 
     const { refreshContext } = useAppConfig();
 
+    const appConfig = useAppConfig();
+
     const handleLogin = useCallback(
         (values: FormValues) => {
             setLoading(true);
@@ -116,7 +118,9 @@ export const LogIn: React.VFC<LogInProps> = () => {
             )}
             <div className={styles.login_box}>
                 <div className={styles.login_logo_box}>
-                    <Image wrapperClassName={styles.logo_image} src={themeConfig.assets?.logoUrl} preview={false} />
+                    <Image wrapperClassName={styles.logo_image}
+                        src={ appConfig.config !== DEFAULT_APP_CONFIG ? appConfig.config.visualConfig.logoUrl ||
+                        themeConfig.assets.logoUrl : undefined } preview={false} />
                 </div>
                 <div className={styles.login_form_box}>
                     {loading && <Message type="loading" content="Logging in..." />}
