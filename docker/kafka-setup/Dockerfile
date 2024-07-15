@@ -35,7 +35,7 @@ RUN apk --no-cache add openjdk17-jre-headless --repository=${ALPINE_REPO_URL}/ed
 
 RUN apk add --no-cache -t .build-deps git curl ca-certificates jq gcc musl-dev libffi-dev zip
 RUN mkdir -p /opt \
-  && if [ "${APACHE_DOWNLOAD_URL}" != "null" ] ; then mirror="${APACHE_DOWNLOAD_URL}/" ; else mirror=$(curl --stderr /dev/null https://dlcdn.apache.org); fi \
+  && if [ "${APACHE_DOWNLOAD_URL}" != "null" ] ; then mirror="${APACHE_DOWNLOAD_URL}/" ; else mirror="https://dlcdn.apache.org/"; fi \
   && curl -sSL "${mirror}kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz" \
   | tar -xzf - -C /opt \
   && mv /opt/kafka_${SCALA_VERSION}-${KAFKA_VERSION} /opt/kafka \
