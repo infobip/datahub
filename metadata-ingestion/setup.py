@@ -137,12 +137,6 @@ sqllineage_lib = {
     "sqlparse==0.4.4",
 }
 
-sqlglot_lib = {
-    # Using an Acryl fork of sqlglot.
-    # https://github.com/tobymao/sqlglot/compare/main...hsheth2:sqlglot:hsheth?expand=1
-    "acryl-sqlglot==18.5.2.dev45",
-}
-
 ib_pyodbc = "pyodbc"
 
 aws_common = {
