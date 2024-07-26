@@ -11,7 +11,6 @@ import com.datahub.authentication.AuthenticatorConfiguration;
 import com.datahub.authentication.AuthenticatorContext;
 import com.datahub.authentication.authenticator.AuthenticatorChain;
 import com.datahub.authentication.authenticator.DataHubSystemAuthenticator;
-//import com.datahub.authentication.authenticator.HealthStatusAuthenticator;
 import com.datahub.authentication.authenticator.NoOpAuthenticator;
 import com.datahub.authentication.token.StatefulTokenService;
 import com.datahub.plugins.PluginConstant;
