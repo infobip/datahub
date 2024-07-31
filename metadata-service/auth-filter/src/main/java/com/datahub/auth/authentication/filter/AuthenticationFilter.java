@@ -284,7 +284,19 @@ public class AuthenticationFilter implements Filter {
         final Authenticator authenticator = clazz.newInstance();
         // Successfully created authenticator. Now init and register it.
         log.debug(String.format("Initializing Authenticator with name %s", type));
-        authenticator.init(configs, authenticatorContext);
+//        if (authenticator instanceof HealthStatusAuthenticator) {
+//          Map<String, Object> authenticatorConfig =
+//              new HashMap<>(
+//                  Map.of(
+//                      SYSTEM_CLIENT_ID_CONFIG,
+//                      this.configurationProvider.getAuthentication().getSystemClientId()));
+//          authenticatorConfig.putAll(
+//              Optional.ofNullable(internalAuthenticatorConfig.getConfigs())
+//                  .orElse(Collections.emptyMap()));
+//          authenticator.init(authenticatorConfig, authenticatorContext);
+//        } else {
+          authenticator.init(configs, authenticatorContext);
+//        }
         log.info(String.format("Registering Authenticator with name %s", type));
         authenticatorChain.register(authenticator);
       } catch (Exception e) {
