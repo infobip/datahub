@@ -1,7 +1,5 @@
 package com.linkedin.datahub.upgrade;
 
-import static com.linkedin.metadata.EventUtils.RENAMED_MCL_AVRO_SCHEMA;
-import static com.linkedin.metadata.boot.kafka.MockSystemUpdateSerializer.topicToSubjectName;
 import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.assertNotNull;
 
@@ -11,10 +9,6 @@ import com.linkedin.metadata.boot.kafka.MockSystemUpdateDeserializer;
 import com.linkedin.metadata.boot.kafka.MockSystemUpdateSerializer;
 import com.linkedin.metadata.dao.producer.KafkaEventProducer;
 import com.linkedin.metadata.entity.EntityServiceImpl;
-import com.linkedin.mxe.Topics;
-import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
-import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -108,6 +102,11 @@ public class DatahubUpgradeNoSchemaRegistryTest extends AbstractTestNGSpringCont
                   @Override
                   public Map<String, Optional<String>> parsedArgs() {
                     return null;
+                  }
+
+                  @Override
+                  public OperationContext opContext() {
+                    return mock(OperationContext.class);
                   }
                 })
             .result();

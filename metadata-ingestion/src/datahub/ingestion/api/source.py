@@ -34,13 +34,15 @@ from datahub.ingestion.api.prometheus_metrics import (
 from datahub.ingestion.api.report import Report
 from datahub.ingestion.api.source_helpers import (
     auto_browse_path_v2,
+    auto_fix_duplicate_schema_field_paths,
     auto_lowercase_urns,
-    auto_materialize_referenced_tags,
+    auto_materialize_referenced_tags_terms,
     auto_status_aspect,
     auto_workunit_reporter,
 )
 from datahub.ingestion.api.workunit import MetadataWorkUnit
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import MetadataChangeEvent
+from datahub.metadata.schema_classes import UpstreamLineageClass
 from datahub.utilities.lossy_collections import LossyDict, LossyList
 from datahub.utilities.type_annotations import get_class_from_annotation
 
@@ -74,6 +76,9 @@ class SourceReport(Report):
     aspects: Dict[str, Dict[str, int]] = field(
         default_factory=lambda: defaultdict(lambda: defaultdict(int))
     )
+    aspect_urn_samples: Dict[str, Dict[str, LossyList[str]]] = field(
+        default_factory=lambda: defaultdict(lambda: defaultdict(LossyList))
+    )
 
     warnings: LossyDict[str, LossyList[str]] = field(default_factory=LossyDict)
     failures: LossyDict[str, LossyList[str]] = field(default_factory=LossyDict)
@@ -100,6 +105,13 @@ class SourceReport(Report):
 
                 if aspectName is not None:  # usually true
                     self.aspects[entityType][aspectName] += 1
+                    self.aspect_urn_samples[entityType][aspectName].append(urn)
+                    if isinstance(mcp.aspect, UpstreamLineageClass):
+                        upstream_lineage = cast(UpstreamLineageClass, mcp.aspect)
+                        if upstream_lineage.fineGrainedLineages:
+                            self.aspect_urn_samples[entityType][
+                                "fineGrainedLineages"
+                            ].append(urn)
 
         report_ingested_workunit_to_prometheus(wu)
 
@@ -239,7 +251,10 @@ class Source(Closeable, metaclass=ABCMeta):
         return [
             auto_lowercase_dataset_urns,
             auto_status_aspect,
-            auto_materialize_referenced_tags,
+            auto_materialize_referenced_tags_terms,
+            partial(
+                auto_fix_duplicate_schema_field_paths, platform=self._infer_platform()
+            ),
             browse_path_processor,
             partial(auto_workunit_reporter, self.get_report()),
         ]
@@ -283,9 +298,18 @@ class Source(Closeable, metaclass=ABCMeta):
     def close(self) -> None:
         pass
 
+    def _infer_platform(self) -> Optional[str]:
+        config = self.get_config()
+        return (
+            getattr(config, "platform_name", None)
+            or getattr(self, "platform", None)
+            or getattr(config, "platform", None)
+        )
+
     def _get_browse_path_processor(self, dry_run: bool) -> MetadataWorkUnitProcessor:
         config = self.get_config()
-        platform = getattr(self, "platform", None) or getattr(config, "platform", None)
+
+        platform = self._infer_platform()
         env = getattr(config, "env", None)
         browse_path_drop_dirs = [
             platform,
