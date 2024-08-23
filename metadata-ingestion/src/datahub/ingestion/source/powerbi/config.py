@@ -49,7 +49,6 @@ class Constant:
     DATASET_ID = "datasetId"
     REPORT_ID = "reportId"
     SCAN_ID = "ScanId"
-    Dataset_URN = "DatasetURN"
     CHART_URN = "ChartURN"
     CHART = "chart"
     CORP_USER = "corpuser"
@@ -95,6 +94,7 @@ class Constant:
     TITLE = "title"
     EMBED_URL = "embedUrl"
     ACCESS_TOKEN = "access_token"
+    ACCESS_TOKEN_EXPIRY = "expires_in"
     IS_READ_ONLY = "isReadOnly"
     WEB_URL = "webUrl"
     ODATA_COUNT = "@odata.count"
@@ -314,6 +314,7 @@ class PowerBiDashboardSourceConfig(
         description="Configure how is ownership ingested",
     )
     modified_since: Optional[str] = pydantic.Field(
+        default=None,
         description="Get only recently modified workspaces based on modified_since datetime '2023-02-10T00:00:00.0000000Z', excludePersonalWorkspaces and excludeInActiveWorkspaces limit to last 30 days",
     )
     extract_dashboards: bool = pydantic.Field(
@@ -405,8 +406,7 @@ class PowerBiDashboardSourceConfig(
         "Works for M-Query where native SQL is used for transformation.",
     )
 
-    @root_validator
-    @classmethod
+    @root_validator(skip_on_failure=True)
     def validate_extract_column_level_lineage(cls, values: Dict) -> Dict:
         flags = [
             "native_query_parsing",
@@ -445,7 +445,7 @@ class PowerBiDashboardSourceConfig(
 
         return value
 
-    @root_validator(pre=False)
+    @root_validator(skip_on_failure=True)
     def workspace_id_backward_compatibility(cls, values: Dict) -> Dict:
         workspace_id = values.get("workspace_id")
         workspace_id_pattern = values.get("workspace_id_pattern")

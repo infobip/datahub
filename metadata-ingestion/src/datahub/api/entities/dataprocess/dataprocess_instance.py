@@ -29,7 +29,7 @@ from datahub.utilities.urns.dataset_urn import DatasetUrn
 
 
 class DataProcessInstanceKey(DatahubKey):
-    cluster: str
+    cluster: Optional[str]
     orchestrator: str
     id: str
 
@@ -46,23 +46,23 @@ class DataProcessInstance:
     """This is a DataProcessInstance class which represent an instance of a DataFlow or DataJob.
 
     Args:
-        id (str): The id of the dataprocess instance execution.
-        orchestrator (str): The orchestrator which does the execution. For example airflow.
-        type (str): The execution type like Batch, Streaming, Ad-hoc, etc..  See valid values at DataProcessTypeClass
-        template_urn (Optional[Union[DataJobUrn, DataFlowUrn]]): The parent DataJob or DataFlow which was instantiated if applicable
-        parent_instance (Optional[DataProcessInstanceUrn]): The parent execution's urn if applicable
-        properties Dict[str, str]: Custom properties to set for the DataProcessInstance
-        url (Optional[str]): Url which points to the execution at the orchestrator
-        inlets (List[str]): List of entities the DataProcessInstance consumes
-        outlets (List[str]): List of entities the DataProcessInstance produces
+        id: The id of the dataprocess instance execution.
+        orchestrator: The orchestrator which does the execution. For example airflow.
+        type: The execution type like Batch, Streaming, Ad-hoc, etc..  See valid values at DataProcessTypeClass
+        template_urn: The parent DataJob or DataFlow which was instantiated if applicable
+        parent_instance: The parent execution's urn if applicable
+        properties: Custom properties to set for the DataProcessInstance
+        url: Url which points to the execution at the orchestrator
+        inlets: List of entities the DataProcessInstance consumes
+        outlets: List of entities the DataProcessInstance produces
     """
 
-    id: str
     urn: DataProcessInstanceUrn = field(init=False)
+    id: str
     orchestrator: str
-    cluster: str
+    cluster: Optional[str]
     type: str = DataProcessTypeClass.BATCH_SCHEDULED
-    template_urn: Optional[Union[DataJobUrn, DataFlowUrn]] = None
+    template_urn: Optional[Union[DataJobUrn, DataFlowUrn, DatasetUrn]] = None
     parent_instance: Optional[DataProcessInstanceUrn] = None
     properties: Dict[str, str] = field(default_factory=dict)
     url: Optional[str] = None
@@ -74,8 +74,8 @@ class DataProcessInstance:
     )
 
     def __post_init__(self):
-        self.urn = DataProcessInstanceUrn.create_from_id(
-            dataprocessinstance_id=DataProcessInstanceKey(
+        self.urn = DataProcessInstanceUrn(
+            id=DataProcessInstanceKey(
                 cluster=self.cluster,
                 orchestrator=self.orchestrator,
                 id=self.id,
@@ -168,6 +168,7 @@ class DataProcessInstance:
         result: InstanceRunResult,
         result_type: Optional[str] = None,
         attempt: Optional[int] = None,
+        start_timestamp_millis: Optional[int] = None,
     ) -> Iterable[MetadataChangeProposalWrapper]:
         """
 
@@ -188,6 +189,9 @@ class DataProcessInstance:
                     else self.orchestrator,
                 ),
                 attempt=attempt,
+                durationMillis=(end_timestamp_millis - start_timestamp_millis)
+                if start_timestamp_millis
+                else None,
             ),
         )
         yield mcp
@@ -199,6 +203,7 @@ class DataProcessInstance:
         result: InstanceRunResult,
         result_type: Optional[str] = None,
         attempt: Optional[int] = None,
+        start_timestamp_millis: Optional[int] = None,
         callback: Optional[Callable[[Exception, str], None]] = None,
     ) -> None:
         """
@@ -220,12 +225,10 @@ class DataProcessInstance:
             self._emit_mcp(mcp, emitter, callback)
 
     def generate_mcp(
-        self, created_ts_millis: Optional[int] = None
+        self, created_ts_millis: Optional[int] = None, materialize_iolets: bool = True
     ) -> Iterable[MetadataChangeProposalWrapper]:
-        """
-        Generates mcps from the object
-        :rtype: Iterable[MetadataChangeProposalWrapper]
-        """
+        """Generates mcps from the object"""
+
         mcp = MetadataChangeProposalWrapper(
             entityUrn=str(self.urn),
             aspect=DataProcessInstanceProperties(
@@ -253,7 +256,7 @@ class DataProcessInstance:
         )
         yield mcp
 
-        yield from self.generate_inlet_outlet_mcp()
+        yield from self.generate_inlet_outlet_mcp(materialize_iolets=materialize_iolets)
 
     @staticmethod
     def _emit_mcp(
@@ -329,7 +332,9 @@ class DataProcessInstance:
         dpi._template_object = dataflow
         return dpi
 
-    def generate_inlet_outlet_mcp(self) -> Iterable[MetadataChangeProposalWrapper]:
+    def generate_inlet_outlet_mcp(
+        self, materialize_iolets: bool
+    ) -> Iterable[MetadataChangeProposalWrapper]:
         if self.inlets:
             mcp = MetadataChangeProposalWrapper(
                 entityUrn=str(self.urn),
@@ -349,10 +354,9 @@ class DataProcessInstance:
             yield mcp
 
         # Force entity materialization
-        for iolet in self.inlets + self.outlets:
-            mcp = MetadataChangeProposalWrapper(
-                entityUrn=str(iolet),
-                aspect=StatusClass(removed=False),
-            )
-
-            yield mcp
+        if materialize_iolets:
+            for iolet in self.inlets + self.outlets:
+                yield MetadataChangeProposalWrapper(
+                    entityUrn=str(iolet),
+                    aspect=StatusClass(removed=False),
+                )

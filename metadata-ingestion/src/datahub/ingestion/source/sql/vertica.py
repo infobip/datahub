@@ -24,6 +24,7 @@ from datahub.ingestion.api.decorators import (
     support_status,
 )
 from datahub.ingestion.api.workunit import MetadataWorkUnit
+from datahub.ingestion.source.common.data_reader import DataReader
 from datahub.ingestion.source.sql.sql_common import (
     SQLAlchemySource,
     SQLSourceReport,
@@ -86,7 +87,7 @@ class VerticaConfig(BasicSQLAlchemyConfig):
         default=True, description="Whether Models should be ingested."
     )
 
-    include_view_lineage: Optional[bool] = pydantic.Field(
+    include_view_lineage: bool = pydantic.Field(
         default=True,
         description="If the source supports it, include view lineage to the underlying storage location.",
     )
@@ -221,6 +222,7 @@ class VerticaSource(SQLAlchemySource):
         schema: str,
         table: str,
         sql_config: SQLCommonConfig,
+        data_reader: Optional[DataReader],
     ) -> Iterable[Union[SqlWorkUnit, MetadataWorkUnit]]:
         dataset_urn = make_dataset_urn_with_platform_instance(
             self.platform,
@@ -235,7 +237,7 @@ class VerticaSource(SQLAlchemySource):
             owner_urn=f"urn:li:corpuser:{table_owner}",
         )
         yield from super()._process_table(
-            dataset_name, inspector, schema, table, sql_config
+            dataset_name, inspector, schema, table, sql_config, data_reader
         )
 
     def loop_views(

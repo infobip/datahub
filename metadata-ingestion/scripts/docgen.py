@@ -7,11 +7,10 @@ import re
 import sys
 import textwrap
 from importlib.metadata import metadata, requires
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional
 
 import click
 from pydantic import BaseModel, Field
-from pydantic.dataclasses import dataclass
 
 from datahub.configuration.common import ConfigModel
 from datahub.ingestion.api.decorators import (
@@ -94,7 +93,6 @@ class FieldRow(BaseModel):
 
     @staticmethod
     def map_field_path_to_components(field_path: str) -> List[Component]:
-
         m = re.match(FieldRow._V2_FIELD_PATH_TOKEN_MATCHER_PREFIX, field_path)
         v = re.match(FieldRow._V2_FIELD_PATH_FIELD_NAME_MATCHER, field_path)
         components: List[FieldRow.Component] = []
@@ -197,7 +195,7 @@ class FieldRow(BaseModel):
             # Using a non-breaking space to prevent the checkbox from being
             # broken into a new line.
             if not self.parent:  # None and empty string both count
-                return f'&nbsp;<abbr title="Required">✅</abbr>'
+                return '&nbsp;<abbr title="Required">✅</abbr>'
             else:
                 return f'&nbsp;<abbr title="Required if {self.parent} is set">❓</abbr>'
         else:
@@ -356,7 +354,6 @@ def priority_value(path: str) -> str:
 
 
 def gen_md_table_from_struct(schema_dict: Dict[str, Any]) -> List[str]:
-
     from datahub.ingestion.extractor.json_schema_util import JsonSchemaTranslator
 
     # we don't want default field values to be injected into the description of the field
@@ -416,6 +413,7 @@ def get_capability_text(src_capability: SourceCapability) -> str:
         SourceCapability.DOMAINS: "../../../domains.md",
         SourceCapability.PLATFORM_INSTANCE: "../../../platform-instances.md",
         SourceCapability.DATA_PROFILING: "../../../../metadata-ingestion/docs/dev_guides/sql_profiles.md",
+        SourceCapability.CLASSIFICATION: "../../../../metadata-ingestion/docs/dev_guides/classification.md",
     }
 
     capability_doc = capability_docs_mapping.get(src_capability)
@@ -460,7 +458,6 @@ def get_additional_deps_for_extra(extra_name: str) -> List[str]:
 
 
 def relocate_path(orig_path: str, relative_path: str, relocated_path: str) -> str:
-
     newPath = os.path.join(os.path.dirname(orig_path), relative_path)
     assert os.path.exists(newPath)
 
@@ -515,7 +512,6 @@ def generate(
 
     if extra_docs:
         for path in glob.glob(f"{extra_docs}/**/*[.md|.yaml|.yml]", recursive=True):
-
             m = re.search("/docs/sources/(.*)/(.*).md", path)
             if m:
                 platform_name = m.group(1).lower()
@@ -741,7 +737,7 @@ def generate(
             i += 1
             f.write(f"---\nsidebar_position: {i}\n---\n\n")
             f.write(
-                f"import Tabs from '@theme/Tabs';\nimport TabItem from '@theme/TabItem';\n\n"
+                "import Tabs from '@theme/Tabs';\nimport TabItem from '@theme/TabItem';\n\n"
             )
             f.write(f"# {platform_docs['name']}\n")
 
@@ -1023,7 +1019,7 @@ Visit our [Official Roadmap](https://feature-requests.datahubproject.io/roadmap)
 - [Acryl Data introduces lineage support and automated propagation of governance information for Snowflake in DataHub](https://blog.datahubproject.io/acryl-data-introduces-lineage-support-and-automated-propagation-of-governance-information-for-339c99536561)
 - [Data in Context: Lineage Explorer in DataHub](https://blog.datahubproject.io/data-in-context-lineage-explorer-in-datahub-a53a9a476dc4)
 - [Harnessing the Power of Data Lineage with DataHub](https://blog.datahubproject.io/harnessing-the-power-of-data-lineage-with-datahub-ad086358dec4)
-- [DataHub Lineage Impact Analysis](https://datahubproject.io/docs/next/act-on-metadata/impact-analysis)
+- [DataHub Lineage Impact Analysis](../../act-on-metadata/impact-analysis.md)
                         """)
 
     print("Lineage Documentation Generation Complete")

@@ -4,6 +4,7 @@ from typing import Iterable, Optional, Type, TypeVar, Union, overload
 
 from deprecated import deprecated
 
+from datahub.emitter.aspect import TIMESERIES_ASPECT_MAP
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import WorkUnit
 from datahub.metadata.com.linkedin.pegasus2avro.mxe import (
@@ -22,7 +23,11 @@ class MetadataWorkUnit(WorkUnit):
     metadata: Union[
         MetadataChangeEvent, MetadataChangeProposal, MetadataChangeProposalWrapper
     ]
-    # A workunit creator can determine if this workunit is allowed to fail
+
+    # A workunit creator can determine if this workunit is allowed to fail.
+    # TODO: This flag was initially added during the rollout of the subType aspect
+    # to improve backwards compatibility, but is not really needed anymore and so
+    # should be removed.
     treat_errors_as_warnings: bool = False
 
     # When this is set to false, this MWU will be ignored by automatic helpers
@@ -92,6 +97,28 @@ class MetadataWorkUnit(WorkUnit):
         else:
             assert self.metadata.entityUrn
             return self.metadata.entityUrn
+
+    @classmethod
+    def generate_workunit_id(
+        cls,
+        item: Union[
+            MetadataChangeEvent, MetadataChangeProposal, MetadataChangeProposalWrapper
+        ],
+    ) -> str:
+        if isinstance(item, MetadataChangeEvent):
+            return f"{item.proposedSnapshot.urn}/mce"
+        elif isinstance(item, (MetadataChangeProposalWrapper, MetadataChangeProposal)):
+            if item.aspect and item.aspectName in TIMESERIES_ASPECT_MAP:
+                # TODO: Make this a cleaner interface.
+                ts = getattr(item.aspect, "timestampMillis", None)
+                assert ts is not None
+
+                # If the aspect is a timeseries aspect, include the timestampMillis in the ID.
+                return f"{item.entityUrn}-{item.aspectName}-{ts}"
+
+            return f"{item.entityUrn}-{item.aspectName}"
+        else:
+            raise ValueError(f"Unexpected type {type(item)}")
 
     def get_aspect_of_type(self, aspect_cls: Type[T_Aspect]) -> Optional[T_Aspect]:
         aspects: list
