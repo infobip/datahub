@@ -33,7 +33,7 @@ base_requirements = {
 mypy_stubs = {
     "types-dataclasses",
     "sqlalchemy-stubs",
-    "types-setuptools",
+    "types-pkg_resources",
     "types-six",
     "types-python-dateutil",
     "types-requests",
