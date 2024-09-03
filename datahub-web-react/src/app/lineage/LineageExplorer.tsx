@@ -3,7 +3,6 @@ import { useHistory } from 'react-router';
 import { Button, Drawer } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import styled from 'styled-components';
-import { Message } from '../shared/Message';
 import { useEntityRegistry } from '../useEntityRegistry';
 import CompactContext from '../shared/CompactContext';
 import { EntityAndType, EntitySelectParams, FetchedEntities } from './types';
@@ -18,12 +17,10 @@ import { ErrorSection } from '../shared/error/ErrorSection';
 import usePrevious from '../shared/usePrevious';
 import { useGetLineageTimeParams } from './utils/useGetLineageTimeParams';
 import analytics, { EventType } from '../analytics';
+import LineageLoadingSection from './LineageLoadingSection';
 
 const DEFAULT_DISTANCE_FROM_TOP = 106;
 
-const LoadingMessage = styled(Message)`
-    margin-top: 10%;
-`;
 const FooterButtonGroup = styled.div`
     display: flex;
     justify-content: space-between;
@@ -116,26 +113,30 @@ export default function LineageExplorer({ urn, type }: Props) {
                 );
                 const config = entityRegistry.getLineageVizConfig(entityAndType.type, entityAndType.entity);
 
-                config?.downstreamChildren?.forEach((downstream) => {
-                    newAsyncEntities = extendAsyncEntities(
-                        fineGrainedMap,
-                        fineGrainedMapForSiblings,
-                        newAsyncEntities,
-                        entityRegistry,
-                        downstream,
-                        false,
-                    );
-                });
-                config?.upstreamChildren?.forEach((downstream) => {
-                    newAsyncEntities = extendAsyncEntities(
-                        fineGrainedMap,
-                        fineGrainedMapForSiblings,
-                        newAsyncEntities,
-                        entityRegistry,
-                        downstream,
-                        false,
-                    );
-                });
+                config?.downstreamChildren
+                    ?.filter((child) => child.type)
+                    ?.forEach((downstream) => {
+                        newAsyncEntities = extendAsyncEntities(
+                            fineGrainedMap,
+                            fineGrainedMapForSiblings,
+                            newAsyncEntities,
+                            entityRegistry,
+                            downstream,
+                            false,
+                        );
+                    });
+                config?.upstreamChildren
+                    ?.filter((child) => child.type)
+                    ?.forEach((downstream) => {
+                        newAsyncEntities = extendAsyncEntities(
+                            fineGrainedMap,
+                            fineGrainedMapForSiblings,
+                            newAsyncEntities,
+                            entityRegistry,
+                            downstream,
+                            false,
+                        );
+                    });
                 setAsyncEntities(newAsyncEntities);
             }
         },
@@ -167,7 +168,7 @@ export default function LineageExplorer({ urn, type }: Props) {
     return (
         <>
             {error && <ErrorSection />}
-            {loading && <LoadingMessage type="loading" content="Loading..." />}
+            {loading && <LineageLoadingSection />}
             {!!data && (
                 <div>
                     <LineageViz
@@ -219,9 +220,11 @@ export default function LineageExplorer({ urn, type }: Props) {
                             <Button onClick={handleClose} type="text">
                                 Close
                             </Button>
-                            <Button href={entityRegistry.getEntityUrl(selectedEntity.type, selectedEntity.urn)}>
-                                <InfoCircleOutlined /> {entityRegistry.getEntityName(selectedEntity.type)} Details
-                            </Button>
+                            {selectedEntity.type !== EntityType.Restricted && (
+                                <Button href={entityRegistry.getEntityUrl(selectedEntity.type, selectedEntity.urn)}>
+                                    <InfoCircleOutlined /> View details
+                                </Button>
+                            )}
                         </FooterButtonGroup>
                     )
                 }

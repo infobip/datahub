@@ -3,6 +3,7 @@ from typing import Optional
 
 from pydantic import Field, root_validator
 
+from datahub.configuration.common import AllowDenyPattern
 from datahub.configuration.kafka import KafkaConsumerConnectionConfig
 from datahub.ingestion.source.sql.sql_config import SQLAlchemyConnectionConfig
 from datahub.ingestion.source.state.stateful_ingestion_base import (
@@ -80,7 +81,9 @@ class DataHubSourceConfig(StatefulIngestionConfigBase):
         hidden_from_docs=True,
     )
 
-    @root_validator
+    urn_pattern: AllowDenyPattern = Field(default=AllowDenyPattern())
+
+    @root_validator(skip_on_failure=True)
     def check_ingesting_data(cls, values):
         if (
             not values.get("database_connection")

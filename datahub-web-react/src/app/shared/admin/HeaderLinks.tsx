@@ -8,13 +8,14 @@ import {
     SettingOutlined,
     SolutionOutlined,
     DownOutlined,
+    GlobalOutlined,
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { Button, Dropdown, Menu, Tooltip } from 'antd';
-import { useAppConfig } from '../../useAppConfig';
+import { useAppConfig, useBusinessAttributesFlag } from '../../useAppConfig';
 import { ANTD_GRAY } from '../../entity/shared/constants';
 import { HOME_PAGE_INGESTION_ID } from '../../onboarding/config/HomePageOnboardingConfig';
-import { useUpdateEducationStepIdsAllowlist } from '../../onboarding/useUpdateEducationStepIdsAllowlist';
+import { useToggleEducationStepIdsAllowList } from '../../onboarding/useToggleEducationStepIdsAllowList';
 import { useUserContext } from '../../context/useUserContext';
 import DomainIcon from '../../domain/DomainIcon';
 
@@ -67,16 +68,17 @@ export function HeaderLinks(props: Props) {
     const me = useUserContext();
     const { config } = useAppConfig();
 
+    const businessAttributesFlag = useBusinessAttributesFlag();
+
     const isAnalyticsEnabled = config?.analyticsConfig.enabled;
     const isIngestionEnabled = config?.managedIngestionConfig.enabled;
 
     const showAnalytics = (isAnalyticsEnabled && me && me?.platformPrivileges?.viewAnalytics) || false;
     const showSettings = true;
     const showIngestion =
-        isIngestionEnabled && me && me.platformPrivileges?.manageIngestion && me.platformPrivileges?.manageSecrets;
-    const showDomains = me?.platformPrivileges?.createDomains || me?.platformPrivileges?.manageDomains;
+        isIngestionEnabled && me && (me.platformPrivileges?.manageIngestion || me.platformPrivileges?.manageSecrets);
 
-    useUpdateEducationStepIdsAllowlist(!!showIngestion, HOME_PAGE_INGESTION_ID);
+    useToggleEducationStepIdsAllowList(!!showIngestion, HOME_PAGE_INGESTION_ID);
 
     return (
         <LinksWrapper areLinksHidden={areLinksHidden}>
@@ -107,19 +109,33 @@ export function HeaderLinks(props: Props) {
                                 <NavTitleDescription>View and modify your data dictionary</NavTitleDescription>
                             </Link>
                         </MenuItem>
-                        {showDomains && (
-                            <MenuItem key="1">
-                                <Link to="/domains">
+                        <MenuItem key="1">
+                            <Link to="/domains">
+                                <NavTitleContainer>
+                                    <DomainIcon
+                                        style={{
+                                            fontSize: 14,
+                                            fontWeight: 'bold',
+                                        }}
+                                    />
+                                    <NavTitleText>Domains</NavTitleText>
+                                </NavTitleContainer>
+                                <NavTitleDescription>Manage related groups of data assets</NavTitleDescription>
+                            </Link>
+                        </MenuItem>
+                        {businessAttributesFlag && (
+                            <MenuItem key="2">
+                                <Link to="/business-attribute">
                                     <NavTitleContainer>
-                                        <DomainIcon
+                                        <GlobalOutlined
                                             style={{
                                                 fontSize: 14,
                                                 fontWeight: 'bold',
                                             }}
                                         />
-                                        <NavTitleText>Domains</NavTitleText>
+                                        <NavTitleText>Business Attribute</NavTitleText>
                                     </NavTitleContainer>
-                                    <NavTitleDescription>Manage related groups of data assets</NavTitleDescription>
+                                    <NavTitleDescription>Universal field for data consistency</NavTitleDescription>
                                 </Link>
                             </MenuItem>
                         )}
