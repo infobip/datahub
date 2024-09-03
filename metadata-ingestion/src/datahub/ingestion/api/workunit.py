@@ -2,6 +2,8 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable, Optional, Type, TypeVar, Union, overload
 
+from deprecated import deprecated
+
 from datahub.emitter.aspect import TIMESERIES_ASPECT_MAP
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import WorkUnit
@@ -9,7 +11,7 @@ from datahub.metadata.com.linkedin.pegasus2avro.mxe import (
     MetadataChangeEvent,
     MetadataChangeProposal,
 )
-from datahub.metadata.schema_classes import _Aspect
+from datahub.metadata.schema_classes import UsageAggregationClass, _Aspect
 
 logger = logging.getLogger(__name__)
 
@@ -175,10 +177,10 @@ class MetadataWorkUnit(WorkUnit):
         else:
             raise ValueError(f"Unexpected metadata type {type(metadata)}")
 
-    @deprecated
-    @dataclass
-    class UsageStatsWorkUnit(WorkUnit):
-        usageStats: UsageAggregationClass
+@deprecated
+@dataclass
+class UsageStatsWorkUnit(WorkUnit):
+    usageStats: UsageAggregationClass
 
-        def get_metadata(self) -> dict:
-            return {"usage": self.usageStats}
+    def get_metadata(self) -> dict:
+        return {"usage": self.usageStats}
