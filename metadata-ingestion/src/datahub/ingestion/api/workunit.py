@@ -174,3 +174,11 @@ class MetadataWorkUnit(WorkUnit):
             return MetadataWorkUnit(id=workunit_id, mcp=metadata)
         else:
             raise ValueError(f"Unexpected metadata type {type(metadata)}")
+
+    @deprecated
+    @dataclass
+    class UsageStatsWorkUnit(WorkUnit):
+        usageStats: UsageAggregationClass
+
+        def get_metadata(self) -> dict:
+            return {"usage": self.usageStats}
