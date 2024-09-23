@@ -10,12 +10,17 @@ fi
 
 source venv/bin/activate
 
+# set environment variables for the test
+source ./set-test-env-vars.sh
+
 python -c 'from tests.cypress.integration_test import ingest_data; ingest_data()'
 
 cd tests/cypress
-npm install
+yarn install
 
-source ../../set-cypress-creds.sh
+source "$DIR/set-cypress-creds.sh"
 
-npx cypress open \
-   --env "ADMIN_DISPLAYNAME=$CYPRESS_ADMIN_DISPLAYNAME,ADMIN_USERNAME=$CYPRESS_ADMIN_USERNAME,ADMIN_PASSWORD=$CYPRESS_ADMIN_PASSWORD"
+if [ "${RUN_UI:-true}" == "true" ]; then
+  npx cypress open \
+     --env "ADMIN_DISPLAYNAME=$CYPRESS_ADMIN_DISPLAYNAME,ADMIN_USERNAME=$CYPRESS_ADMIN_USERNAME,ADMIN_PASSWORD=$CYPRESS_ADMIN_PASSWORD"
+fi
