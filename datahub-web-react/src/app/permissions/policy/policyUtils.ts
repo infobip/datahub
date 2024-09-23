@@ -142,6 +142,10 @@ export const getFieldValuesOfTags = (filter: Maybe<PolicyMatchFilter> | undefine
     return filter?.criteria?.find((criterion) => criterion.field === resourceFieldType)?.values || [];
 };
 
+export const getFieldValuesOfTags = (filter: Maybe<PolicyMatchFilter> | undefined, resourceFieldType: string) => {
+    return filter?.criteria?.find((criterion) => criterion.field === resourceFieldType)?.values || [];
+};
+
 export const setFieldValues = (
     filter: PolicyMatchFilter,
     resourceFieldType: string,

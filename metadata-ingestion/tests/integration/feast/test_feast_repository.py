@@ -1,6 +1,3 @@
-import sys
-
-import pytest
 from freezegun import freeze_time
 
 from datahub.ingestion.run.pipeline import Pipeline

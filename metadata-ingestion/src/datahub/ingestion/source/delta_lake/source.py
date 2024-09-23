@@ -131,6 +131,15 @@ class DeltaLakeSource(Source):
 
         return get_schema_fields_for_hive_column(field_name, field_type)
 
+    def _parse_datatype(self, raw_field_json_str: str) -> List[SchemaFieldClass]:
+        raw_field_json = json.loads(raw_field_json_str)
+
+        # get the parent field name and type
+        field_name = raw_field_json.get("name")
+        field_type = delta_type_to_hive_type(raw_field_json.get("type"))
+
+        return get_schema_fields_for_hive_column(field_name, field_type)
+
     def get_fields(self, delta_table: DeltaTable) -> List[SchemaField]:
         fields: List[SchemaField] = []
 
