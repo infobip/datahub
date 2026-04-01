@@ -12,7 +12,7 @@ RUN sed -i \
  && printf '[centos-sclo-rh]\nname=CentOS-7 - SCLo rh\nbaseurl=http://vault.centos.org/centos/7/sclo/x86_64/rh/\ngpgcheck=0\nenabled=1\n' > /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo
 RUN yum history sync
 RUN yum -y update
-RUN yum -y install java-11-openjdk epel-release gcc python3-devel openldap-devel
+RUN yum -y install java-17-openjdk-devel epel-release gcc python3-devel openldap-devel
 RUN yum -y install jq
 RUN python3 -m pip install --upgrade pip wheel setuptools acryl-datahub
 
