@@ -251,28 +251,82 @@ class SourceReport(Report):
         report_ingested_workunit_to_prometheus(wu)
 
     def report_warning(
-            self,
-            message: LiteralString,
-            context: Optional[str] = None,
-            title: Optional[LiteralString] = None,
-            exc: Optional[BaseException] = None,
-        ) -> None:
-            self._structured_logs.report_log(
-                StructuredLogLevel.WARN, message, title, context, exc, log=False
-            )
-            report_ingestion_issue_to_prometheus('warning', reason)
+        self,
+        message: LiteralString,
+        context: Optional[str] = None,
+        title: Optional[LiteralString] = None,
+        exc: Optional[BaseException] = None,
+    ) -> None:
+        self._structured_logs.report_log(
+            StructuredLogLevel.WARN, message, title, context, exc, log=False
+        )
+        report_ingestion_issue_to_prometheus("warning", message)
 
-        def warning(
-            self,
-            message: LiteralString,
-            context: Optional[str] = None,
-            title: Optional[LiteralString] = None,
-            exc: Optional[BaseException] = None,
-        ) -> None:
+    def warning(
+        self,
+        message: LiteralString,
+        context: Optional[str] = None,
+        title: Optional[LiteralString] = None,
+        exc: Optional[BaseException] = None,
+    ) -> None:
+        self._structured_logs.report_log(
+            StructuredLogLevel.WARN, message, title, context, exc, log=True
+        )
+        report_ingestion_issue_to_prometheus("warning", message)
+
+    def report_failure(
+        self,
+        message: LiteralString,
+        context: Optional[str] = None,
+        title: Optional[LiteralString] = None,
+        exc: Optional[BaseException] = None,
+        log: bool = True,
+    ) -> None:
+        self._structured_logs.report_log(
+            StructuredLogLevel.ERROR, message, title, context, exc, log=log
+        )
+        report_ingestion_issue_to_prometheus("failure", message)
+
+    def failure(
+        self,
+        message: LiteralString,
+        context: Optional[str] = None,
+        title: Optional[LiteralString] = None,
+        exc: Optional[BaseException] = None,
+        log: bool = True,
+    ) -> None:
+        self._structured_logs.report_log(
+            StructuredLogLevel.ERROR, message, title, context, exc, log=log
+        )
+        report_ingestion_issue_to_prometheus("failure", message)
+
+    def info(
+        self,
+        message: LiteralString,
+        context: Optional[str] = None,
+        title: Optional[LiteralString] = None,
+        exc: Optional[BaseException] = None,
+        log: bool = True,
+    ) -> None:
+        self._structured_logs.report_log(
+            StructuredLogLevel.INFO, message, title, context, exc, log=log
+        )
+
+    @contextlib.contextmanager
+    def report_exc(
+        self,
+        message: LiteralString,
+        title: Optional[LiteralString] = None,
+        context: Optional[str] = None,
+        level: StructuredLogLevel = StructuredLogLevel.ERROR,
+    ) -> Iterator[None]:
+        # Convenience method that helps avoid boilerplate try/except blocks.
+        try:
+            yield
+        except Exception as exc:
             self._structured_logs.report_log(
-                StructuredLogLevel.WARN, message, title, context, exc, log=True
+                level, message=message, title=title, context=context, exc=exc
             )
-            report_ingestion_issue_to_prometheus('failure', reason)
 
     def __post_init__(self) -> None:
         self.start_time = datetime.datetime.now()
