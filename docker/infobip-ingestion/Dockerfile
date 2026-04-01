@@ -3,8 +3,8 @@ FROM centos/python-38-centos7
 USER root
 ARG version
 
-RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*.repo \
- && sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
+RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/*.repo \
+ && sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/*.repo
 RUN yum history sync
 RUN yum -y update
 RUN yum -y install java-11-openjdk epel-release gcc python3-devel openldap-devel
