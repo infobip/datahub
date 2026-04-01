@@ -1,8 +1,4 @@
-<<<<<<<< HEAD:metadata-service/openapi-servlet/src/main/java/io/datahubproject/openapi/v1/timeline/TimelineControllerV1.java
 package io.datahubproject.openapi.v1.timeline;
-========
-package io.datahubproject.openapi.v2.controller;
->>>>>>>> 11764361c (Upgrade v14 (#71)):metadata-service/openapi-servlet/src/main/java/io/datahubproject/openapi/v2/controller/TimelineControllerV2.java
 
 import com.datahub.authentication.Authentication;
 import com.datahub.authentication.AuthenticationContext;
@@ -36,7 +32,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-<<<<<<<< HEAD:metadata-service/openapi-servlet/src/main/java/io/datahubproject/openapi/v1/timeline/TimelineControllerV1.java
 /*
  Use v2 or v3 controllers instead
 */
@@ -44,20 +39,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @AllArgsConstructor
 @RequestMapping("/timeline/v1")
-========
-@RestController
-@AllArgsConstructor
-@RequestMapping("/v2/timeline/v1")
->>>>>>>> 11764361c (Upgrade v14 (#71)):metadata-service/openapi-servlet/src/main/java/io/datahubproject/openapi/v2/controller/TimelineControllerV2.java
 @Tag(
     name = "Timeline",
     description =
         "An API for retrieving historical updates to entities and their related documentation.")
-<<<<<<<< HEAD:metadata-service/openapi-servlet/src/main/java/io/datahubproject/openapi/v1/timeline/TimelineControllerV1.java
 public class TimelineControllerV1 {
-========
-public class TimelineControllerV2 {
->>>>>>>> 11764361c (Upgrade v14 (#71)):metadata-service/openapi-servlet/src/main/java/io/datahubproject/openapi/v2/controller/TimelineControllerV2.java
 
   private final OperationContext systemOperationContext;
   private final TimelineService _timelineService;
@@ -107,12 +93,7 @@ public class TimelineControllerV2 {
             ImmutableList.of(
                 new ConjunctivePrivilegeGroup(
                     ImmutableList.of(PoliciesConfig.GET_TIMELINE_PRIVILEGE.getType()))));
-<<<<<<<< HEAD:metadata-service/openapi-servlet/src/main/java/io/datahubproject/openapi/v1/timeline/TimelineControllerV1.java
     if (restApiAuthorizationEnabled && !AuthUtil.isAuthorized(opContext, orGroup, resourceSpec)) {
-========
-    if (restApiAuthorizationEnabled
-        && !AuthUtil.isAuthorized(_authorizerChain, actorUrnStr, orGroup, resourceSpec)) {
->>>>>>>> 11764361c (Upgrade v14 (#71)):metadata-service/openapi-servlet/src/main/java/io/datahubproject/openapi/v2/controller/TimelineControllerV2.java
       throw new UnauthorizedException(actorUrnStr + " is unauthorized to edit entities.");
     }
     return ResponseEntity.ok(
