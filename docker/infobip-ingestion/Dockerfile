@@ -17,7 +17,7 @@ RUN yum -y install jq
 RUN python3 -m pip install --upgrade pip wheel setuptools acryl-datahub
 
 COPY . /datahub-src
-RUN export JAVA_HOME=$(dirname $(dirname $(readlink -f /usr/bin/java))) \
+RUN export JAVA_HOME=$(find /usr/lib/jvm -maxdepth 1 -type d -name 'java-17*' | head -1) \
  && echo "Using JAVA_HOME=${JAVA_HOME}" \
  && cd /datahub-src \
  && ./gradlew :metadata-ingestion:installDev --stacktrace
