@@ -12,7 +12,7 @@ RUN sed -i \
  && printf '[centos-sclo-rh]\nname=CentOS-7 - SCLo rh\nbaseurl=http://vault.centos.org/centos/7/sclo/x86_64/rh/\ngpgcheck=0\nenabled=1\n' > /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo
 RUN yum history sync
 RUN yum -y update
-RUN yum -y install epel-release gcc python3-devel openldap-devel
+RUN yum -y install epel-release gcc python3-devel openldap-devel librdkafka-devel
 RUN curl -sL "https://api.adoptium.net/v3/binary/latest/17/ga/linux/x64/jdk/hotspot/normal/eclipse?project=jdk" -o /tmp/jdk17.tar.gz \
  && mkdir -p /opt/java \
  && tar xzf /tmp/jdk17.tar.gz -C /opt/java --strip-components=1 \
