@@ -13,7 +13,7 @@ RUN sed -i \
 RUN yum history sync
 RUN yum -y update
 RUN yum -y install java-17-openjdk-devel epel-release gcc python3-devel openldap-devel
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+ENV JAVA_HOME=/usr/lib/jvm/java-17
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 RUN yum -y install jq
 RUN python3 -m pip install --upgrade pip wheel setuptools acryl-datahub
