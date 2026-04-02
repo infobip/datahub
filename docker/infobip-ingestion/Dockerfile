@@ -12,7 +12,10 @@ RUN apt-get -y update && \
 RUN python3 -m pip install --upgrade pip wheel setuptools acryl-datahub
 
 COPY . /datahub-src
-RUN cd /datahub-src && ./gradlew :metadata-ingestion:installDev --stacktrace
+RUN cd /datahub-src && \
+    ./gradlew :metadata-ingestion:install --stacktrace && \
+    metadata-ingestion/venv/bin/pip install 'flatdict>=4.1.0' && \
+    ./gradlew :metadata-ingestion:installDev --stacktrace
 
 ENTRYPOINT ["python", "/datahub-src/docker/infobip-ingestion/start.py"]
 CMD ["--help"]
