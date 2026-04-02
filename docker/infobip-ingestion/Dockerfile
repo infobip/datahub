@@ -13,17 +13,14 @@ RUN sed -i \
 RUN yum history sync
 RUN yum -y update
 RUN yum -y install java-17-openjdk-devel epel-release gcc python3-devel openldap-devel
-RUN export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java)))) \
- && echo "export JAVA_HOME=${JAVA_HOME}" >> /etc/profile.d/java.sh \
- && echo "export PATH=\${JAVA_HOME}/bin:\${PATH}" >> /etc/profile.d/java.sh \
- && ln -sf ${JAVA_HOME} /usr/lib/jvm/java-home
-ENV JAVA_HOME=/usr/lib/jvm/java-home
-ENV PATH="${JAVA_HOME}/bin:${PATH}"
 RUN yum -y install jq
 RUN python3 -m pip install --upgrade pip wheel setuptools acryl-datahub
 
 COPY . /datahub-src
-RUN cd /datahub-src && ./gradlew :metadata-ingestion:installDev --stacktrace
+RUN export JAVA_HOME=$(dirname $(dirname $(readlink -f /usr/bin/java))) \
+ && echo "Using JAVA_HOME=${JAVA_HOME}" \
+ && cd /datahub-src \
+ && ./gradlew :metadata-ingestion:installDev --stacktrace
 
 ENTRYPOINT ["python", "/datahub-src/docker/infobip-ingestion/start.py"]
 CMD ["--help"]
