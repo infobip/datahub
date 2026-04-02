@@ -11,11 +11,13 @@ RUN apt-get -y update && \
 
 RUN python3 -m pip install --upgrade pip wheel setuptools acryl-datahub
 
+ENV UV_NO_BUILD_ISOLATION_PACKAGE=flatdict
+
 COPY . /datahub-src
 RUN cd /datahub-src && \
     ./gradlew :metadata-ingestion:install --stacktrace && \
     metadata-ingestion/venv/bin/pip install setuptools && \
-    UV_NO_BUILD_ISOLATION_PACKAGE=flatdict ./gradlew :metadata-ingestion:installDev --stacktrace
+    ./gradlew :metadata-ingestion:installDev --stacktrace
 
 ENTRYPOINT ["python", "/datahub-src/docker/infobip-ingestion/start.py"]
 CMD ["--help"]
