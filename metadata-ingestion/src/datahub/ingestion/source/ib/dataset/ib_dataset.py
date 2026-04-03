@@ -1,14 +1,14 @@
 import json
 import logging
 from abc import abstractmethod
-from typing import Iterable, List, Optional, Union
+from typing import Iterable, List, Optional
 
 import pandas as pd
 
 import datahub.emitter.mce_builder as builder
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import PipelineContext
-from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
+from datahub.ingestion.api.workunit import MetadataWorkUnit
 from datahub.ingestion.source.ib.ib_common import IBRedashSource, IBRedashSourceConfig
 from datahub.ingestion.source.ib.utils.dataset_utils import (
     DatasetUtils,
@@ -66,7 +66,7 @@ class IBRedashDatasetSource(IBRedashSource):
         super().__init__(config, ctx)
         self.source_config: IBRedashSourceConfig = config
 
-    def fetch_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
+    def fetch_workunits(self) -> Iterable[MetadataWorkUnit]:
         exp_df = pd.read_json(json.dumps(self.query_exp_get(self.config.exp_query_id)))
         extended_properties = self.prepare_extended_properties(exp_df)
         df = pd.read_json(json.dumps(self.query_get(self.config.query_id)))

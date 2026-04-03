@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Dict, Iterable, List, Set, Union
+from typing import Dict, Iterable, List, Set
 
 import pandas as pd
 
@@ -8,7 +8,7 @@ import datahub.emitter.mce_builder as builder
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.decorators import config_class, platform_name
-from datahub.ingestion.api.workunit import MetadataWorkUnit, UsageStatsWorkUnit
+from datahub.ingestion.api.workunit import MetadataWorkUnit
 from datahub.ingestion.source.ib.ib_common import IBRedashSource, IBRedashSourceConfig
 from datahub.ingestion.source.ib.utils.dataset_utils import (
     DatasetUtils,
@@ -40,7 +40,7 @@ class IBLineagesSource(IBRedashSource):
     def __init__(self, config: IBLineagesSourceConfig, ctx: PipelineContext):
         super().__init__(config, ctx)
 
-    def fetch_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
+    def fetch_workunits(self) -> Iterable[MetadataWorkUnit]:
         lineages_grouped = pd.read_json(
             json.dumps(self.query_get(self.config.query_id))
         ).groupby(
