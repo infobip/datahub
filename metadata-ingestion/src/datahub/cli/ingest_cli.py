@@ -103,9 +103,6 @@ def ingest() -> None:
     default=-1,
     help="Port which prometheus_client's Prometheus Exporter will listen on, will not start prometheus_client if port < 0",
 )
-@click.pass_context
-@telemetry.with_telemetry
-@memory_leak_detector.with_leak_detection
 @click.option(
     "--no-progress",
     type=bool,
