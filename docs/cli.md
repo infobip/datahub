@@ -34,9 +34,9 @@ datahub init
 # authenticate your datahub CLI with your datahub instance
 ```
 
-If you run into an error, try checking the [_common setup issues_](../metadata-ingestion/developing.md#Common-setup-issues).
+If you run into an error, try checking the [_common setup issues_](../metadata-ingestion/developing.md#common-setup-issues).
 
-Other installation options such as installation from source and running the cli inside a container are available further below in the guide [here](#alternate-installation-options)
+Other installation options such as installation from source and running the cli inside a container are available further below in the guide [here](#alternate-installation-options).
 
 ## Starter Commands
 
@@ -113,6 +113,19 @@ ingestion recipe is producing the desired metadata events before ingesting them 
 datahub ingest -c ./examples/recipes/example_to_datahub_rest.dhub.yaml --dry-run
 # Short-form
 datahub ingest -c ./examples/recipes/example_to_datahub_rest.dhub.yaml -n
+```
+
+#### ingest --list-source-runs
+
+The `--list-source-runs` option of the `ingest` command lists the previous runs, displaying their run ID, source name, 
+start time, status, and source URN. This command allows you to filter results using the --urn option for URN-based 
+filtering or the --source option to filter by source name (partial or complete matches are supported).
+
+```shell
+# List all ingestion runs
+datahub ingest --list-source-runs
+# Filter runs by a source name containing "demo"
+datahub ingest --list-source-runs --source "demo"
 ```
 
 #### ingest --preview
@@ -672,7 +685,6 @@ Old Entities Migrated = {'urn:li:dataset:(urn:li:dataPlatform:hive,logging_event
 ### Using docker
 
 [![Docker Hub](https://img.shields.io/docker/pulls/acryldata/datahub-ingestion?style=plastic)](https://hub.docker.com/r/acryldata/datahub-ingestion)
-[![datahub-ingestion docker](https://github.com/acryldata/datahub/workflows/datahub-ingestion%20docker/badge.svg)](https://github.com/acryldata/datahub/actions/workflows/docker-ingestion.yml)
 
 If you don't want to install locally, you can alternatively run metadata ingestion within a Docker container.
 We have prebuilt images available on [Docker hub](https://hub.docker.com/r/acryldata/datahub-ingestion). All plugins will be installed and enabled automatically.
@@ -706,6 +718,7 @@ Please see our [Integrations page](https://datahubproject.io/integrations) if yo
 | [datahub-lineage-file](./generated/ingestion/sources/file-based-lineage.md)                    | _no additional dependencies_                               | Lineage File source                     |
 | [datahub-business-glossary](./generated/ingestion/sources/business-glossary.md)                | _no additional dependencies_                               | Business Glossary File source           |
 | [dbt](./generated/ingestion/sources/dbt.md)                                                    | _no additional dependencies_                               | dbt source                              |
+| [dremio](./generated/ingestion/sources/dremio.md)                                              | `pip install 'acryl-datahub[dremio]'`                      | Dremio Source                          |
 | [druid](./generated/ingestion/sources/druid.md)                                                | `pip install 'acryl-datahub[druid]'`                       | Druid Source                            |
 | [feast](./generated/ingestion/sources/feast.md)                                                | `pip install 'acryl-datahub[feast]'`                       | Feast source (0.26.0)                   |
 | [glue](./generated/ingestion/sources/glue.md)                                                  | `pip install 'acryl-datahub[glue]'`                        | AWS Glue source                         |

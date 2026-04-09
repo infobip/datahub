@@ -1,4 +1,4 @@
-ARG KAFKA_DOCKER_VERSION=7.4.4
+ARG KAFKA_DOCKER_VERSION=7.7.1
 
 # Defining custom repo urls for use in enterprise environments. Re-used between stages below.
 ARG ALPINE_REPO_URL=http://dl-cdn.alpinelinux.org/alpine
@@ -6,8 +6,8 @@ ARG GITHUB_REPO_URL=https://github.com
 ARG MAVEN_CENTRAL_REPO_URL=https://repo1.maven.org/maven2
 ARG APACHE_DOWNLOAD_URL=null
 
-# Using as a base image because to get the needed jars for confluent utils
-FROM confluentinc/cp-base-new:$KAFKA_DOCKER_VERSION as confluent_base
+# Using AS a base image because to get the needed jars for confluent utils
+FROM confluentinc/cp-base-new:$KAFKA_DOCKER_VERSION AS confluent_base
 
 ARG MAVEN_CENTRAL_REPO_URL
 ARG SNAKEYAML_VERSION="2.0"
@@ -22,7 +22,7 @@ ARG ALPINE_REPO_URL
 ARG APACHE_DOWNLOAD_URL
 ARG GITHUB_REPO_URL
 
-ENV KAFKA_VERSION=3.7.1
+ENV KAFKA_VERSION=3.7.2
 ENV SCALA_VERSION=2.13
 
 LABEL name="kafka" version=${KAFKA_VERSION}
@@ -35,7 +35,7 @@ RUN apk --no-cache add openjdk17-jre-headless --repository=${ALPINE_REPO_URL}/ed
 
 RUN apk add --no-cache -t .build-deps git curl ca-certificates jq gcc musl-dev libffi-dev zip
 RUN mkdir -p /opt \
-  && if [ "${APACHE_DOWNLOAD_URL}" != "null" ] ; then mirror="${APACHE_DOWNLOAD_URL}/" ; else mirror=$(curl --stderr /dev/null https://www.apache.org/dyn/closer.cgi\?as_json\=1 | jq -r '.preferred'); fi \
+  && if [ "${APACHE_DOWNLOAD_URL}" != "null" ] ; then mirror="${APACHE_DOWNLOAD_URL}/" ; else mirror="https://archive.apache.org/dist/" ; fi \
   && curl -sSL "${mirror}kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz" \
   | tar -xzf - -C /opt \
   && mv /opt/kafka_${SCALA_VERSION}-${KAFKA_VERSION} /opt/kafka \
@@ -44,7 +44,7 @@ RUN mkdir -p /opt \
   && rm -rf /tmp/* \
   && apk del --purge .build-deps
 
-ENV PATH /sbin:/opt/kafka/bin/:$PATH
+ENV PATH=/sbin:/opt/kafka/bin/:$PATH
 
 WORKDIR /opt/kafka
 

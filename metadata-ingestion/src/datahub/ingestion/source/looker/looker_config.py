@@ -298,6 +298,21 @@ class LookerDashboardSourceConfig(
         description="When enabled, platform instance will be added in dashboard and chart urn.",
     )
 
+    folder_path_pattern: AllowDenyPattern = Field(
+        default=AllowDenyPattern.allow_all(),
+        description="Allow or deny dashboards from specific folders using their fully qualified paths. "
+        "For example: \n"
+        "deny: \n"
+        " - Shared/deprecated \n"
+        "This pattern will deny the ingestion of all dashboards and looks within the Shared/deprecated folder. \n"
+        "allow: \n"
+        " - Shared/sales \n"
+        "This pattern will allow only the ingestion of dashboards within the Shared/sales folder. \n"
+        "To get the correct path from Looker, take the folder hierarchy shown in the UI and join it with slashes. "
+        "For example, Shared -> Customer Reports -> Sales becomes Shared/Customer Reports/Sales. "
+        "Dashboards will only be ingested if they're allowed by both this config and dashboard_pattern.",
+    )
+
     @validator("external_base_url", pre=True, always=True)
     def external_url_defaults_to_api_config_base_url(
         cls, v: Optional[str], *, values: Dict[str, Any], **kwargs: Dict[str, Any]

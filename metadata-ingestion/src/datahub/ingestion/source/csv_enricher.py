@@ -129,6 +129,10 @@ class CSVEnricherSource(Source):
 
     If ownership_type_urn is set then ownership_type must be set to CUSTOM.
 
+    Note that you have the option in your recipe config to write as a PATCH or as an OVERRIDE. This choice will apply to
+    all metadata for the entity, not just a single aspect. So OVERRIDE will override all metadata, including performing
+    deletes if a metadata field is empty. The default is PATCH.
+
     :::note
     This source will not work on very large csv files that do not fit in memory.
     :::
@@ -649,7 +653,7 @@ class CSVEnricherSource(Source):
 
             is_resource_row: bool = not row["subresource"]
             entity_urn = row["resource"]
-            entity_type = Urn.create_from_string(row["resource"]).get_type()
+            entity_type = Urn.from_string(row["resource"]).get_type()
 
             term_associations: List[
                 GlossaryTermAssociationClass

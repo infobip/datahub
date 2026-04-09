@@ -46,7 +46,7 @@ const styles = {
     navBar: { padding: '24px' },
     searchContainer: { width: '100%', marginTop: '40px' },
     logoImage: { width: 140 },
-    searchBox: { width: '50vw', minWidth: 400, margin: '40px 0px', marginBottom: '12px', maxWidth: '650px' },
+    searchBox: { width: '47vw', minWidth: 400, margin: '40px 0px', marginBottom: '12px', maxWidth: '650px' },
     subtitle: { marginTop: '28px', color: '#FFFFFF', fontSize: 12 },
 };
 
@@ -221,7 +221,7 @@ export const HomePageHeader = () => {
     const searchResultsToShow = useMemo(() => {
         let result: string[] | undefined = [];
         if (searchResultsData) {
-            const entities = searchResultsData?.searchAcrossEntities?.searchResults.map((searchResult) => {
+            const entities = searchResultsData?.searchAcrossEntities?.searchResults?.map((searchResult) => {
                 return searchResult?.entity;
             });
 
