@@ -29,6 +29,7 @@ base_requirements = {
 
 framework_common = {
     "click>=7.1.2",
+    "pyorient @ git+https://github.com/OpenConjecture/pyorient.git",
     "click-default-group",
     "PyYAML",
     "toml>=0.10.0",
@@ -51,6 +52,7 @@ framework_common = {
     "cached_property",
     "ijson",
     "click-spinner",
+    "prometheus_client>=0.15.0",
     "requests_file",
     "jsonref",
     "jsonschema",
@@ -162,6 +164,8 @@ sql_common = (
     | sqlglot_lib
     | classification_lib
 )
+
+ib_pyodbc = "pyodbc"
 
 aws_common = {
     # AWS Python SDK
@@ -356,6 +360,7 @@ superset_common = {
 # Note: for all of these, framework_common will be added.
 plugins: Dict[str, Set[str]] = {
     # Sink plugins.
+    "pyorient": {"pyorient"},
     "datahub-kafka": kafka_common,
     "datahub-rest": rest_common,
     "sync-file-emitter": {"filelock"},
@@ -449,6 +454,13 @@ plugins: Dict[str, Set[str]] = {
         # https://github.com/great-expectations/great_expectations/pull/6149.
         "great-expectations != 0.15.23, != 0.15.24, != 0.15.25, != 0.15.26",
     },
+    "ib-lineages": {ib_pyodbc},
+    "ib-kafka": {ib_pyodbc},
+    "ib-elasticsearch": {ib_pyodbc},
+    "ib-clickhouse": {ib_pyodbc},
+    "ib-mssql-views": {ib_pyodbc},
+    "ib-mssql-tables": {ib_pyodbc},
+    "ib-postgresql": {ib_pyodbc},
     # keep in sync with presto-on-hive until presto-on-hive will be removed
     "hive-metastore": sql_common
     | pyhive_common
@@ -638,6 +650,13 @@ base_dev_requirements = {
             "feast",
             "iceberg",
             "iceberg-catalog",
+            "ib-lineages",
+            "ib-kafka",
+            "ib-elasticsearch",
+            "ib-clickhouse",
+            "ib-mssql-views",
+            "ib-mssql-tables",
+            "ib-postgresql",
             "mlflow",
             "json-schema",
             "ldap",
@@ -723,6 +742,13 @@ entry_points = {
         "csv-enricher = datahub.ingestion.source.csv_enricher:CSVEnricherSource",
         "file = datahub.ingestion.source.file:GenericFileSource",
         "datahub = datahub.ingestion.source.datahub.datahub_source:DataHubSource",
+        "ib-lineages = datahub.ingestion.source.ib.lineage.ib_lineages:IBLineagesSource",
+        "ib-kafka = datahub.ingestion.source.ib.dataset.ib_kafka:IBKafkaSource",
+        "ib-elasticsearch = datahub.ingestion.source.ib.dataset.ib_elasticsearch:IBElasticsearchSource",
+        "ib-clickhouse = datahub.ingestion.source.ib.dataset.ib_clickhouse:IBClickhouseSource",
+        "ib-mssql-views = datahub.ingestion.source.ib.dataset.ib_mssql_views:IBMSSQLViewsSource",
+        "ib-mssql-tables = datahub.ingestion.source.ib.dataset.ib_mssql_tables:IBMSSQLTablesSource",
+        "ib-postgresql = datahub.ingestion.source.ib.dataset.ib_postgresql:IBPostgreSQLSource",
         "sqlalchemy = datahub.ingestion.source.sql.sql_generic:SQLAlchemyGenericSource",
         "athena = datahub.ingestion.source.sql.athena:AthenaSource",
         "azure-ad = datahub.ingestion.source.identity.azure_ad:AzureADSource",

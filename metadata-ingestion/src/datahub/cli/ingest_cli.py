@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import sys
+import time
 import textwrap
 from datetime import datetime
 from typing import Optional
@@ -10,6 +11,7 @@ from typing import Optional
 import click
 import click_spinner
 from click_default_group import DefaultGroup
+from prometheus_client import start_http_server
 from tabulate import tabulate
 
 from datahub._version import nice_version_name
@@ -96,6 +98,12 @@ def ingest() -> None:
     "--no-spinner", type=bool, is_flag=True, default=False, help="Turn off spinner"
 )
 @click.option(
+    "--prometheus-exporter-port",
+    type=int,
+    default=-1,
+    help="Port which prometheus_client's Prometheus Exporter will listen on, will not start prometheus_client if port < 0",
+)
+@click.option(
     "--no-progress",
     type=bool,
     is_flag=True,
@@ -123,11 +131,23 @@ def run(
     report_to: Optional[str],
     no_default_report: bool,
     no_spinner: bool,
+    prometheus_exporter_port: int,
     no_progress: bool,
 ) -> None:
     """Ingest metadata into DataHub."""
 
-    def run_pipeline_to_completion(pipeline: Pipeline) -> int:
+    def run_pipeline_to_completion(
+        pipeline: Pipeline, structured_report: Optional[str] = None
+    ) -> int:
+        if prometheus_exporter_port > 0:
+            logger.info(
+                "Starting http server for Prometheus Python Client (Prometheus exporter)"
+            )
+            start_http_server(prometheus_exporter_port)
+            logger.info(
+                "/Started http server for Prometheus Python Client (Prometheus exporter)"
+            )
+
         logger.info("Starting metadata ingestion")
         with click_spinner.spinner(disable=no_spinner or no_progress):
             try:
@@ -144,6 +164,14 @@ def run(
                 logger.info("Finished metadata ingestion")
                 pipeline.log_ingestion_stats()
                 ret = pipeline.pretty_print_summary(warnings_as_failure=strict_warnings)
+
+                if prometheus_exporter_port > 0:
+                    logger.info(
+                        "Sleeping for 60 seconds so that prometheus is able to grab all the metrics"
+                    )
+                    time.sleep(60)
+                    logger.info("/Sleeping finished")
+
                 return ret
 
     # main function begins

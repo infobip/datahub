@@ -319,7 +319,7 @@ export class DatasetEntity implements Entity<Dataset> {
         return (
             <Preview
                 urn={data.urn}
-                name={data.editableProperties?.name || data.properties?.name || data.name}
+                name={data.properties?.qualifiedName || data.properties?.name || data.name}
                 origin={data.origin}
                 description={data.editableProperties?.description || data.properties?.description}
                 platformName={

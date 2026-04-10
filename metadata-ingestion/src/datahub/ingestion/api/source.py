@@ -36,6 +36,10 @@ from datahub.ingestion.api.auto_work_units.auto_ensure_aspect_size import (
 )
 from datahub.ingestion.api.closeable import Closeable
 from datahub.ingestion.api.common import PipelineContext, RecordEnvelope, WorkUnit
+from datahub.ingestion.api.prometheus_metrics import (
+    report_ingested_workunit_to_prometheus,
+    report_ingestion_issue_to_prometheus,
+)
 from datahub.ingestion.api.report import Report
 from datahub.ingestion.api.source_helpers import (
     auto_browse_path_v2,
@@ -244,6 +248,8 @@ class SourceReport(Report):
                                 "fineGrainedLineages"
                             ].append(urn)
 
+        report_ingested_workunit_to_prometheus(wu)
+
     def report_warning(
         self,
         message: LiteralString,
@@ -254,6 +260,7 @@ class SourceReport(Report):
         self._structured_logs.report_log(
             StructuredLogLevel.WARN, message, title, context, exc, log=False
         )
+        report_ingestion_issue_to_prometheus("warning", message)
 
     def warning(
         self,
@@ -265,6 +272,7 @@ class SourceReport(Report):
         self._structured_logs.report_log(
             StructuredLogLevel.WARN, message, title, context, exc, log=True
         )
+        report_ingestion_issue_to_prometheus("warning", message)
 
     def report_failure(
         self,
@@ -277,6 +285,7 @@ class SourceReport(Report):
         self._structured_logs.report_log(
             StructuredLogLevel.ERROR, message, title, context, exc, log=log
         )
+        report_ingestion_issue_to_prometheus("failure", message)
 
     def failure(
         self,
@@ -289,6 +298,7 @@ class SourceReport(Report):
         self._structured_logs.report_log(
             StructuredLogLevel.ERROR, message, title, context, exc, log=log
         )
+        report_ingestion_issue_to_prometheus("failure", message)
 
     def info(
         self,
@@ -311,8 +321,6 @@ class SourceReport(Report):
         level: StructuredLogLevel = StructuredLogLevel.ERROR,
     ) -> Iterator[None]:
         # Convenience method that helps avoid boilerplate try/except blocks.
-        # TODO: I'm not super happy with the naming here - it's not obvious that this
-        # suppresses the exception in addition to reporting it.
         try:
             yield
         except Exception as exc:
