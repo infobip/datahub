@@ -5,7 +5,7 @@ ARG version
 
 RUN apt-get -y update && \
     apt-get -y install git openjdk-17-jdk jq gcc python3-dev libldap2-dev libsasl2-dev \
-      libssl-dev build-essential unixodbc-dev libkrb5-dev && \
+      libssl-dev build-essential unixodbc-dev libkrb5-dev ant && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
