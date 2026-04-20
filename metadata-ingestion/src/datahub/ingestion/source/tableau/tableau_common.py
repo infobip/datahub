@@ -514,7 +514,8 @@ FIELD_TYPE_MAPPING = {
 }
 
 
-def get_tags_from_params(params: List[str] = []) -> GlobalTagsClass:
+def get_tags_from_params(params: Optional[List[str]] = None) -> GlobalTagsClass:
+    params = params or []
     tags = [
         TagAssociationClass(tag=builder.make_tag_urn(tag.upper()))
         for tag in params
@@ -642,8 +643,11 @@ class TableauUpstreamReference:
 
     @classmethod
     def create(
-        cls, d: dict, default_schema_map: Optional[Dict[str, str]] = None
+        cls, d: Dict, default_schema_map: Optional[Dict[str, str]] = None
     ) -> "TableauUpstreamReference":
+        if d is None:
+            raise ValueError("TableauUpstreamReference.create: d is None")
+
         # Values directly from `table` object from Tableau
         database_dict = (
             d.get(c.DATABASE) or {}
@@ -717,7 +721,7 @@ class TableauUpstreamReference:
         #  schema
 
         # TODO: Validate the startswith check. Currently required for our integration tests
-        if full_name is None or not full_name.startswith("["):
+        if full_name is None:
             return None
 
         return full_name.replace("[", "").replace("]", "").split(".")
@@ -758,7 +762,7 @@ class TableauUpstreamReference:
 
 
 def get_overridden_info(
-    connection_type: Optional[str],
+    connection_type: str,
     upstream_db: Optional[str],
     upstream_db_id: Optional[str],
     platform_instance_map: Optional[Dict[str, str]],
