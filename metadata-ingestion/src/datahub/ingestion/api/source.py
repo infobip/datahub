@@ -33,6 +33,10 @@ from datahub.ingestion.api.auto_work_units.auto_ensure_aspect_size import (
 )
 from datahub.ingestion.api.closeable import Closeable
 from datahub.ingestion.api.common import PipelineContext, RecordEnvelope, WorkUnit
+from datahub.ingestion.api.prometheus_metrics import (
+    report_ingested_workunit_to_prometheus,
+    report_ingestion_issue_to_prometheus,
+)
 from datahub.ingestion.api.report import ExamplesReport, Report
 from datahub.ingestion.api.source_helpers import (
     AutoSystemMetadata,
@@ -236,6 +240,7 @@ class SourceReport(ExamplesReport, IngestionStageReport):
             return
 
         super()._store_workunit_data(wu)
+        report_ingested_workunit_to_prometheus(wu)
 
     def report_warning(
         self,
@@ -257,6 +262,7 @@ class SourceReport(ExamplesReport, IngestionStageReport):
             log=False,
             log_category=log_category,
         )
+        report_ingestion_issue_to_prometheus("warning", message)
 
     def warning(
         self,
@@ -279,6 +285,7 @@ class SourceReport(ExamplesReport, IngestionStageReport):
             log=log,
             log_category=log_category,
         )
+        report_ingestion_issue_to_prometheus("warning", message)
 
     def report_failure(
         self,
@@ -301,6 +308,7 @@ class SourceReport(ExamplesReport, IngestionStageReport):
             log=log,
             log_category=log_category,
         )
+        report_ingestion_issue_to_prometheus("failure", message)
 
     def failure(
         self,
@@ -323,6 +331,7 @@ class SourceReport(ExamplesReport, IngestionStageReport):
             log=log,
             log_category=log_category,
         )
+        report_ingestion_issue_to_prometheus("failure", message)
 
     def info(
         self,

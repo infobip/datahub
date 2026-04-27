@@ -49,6 +49,7 @@ framework_common = {
     "cached_property",
     "ijson",
     "click-spinner",
+    "prometheus_client>=0.15.0",
     "requests_file",
     "jsonref",
     "jsonschema",
@@ -173,6 +174,8 @@ sql_common = (
     | sqlglot_lib
     | classification_lib
 )
+
+ib_pyodbc = "pyodbc"
 
 aws_common = {
     # AWS Python SDK
@@ -397,6 +400,14 @@ superset_common = {
 
 # Note: for all of these, framework_common will be added.
 plugins: Dict[str, Set[str]] = {
+    # IB plugins.
+    "ib-lineages": {ib_pyodbc},
+    "ib-kafka": {ib_pyodbc},
+    "ib-elasticsearch": {ib_pyodbc},
+    "ib-clickhouse": {ib_pyodbc},
+    "ib-mssql-views": {ib_pyodbc},
+    "ib-mssql-tables": {ib_pyodbc},
+    "ib-postgresql": {ib_pyodbc},
     # Sink plugins.
     "datahub-kafka": {
         # At some moment, we decoupled from using here kafka_common
@@ -696,6 +707,13 @@ base_dev_requirements = {
             "feast",
             "iceberg",
             "iceberg-catalog",
+            "ib-lineages",
+            "ib-kafka",
+            "ib-elasticsearch",
+            "ib-clickhouse",
+            "ib-mssql-views",
+            "ib-mssql-tables",
+            "ib-postgresql",
             "mlflow",
             "json-schema",
             "ldap",
@@ -814,6 +832,13 @@ entry_points = {
         "json-schema = datahub.ingestion.source.schema.json_schema:JsonSchemaSource",
         "kafka = datahub.ingestion.source.kafka.kafka:KafkaSource",
         "kafka-connect = datahub.ingestion.source.kafka_connect.kafka_connect:KafkaConnectSource",
+        "ib-lineages = datahub.ingestion.source.ib.lineage.ib_lineages:IBLineagesSource",
+        "ib-kafka = datahub.ingestion.source.ib.dataset.ib_kafka:IBKafkaSource",
+        "ib-elasticsearch = datahub.ingestion.source.ib.dataset.ib_elasticsearch:IBElasticsearchSource",
+        "ib-clickhouse = datahub.ingestion.source.ib.dataset.ib_clickhouse:IBClickhouseSource",
+        "ib-mssql-views = datahub.ingestion.source.ib.dataset.ib_mssql_views:IBMSSQLViewsSource",
+        "ib-mssql-tables = datahub.ingestion.source.ib.dataset.ib_mssql_tables:IBMSSQLTablesSource",
+        "ib-postgresql = datahub.ingestion.source.ib.dataset.ib_postgresql:IBPostgreSQLSource",
         "ldap = datahub.ingestion.source.ldap:LDAPSource",
         "looker = datahub.ingestion.source.looker.looker_source:LookerDashboardSource",
         "lookml = datahub.ingestion.source.looker.lookml_source:LookMLSource",

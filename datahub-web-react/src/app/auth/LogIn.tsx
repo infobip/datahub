@@ -1,6 +1,6 @@
-import { LockOutlined, LoginOutlined, UserOutlined } from '@ant-design/icons';
+import { LockOutlined /* , LoginOutlined */, UserOutlined } from '@ant-design/icons';
 import { useReactiveVar } from '@apollo/client';
-import { Button, Divider, Form, Image, Input, message } from 'antd';
+import { Button /* , Divider */, Form, Image, Input, message } from 'antd';
 import * as QueryString from 'query-string';
 import React, { useCallback, useState } from 'react';
 import { Redirect, useLocation } from 'react-router';
@@ -40,6 +40,7 @@ const FormInput = styled(Input)`
     }
 `;
 
+/*
 const SsoDivider = styled(Divider)`
     background-color: white;
 `;
@@ -62,6 +63,7 @@ const LoginLogo = styled(LoginOutlined)`
 const SsoTextSpan = styled.span`
     padding-top: 6px;
 `;
+*/
 
 export type LogInProps = Record<string, never>;
 
@@ -154,6 +156,7 @@ export const LogIn: React.VFC<LogInProps> = () => {
                             }}
                         </Form.Item>
                     </Form>
+                    {/*
                     <SsoDivider />
                     <SsoButton
                         type="primary"
@@ -166,6 +169,7 @@ export const LogIn: React.VFC<LogInProps> = () => {
                         <SsoTextSpan>Sign in with SSO</SsoTextSpan>
                         <span />
                     </SsoButton>
+                    */}
                 </div>
             </div>
         </div>
