@@ -192,11 +192,12 @@ export function HeaderLinks(props: Props) {
                 </LinkWrapper>
             )}
             <LinkWrapper>
-                <Link to={{ pathname: 'https://jira.infobip.com/ideas' }} target="_blank">
+
+                <a href="https://jira.infobip.com/ideas" target="_blank" rel="noopener noreferrer">
                     <Button type="text">
                         <CommentOutlined /> Feedback
                     </Button>
-                </Link>
+                </a>
             </LinkWrapper>
             {showSettings && (
                 <LinkWrapper style={{ marginRight: 12 }}>
