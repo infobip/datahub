@@ -24,18 +24,13 @@ ingestionIssuesCounter = Counter(
 def report_ingested_workunit_to_prometheus(wu: WorkUnit) -> None:
     if isinstance(wu, MetadataWorkUnit):
         if isinstance(wu.metadata, MetadataChangeEvent):
-            for mcp in iter(wu.decompose_mce_into_mcps()):
-                ingestionEntitiesCounter.labels(
-                    work_unit=wu.__class__.__name__
-                    + "."
-                    + wu.metadata.__class__.__name__
-                    + "-"
-                    + mcp.__class__.__name__
-                    + "."
-                    + mcp.metadata.__class__.__name__,
-                    entity_type=mcp.metadata.entityType,
-                    change_type=mcp.metadata.changeType,
-                ).inc()
+            # Avoid decompose_mce_into_mcps() here — the pipeline calls it separately
+            # and doing it again per workunit just for counting is a significant overhead.
+            ingestionEntitiesCounter.labels(
+                work_unit=wu.__class__.__name__ + "." + wu.metadata.__class__.__name__,
+                entity_type="mce",
+                change_type="UPSERT",
+            ).inc()
         elif isinstance(wu.metadata, MetadataChangeProposal) or isinstance(
             wu.metadata, MetadataChangeProposalWrapper
         ):
