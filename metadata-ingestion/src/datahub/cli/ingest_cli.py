@@ -10,9 +10,12 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from datahub.ingestion.recording.recorder import IngestionRecorder
 
+import time
+
 import click
 import click_spinner
 from click_default_group import DefaultGroup
+from prometheus_client import start_http_server
 from tabulate import tabulate
 
 from datahub._version import nice_version_name
@@ -100,6 +103,12 @@ def ingest() -> None:
     "--no-spinner", type=bool, is_flag=True, default=False, help="Turn off spinner"
 )
 @click.option(
+    "--prometheus-exporter-port",
+    type=int,
+    default=-1,
+    help="Port which prometheus_client's Prometheus Exporter will listen on, will not start prometheus_client if port < 0",
+)
+@click.option(
     "--no-progress",
     type=bool,
     is_flag=True,
@@ -167,6 +176,7 @@ def run(
     report_to: Optional[str],
     no_default_report: bool,
     no_spinner: bool,
+    prometheus_exporter_port: int,
     no_progress: bool,
     record: bool,
     record_password: Optional[str],
@@ -180,6 +190,14 @@ def run(
     initialize_secret_masking()
 
     def run_pipeline_to_completion(pipeline: Pipeline) -> int:
+        if prometheus_exporter_port > 0:
+            logger.info(
+                "Starting http server for Prometheus Python Client (Prometheus exporter)"
+            )
+            start_http_server(prometheus_exporter_port)
+            logger.info(
+                "/Started http server for Prometheus Python Client (Prometheus exporter)"
+            )
         logger.info("Starting metadata ingestion")
         with click_spinner.spinner(disable=no_spinner or no_progress):
             try:

@@ -2,6 +2,7 @@ import {
     ApiOutlined,
     BarChartOutlined,
     BookOutlined,
+    CommentOutlined,
     DownOutlined,
     GlobalOutlined,
     SettingOutlined,
@@ -190,6 +191,14 @@ export function HeaderLinks(props: Props) {
                     </Link>
                 </LinkWrapper>
             )}
+            <LinkWrapper>
+
+                <a href="https://jira.infobip.com/ideas" target="_blank" rel="noopener noreferrer">
+                    <Button type="text">
+                        <CommentOutlined /> Feedback
+                    </Button>
+                </a>
+            </LinkWrapper>
             {showSettings && (
                 <LinkWrapper style={{ marginRight: 12 }}>
                     <Link to="/settings">
