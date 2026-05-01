@@ -204,9 +204,9 @@ ext {
                         ':datahub-frontend',
                         ':metadata-jobs:mce-consumer-job',
                         ':metadata-jobs:mae-consumer-job',
-                        ':datahub-actions',
-                        ':docker:datahub-ingestion',
-                        ':docker:postgres-setup'
+                        // ':datahub-actions' — IB uses acryldata/datahub-actions from Acryl registry, not built here
+                        // ':docker:datahub-ingestion' — IB uses docker/infobip-ingestion instead
+                        // ':docker:postgres-setup' — IB uses MySQL, not PostgreSQL
                     ]
             ]
     ]
