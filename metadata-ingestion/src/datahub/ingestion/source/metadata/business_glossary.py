@@ -1,14 +1,15 @@
 import logging
 import pathlib
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, TypeVar, Union
 
-from pydantic import validator
+import pydantic
 from pydantic.fields import Field
 
 import datahub.metadata.schema_classes as models
-from datahub.configuration.common import ConfigModel
+from datahub.configuration.common import ConfigModel, LaxStr
 from datahub.configuration.config_loader import load_config_file
 from datahub.emitter.mce_builder import (
     datahub_guid,
@@ -65,7 +66,7 @@ class GlossaryTermConfig(ConfigModel):
     contains: Optional[List[str]] = None
     values: Optional[List[str]] = None
     related_terms: Optional[List[str]] = None
-    custom_properties: Optional[Dict[str, str]] = None
+    custom_properties: Optional[Dict[str, LaxStr]] = None
     knowledge_links: Optional[List[KnowledgeCard]] = None
     domain: Optional[str] = None
 
@@ -81,7 +82,7 @@ class GlossaryNodeConfig(ConfigModel):
     terms: Optional[List["GlossaryTermConfig"]] = None
     nodes: Optional[List["GlossaryNodeConfig"]] = None
     knowledge_links: Optional[List[KnowledgeCard]] = None
-    custom_properties: Optional[Dict[str, str]] = None
+    custom_properties: Optional[Dict[str, LaxStr]] = None
 
     # Private fields.
     _urn: str
@@ -107,28 +108,69 @@ class BusinessGlossarySourceConfig(ConfigModel):
 
 
 class BusinessGlossaryConfig(DefaultConfig):
-    version: str
+    version: LaxStr
     terms: Optional[List["GlossaryTermConfig"]] = None
     nodes: Optional[List["GlossaryNodeConfig"]] = None
 
-    @validator("version")
-    def version_must_be_1(cls, v):
+    @pydantic.field_validator("version", mode="after")
+    def version_must_be_1(cls, v: str) -> str:
         if v != "1":
             raise ValueError("Only version 1 is supported")
         return v
 
 
+def clean_url(text: str) -> str:
+    """
+    Clean text for use in URLs by:
+    1. Replacing spaces with hyphens
+    2. Removing special characters (preserving hyphens and periods)
+    3. Collapsing multiple hyphens and periods into single ones
+    """
+    # Replace spaces with hyphens
+    text = text.replace(" ", "-")
+    # Remove special characters except hyphens and periods
+    text = re.sub(r"[^a-zA-Z0-9\-.]", "", text)
+    # Collapse multiple hyphens into one
+    text = re.sub(r"-+", "-", text)
+    # Collapse multiple periods into one
+    text = re.sub(r"\.+", ".", text)
+    # Remove leading/trailing hyphens and periods
+    text = text.strip("-.")
+    return text
+
+
 def create_id(path: List[str], default_id: Optional[str], enable_auto_id: bool) -> str:
+    """
+    Create an ID for a glossary node or term.
+
+    Args:
+        path: List of path components leading to this node/term
+        default_id: Optional manually specified ID
+        enable_auto_id: Whether to generate GUIDs
+    """
     if default_id is not None:
-        return default_id  # No need to create id from path as default_id is provided
+        return default_id  # Use explicitly provided ID
 
     id_: str = ".".join(path)
 
-    if UrnEncoder.contains_extended_reserved_char(id_):
-        enable_auto_id = True
+    # Check for non-ASCII characters before cleaning
+    if any(ord(c) > 127 for c in id_):
+        return datahub_guid({"path": id_})
 
     if enable_auto_id:
+        # Generate GUID for auto_id mode
         id_ = datahub_guid({"path": id_})
+    else:
+        # Clean the URL for better readability when not using auto_id
+        id_ = clean_url(id_)
+
+        # Force auto_id if the cleaned URL still contains problematic characters
+        if UrnEncoder.contains_extended_reserved_char(id_):
+            logger.warning(
+                f"ID '{id_}' contains problematic characters after URL cleaning. Falling back to GUID generation for stability."
+            )
+            id_ = datahub_guid({"path": id_})
+
     return id_
 
 

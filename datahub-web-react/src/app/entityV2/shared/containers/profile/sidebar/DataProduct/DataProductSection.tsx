@@ -1,17 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import styled from 'styled-components';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { Modal, message } from 'antd';
-import { useEntityData } from '../../../../../../entity/shared/EntityContext';
-import { EMPTY_MESSAGES } from '../../../../constants';
-import SetDataProductModal from './SetDataProductModal';
-import { DataProductLink } from '../../../../../../sharedV2/tags/DataProductLink';
-import { useBatchSetDataProductMutation } from '../../../../../../../graphql/dataProduct.generated';
-import { DataProduct } from '../../../../../../../types.generated';
-import { SidebarSection } from '../SidebarSection';
-import SectionActionButton from '../SectionActionButton';
-import EmptySectionText from '../EmptySectionText';
+import React, { useEffect, useState } from 'react';
+import styled from 'styled-components';
+
+import { useEntityData } from '@app/entity/shared/EntityContext';
+import { EMPTY_MESSAGES } from '@app/entityV2/shared/constants';
+import SetDataProductModal from '@app/entityV2/shared/containers/profile/sidebar/DataProduct/SetDataProductModal';
+import EmptySectionText from '@app/entityV2/shared/containers/profile/sidebar/EmptySectionText';
+import SectionActionButton from '@app/entityV2/shared/containers/profile/sidebar/SectionActionButton';
+import { SidebarSection } from '@app/entityV2/shared/containers/profile/sidebar/SidebarSection';
+import { useModulesContext } from '@app/homeV3/module/context/ModulesContext';
+import { DataProductLink } from '@app/sharedV2/tags/DataProductLink';
+
+import { useBatchSetDataProductMutation } from '@graphql/dataProduct.generated';
+import { DataHubPageModuleType, DataProduct } from '@types';
 
 const Content = styled.div`
     display: flex;
@@ -25,6 +28,7 @@ interface Props {
 }
 
 export default function DataProductSection({ readOnly }: Props) {
+    const { reloadModules } = useModulesContext();
     const [isModalVisible, setIsModalVisible] = useState(false);
     const { entityData, urn } = useEntityData();
     const [batchSetDataProductMutation] = useBatchSetDataProductMutation();
@@ -46,6 +50,10 @@ export default function DataProductSection({ readOnly }: Props) {
             .then(() => {
                 message.success({ content: 'Removed Data Product.', duration: 2 });
                 setDataProduct(null);
+                // Reload modules
+                // DataProducts - as data products could be shown in domain summary tab
+                // Assets - as assets module could be changed in data product summary tab
+                reloadModules([DataHubPageModuleType.DataProducts, DataHubPageModuleType.Assets], 3000);
             })
             .catch((e: unknown) => {
                 message.destroy();

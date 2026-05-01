@@ -1,10 +1,10 @@
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Type, Union
 
 import yaml
-from pydantic import validator
+from pydantic import Field, StrictStr, validator
 from ruamel.yaml import YAML
 
 from datahub.configuration.common import ConfigModel
@@ -38,17 +38,17 @@ class AllowedTypes(Enum):
 
 
 class AllowedValue(ConfigModel):
-    value: str
+    value: Union[StrictStr, float]
     description: Optional[str] = None
 
 
 VALID_ENTITY_TYPE_URNS = [
-    Urn.make_entity_type_urn(entity_type) for entity_type in URN_TYPES.keys()
+    Urn.make_entity_type_urn(entity_type) for entity_type in URN_TYPES
 ]
 _VALID_ENTITY_TYPES_STRING = f"Valid entity type urns are {', '.join(VALID_ENTITY_TYPE_URNS)}, etc... Ensure that the entity type is valid."
 
 
-def _validate_entity_type_urn(v: str) -> str:
+def _validate_entity_type_urn(cls: Type, v: str) -> str:
     urn = Urn.make_entity_type_urn(v)
     if urn not in VALID_ENTITY_TYPE_URNS:
         raise ValueError(
@@ -68,7 +68,7 @@ class TypeQualifierAllowedTypes(ConfigModel):
 
 class StructuredProperties(ConfigModel):
     id: Optional[str] = None
-    urn: Optional[str] = None
+    urn: Optional[str] = Field(None, validate_default=True)
     qualified_name: Optional[str] = None
     type: str
     value_entity_types: Optional[List[str]] = None

@@ -1,15 +1,18 @@
-import React, { useRef, useState } from 'react';
-import { message, Modal, Button, Select, Tag, Empty } from 'antd';
-import { getModalDomContainer } from '@src/utils/focus';
 import { LoadingOutlined } from '@ant-design/icons';
+import { Button, Empty, Modal, Select, Tag, message } from 'antd';
+import React, { useRef, useState } from 'react';
 import styled from 'styled-components';
-import { useAddGroupMembersMutation } from '../../../graphql/group.generated';
-import { CorpUser, Entity, EntityType } from '../../../types.generated';
-import { useGetSearchResultsLazyQuery } from '../../../graphql/search.generated';
-import { useEntityRegistry } from '../../useEntityRegistry';
-import { useGetRecommendations } from '../../shared/recommendation';
-import { OwnerLabel } from '../../shared/OwnerLabel';
-import { ANTD_GRAY } from '../shared/constants';
+
+import { ANTD_GRAY } from '@app/entityV2/shared/constants';
+import { OwnerLabel } from '@app/shared/OwnerLabel';
+import { useGetRecommendations } from '@app/shared/recommendation';
+import { addUserFiltersToSearchInput } from '@app/shared/userSearchUtils';
+import { useEntityRegistry } from '@app/useEntityRegistry';
+import { getModalDomContainer } from '@src/utils/focus';
+
+import { useAddGroupMembersMutation } from '@graphql/group.generated';
+import { useGetSearchResultsLazyQuery } from '@graphql/search.generated';
+import { CorpUser, Entity, EntityType } from '@types';
 
 type Props = {
     urn: string;
@@ -52,14 +55,19 @@ export const AddGroupMembersModal = ({ urn, visible, onCloseModal, onSubmit }: P
     const inputEl = useRef(null);
 
     const handleUserSearch = (text: string) => {
+        const input = addUserFiltersToSearchInput(
+            {
+                type: EntityType.CorpUser,
+                query: text,
+                start: 0,
+                count: 5,
+            },
+            EntityType.CorpUser,
+        );
+
         userSearch({
             variables: {
-                input: {
-                    type: EntityType.CorpUser,
-                    query: text,
-                    start: 0,
-                    count: 5,
-                },
+                input,
             },
         });
     };

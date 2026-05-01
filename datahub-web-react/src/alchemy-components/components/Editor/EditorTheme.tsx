@@ -1,7 +1,4 @@
-import { defaultRemirrorTheme } from '@remirror/theme';
-import type { RemirrorThemeType } from '@remirror/theme';
-import styled from 'styled-components';
-
+import { colors } from '@components';
 import {
     extensionBlockquoteStyledCss,
     extensionCalloutStyledCss,
@@ -15,6 +12,10 @@ import {
     extensionPositionerStyledCss,
     extensionTablesStyledCss,
 } from '@remirror/styles/styled-components';
+import { defaultRemirrorTheme } from '@remirror/theme';
+import type { RemirrorThemeType } from '@remirror/theme';
+import styled from 'styled-components';
+
 import { ANTD_GRAY } from '@src/app/entityV2/shared/constants';
 
 export const EditorTheme: RemirrorThemeType = {
@@ -82,9 +83,11 @@ export const EditorContainer = styled.div`
         line-height: 1.5;
         white-space: pre-wrap;
         margin: 0;
+        color: ${colors.gray[600]};
 
         a {
             font-weight: 500;
+            color: ${colors.primary[500]};
         }
 
         li {

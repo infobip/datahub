@@ -1,19 +1,29 @@
 import React from 'react';
 import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
-import { AssertionType, EntityType } from '@src/types.generated';
+
+import {
+    ASSERTION_SUMMARY_CARD_HEADER_BY_STATUS,
+    ASSERTION_TYPE_TO_HEADER_SUBTITLE,
+} from '@app/entityV2/shared/tabs/Dataset/Validations/AssertionList/AcrylAssertionListConstants';
+import {
+    AcrylAssertionProgressBar,
+    AssertionProgressSummary,
+} from '@app/entityV2/shared/tabs/Dataset/Validations/AssertionList/AcrylAssertionProgressBar';
+import { AcrylAssertionSummarySection } from '@app/entityV2/shared/tabs/Dataset/Validations/AssertionList/Summary/AcrylAssertionSummarySection';
+import {
+    ASSERTION_SUMMARY_CARD_STATUSES,
+    NO_RUNNING_STATE,
+} from '@app/entityV2/shared/tabs/Dataset/Validations/AssertionList/constant';
+import { buildAssertionUrlSearch } from '@app/entityV2/shared/tabs/Dataset/Validations/AssertionList/utils';
+import { AssertionGroup } from '@app/entityV2/shared/tabs/Dataset/Validations/acrylTypes';
+import { getAssertionGroupName } from '@app/entityV2/shared/tabs/Dataset/Validations/acrylUtils';
+import { ASSERTION_TYPE_TO_ICON_MAP } from '@app/entityV2/shared/tabs/Dataset/Validations/shared/constant';
+import { Button } from '@src/alchemy-components';
+import { useEntityData } from '@src/app/entity/shared/EntityContext';
 import { ANTD_GRAY } from '@src/app/entityV2/shared/constants';
 import { useEntityRegistry } from '@src/app/useEntityRegistry';
-import { useEntityData } from '@src/app/entity/shared/EntityContext';
-import { Button } from '@src/alchemy-components';
-import { AssertionGroup } from '../../acrylTypes';
-import { getAssertionGroupName } from '../../acrylUtils';
-import { AcrylAssertionProgressBar, AssertionProgressSummary } from '../AcrylAssertionProgressBar';
-import { ASSERTION_SUMMARY_CARD_HEADER_BY_STATUS } from '../AcrylAssertionListConstants';
-import { AcrylAssertionSummarySection } from './AcrylAssertionSummarySection';
-import { ASSERTION_TYPE_TO_ICON_MAP } from '../../shared/constant';
-import { ASSERTION_SUMMARY_CARD_STATUSES, NO_RUNNING_STATE } from '../constant';
-import { buildAssertionUrlSearch } from '../utils';
+import { AssertionType, EntityType } from '@src/types.generated';
 
 const StyledCard = styled.div`
     display: flex;
@@ -103,6 +113,7 @@ export const AcrylAssertionSummaryCard: React.FC<Props> = ({ group }) => {
 
     const status = ASSERTION_SUMMARY_CARD_STATUSES.find((key) => group.summary[key]) || NO_RUNNING_STATE;
     const headerTitle = status ? ASSERTION_SUMMARY_CARD_HEADER_BY_STATUS[status].headerComponent : null;
+    const headerSubtitle = group.type ? ASSERTION_TYPE_TO_HEADER_SUBTITLE[group.type] : null;
 
     const handleCardClick = (type: AssertionType, event: React.MouseEvent) => {
         event.stopPropagation(); // Prevent parent click handlers from being triggered
@@ -123,7 +134,7 @@ export const AcrylAssertionSummaryCard: React.FC<Props> = ({ group }) => {
                 <AssertionIconWrapper>{icon}</AssertionIconWrapper>
                 <AssertionTypeDetailsContainer>
                     <AssertionTitle>{name}</AssertionTitle>
-                    <AssertionTextContainer>Verifies when this dataset should be updated.</AssertionTextContainer>
+                    <AssertionTextContainer>{headerSubtitle}</AssertionTextContainer>
                 </AssertionTypeDetailsContainer>
             </AssertionDetailsContainer>
 

@@ -1,34 +1,39 @@
-import { AppstoreOutlined, FileOutlined, FolderOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, FileOutlined, FolderOutlined, UnlockOutlined } from '@ant-design/icons';
+import { ListBullets } from '@phosphor-icons/react';
 import * as React from 'react';
-import { GetContainerQuery, useGetContainerQuery } from '../../../graphql/container.generated';
-import { Container, EntityType, SearchResult } from '../../../types.generated';
-import { capitalizeFirstLetterOnly } from '../../shared/textUtil';
-import { Entity, EntityCapabilityType, IconStyleType, PreviewType } from '../Entity';
-import { EntityMenuItems } from '../shared/EntityDropdown/EntityMenuActions';
-import { SubType, TYPE_ICON_CLASS_NAME } from '../shared/components/subtypes';
-import { EntityProfile } from '../shared/containers/profile/EntityProfile';
-import { SidebarAboutSection } from '../shared/containers/profile/sidebar/AboutSection/SidebarAboutSection';
-import SidebarContentsSection from '../shared/containers/profile/sidebar/Container/SidebarContentsSection';
-import DataProductSection from '../shared/containers/profile/sidebar/DataProduct/DataProductSection';
-import { SidebarDomainSection } from '../shared/containers/profile/sidebar/Domain/SidebarDomainSection';
-import { SidebarOwnerSection } from '../shared/containers/profile/sidebar/Ownership/sidebar/SidebarOwnerSection';
-import SidebarEntityHeader from '../shared/containers/profile/sidebar/SidebarEntityHeader';
-import { SidebarGlossaryTermsSection } from '../shared/containers/profile/sidebar/SidebarGlossaryTermsSection';
-import { SidebarTagsSection } from '../shared/containers/profile/sidebar/SidebarTagsSection';
-import StatusSection from '../shared/containers/profile/sidebar/shared/StatusSection';
-import { getDataForEntityType } from '../shared/containers/profile/utils';
-import EmbeddedProfile from '../shared/embed/EmbeddedProfile';
-import SidebarStructuredProperties from '../shared/sidebarSection/SidebarStructuredProperties';
-import { SUMMARY_TAB_ICON } from '../shared/summary/HeaderComponents';
-import { DocumentationTab } from '../shared/tabs/Documentation/DocumentationTab';
-import { PropertiesTab } from '../shared/tabs/Properties/PropertiesTab';
-import { getDataProduct, isOutputPort } from '../shared/utils';
-import { ContainerEntitiesTab } from './ContainerEntitiesTab';
-import ContainerSummaryTab from './ContainerSummaryTab';
-import { Preview } from './preview/Preview';
-import SidebarNotesSection from '../shared/sidebarSection/SidebarNotesSection';
 
-const headerDropdownItems = new Set([EntityMenuItems.EXTERNAL_URL, EntityMenuItems.SHARE, EntityMenuItems.ANNOUNCE]);
+import AccessManagement from '@app/entity/shared/tabs/Dataset/AccessManagement/AccessManagement';
+import { Entity, EntityCapabilityType, IconStyleType, PreviewType } from '@app/entityV2/Entity';
+import { ContainerEntitiesTab } from '@app/entityV2/container/ContainerEntitiesTab';
+import ContainerSummaryTab from '@app/entityV2/container/ContainerSummaryTab';
+import { Preview } from '@app/entityV2/container/preview/Preview';
+import { EntityMenuItems } from '@app/entityV2/shared/EntityDropdown/EntityMenuActions';
+import { SubType, TYPE_ICON_CLASS_NAME } from '@app/entityV2/shared/components/subtypes';
+import { EntityProfile } from '@app/entityV2/shared/containers/profile/EntityProfile';
+import { SidebarAboutSection } from '@app/entityV2/shared/containers/profile/sidebar/AboutSection/SidebarAboutSection';
+import SidebarContentsSection from '@app/entityV2/shared/containers/profile/sidebar/Container/SidebarContentsSection';
+import DataProductSection from '@app/entityV2/shared/containers/profile/sidebar/DataProduct/DataProductSection';
+import { SidebarDomainSection } from '@app/entityV2/shared/containers/profile/sidebar/Domain/SidebarDomainSection';
+import { SidebarOwnerSection } from '@app/entityV2/shared/containers/profile/sidebar/Ownership/sidebar/SidebarOwnerSection';
+import SidebarEntityHeader from '@app/entityV2/shared/containers/profile/sidebar/SidebarEntityHeader';
+import { SidebarGlossaryTermsSection } from '@app/entityV2/shared/containers/profile/sidebar/SidebarGlossaryTermsSection';
+import { SidebarTagsSection } from '@app/entityV2/shared/containers/profile/sidebar/SidebarTagsSection';
+import StatusSection from '@app/entityV2/shared/containers/profile/sidebar/shared/StatusSection';
+import { getDataForEntityType } from '@app/entityV2/shared/containers/profile/utils';
+import EmbeddedProfile from '@app/entityV2/shared/embed/EmbeddedProfile';
+import SidebarNotesSection from '@app/entityV2/shared/sidebarSection/SidebarNotesSection';
+import SidebarStructuredProperties from '@app/entityV2/shared/sidebarSection/SidebarStructuredProperties';
+import { SUMMARY_TAB_ICON } from '@app/entityV2/shared/summary/HeaderComponents';
+import { DocumentationTab } from '@app/entityV2/shared/tabs/Documentation/DocumentationTab';
+import { PropertiesTab } from '@app/entityV2/shared/tabs/Properties/PropertiesTab';
+import { getDataProduct, getFirstSubType, isOutputPort } from '@app/entityV2/shared/utils';
+import { capitalizeFirstLetterOnly } from '@app/shared/textUtil';
+import { useAppConfig } from '@app/useAppConfig';
+
+import { GetContainerQuery, useGetContainerQuery } from '@graphql/container.generated';
+import { Container, EntityType, SearchResult } from '@types';
+
+const headerDropdownItems = new Set([EntityMenuItems.SHARE, EntityMenuItems.ANNOUNCE]);
 
 /**
  * Definition of the DataHub Container entity.
@@ -54,10 +59,7 @@ export class ContainerEntity implements Entity<Container> {
         return (
             <FolderOutlined
                 className={TYPE_ICON_CLASS_NAME}
-                style={{
-                    fontSize,
-                    color: color || '#BFBFBF',
-                }}
+                style={{ fontSize: fontSize || 'inherit', color: color || 'inherit' }}
             />
         );
     };
@@ -79,6 +81,8 @@ export class ContainerEntity implements Entity<Container> {
     getCollectionName = () => 'Containers';
 
     useEntityQuery = useGetContainerQuery;
+
+    appconfig = useAppConfig;
 
     renderProfile = (urn: string) => (
         <EntityProfile
@@ -112,7 +116,21 @@ export class ContainerEntity implements Entity<Container> {
                 {
                     name: 'Properties',
                     component: PropertiesTab,
-                    icon: UnorderedListOutlined,
+                    icon: ListBullets,
+                },
+                {
+                    name: 'Access',
+                    component: AccessManagement,
+                    icon: UnlockOutlined,
+                    display: {
+                        visible: (_, container: GetContainerQuery) => {
+                            return (
+                                this.appconfig().config.featureFlags.showAccessManagement &&
+                                !!container?.container?.access
+                            );
+                        },
+                        enabled: (_, _2) => true,
+                    },
                 },
             ]}
             sidebarSections={this.getSidebarSections()}
@@ -165,11 +183,11 @@ export class ContainerEntity implements Entity<Container> {
             name: 'Properties',
             component: PropertiesTab,
             description: 'View additional properties about this asset',
-            icon: UnorderedListOutlined,
+            icon: ListBullets,
         },
     ];
 
-    renderPreview = (_: PreviewType, data: Container) => {
+    renderPreview = (previewType: PreviewType, data: Container) => {
         const genericProperties = this.getGenericEntityProperties(data);
         return (
             <Preview
@@ -189,6 +207,7 @@ export class ContainerEntity implements Entity<Container> {
                 entityCount={data.entities?.total}
                 headerDropdownItems={headerDropdownItems}
                 browsePaths={data.browsePathV2 || undefined}
+                previewType={previewType}
             />
         );
     };
@@ -221,6 +240,7 @@ export class ContainerEntity implements Entity<Container> {
                 isOutputPort={isOutputPort(result)}
                 headerDropdownItems={headerDropdownItems}
                 browsePaths={data.browsePathV2 || undefined}
+                previewType={PreviewType.SEARCH}
             />
         );
     };
@@ -232,7 +252,7 @@ export class ContainerEntity implements Entity<Container> {
             type: this.type,
             icon: entity?.platform?.properties?.logoUrl || undefined,
             platform: entity?.platform,
-            subtype: entity?.subTypes?.typeNames?.[0] || undefined,
+            subtype: getFirstSubType(entity) || undefined,
         };
     }
 

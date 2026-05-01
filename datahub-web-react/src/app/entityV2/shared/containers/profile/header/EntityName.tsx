@@ -1,32 +1,38 @@
-import { message, Typography } from 'antd';
-import React, { useState, useEffect } from 'react';
+import { Typography, message } from 'antd';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components/macro';
+
+import colors from '@components/theme/foundations/colors';
+
+import { useDomainsContext } from '@app/domainV2/DomainsContext';
+import { useEntityData, useRefetch } from '@app/entity/shared/EntityContext';
+import { useGlossaryEntityData } from '@app/entityV2/shared/GlossaryEntityContext';
+import { getParentNodeToUpdate, updateGlossarySidebar } from '@app/glossary/utils';
+import { useModulesContext } from '@app/homeV3/module/context/ModulesContext';
+import CompactContext from '@app/shared/CompactContext';
+import { useEntityRegistry } from '@app/useEntityRegistry';
+import { getColor } from '@src/alchemy-components/theme/utils';
 import { useEmbeddedProfileLinkProps } from '@src/app/shared/useEmbeddedProfileLinkProps';
-import { useUpdateNameMutation } from '../../../../../../graphql/mutations.generated';
-import { getParentNodeToUpdate, updateGlossarySidebar } from '../../../../../glossary/utils';
-import { useEntityRegistry } from '../../../../../useEntityRegistry';
-import { useEntityData, useRefetch } from '../../../../../entity/shared/EntityContext';
-import { useGlossaryEntityData } from '../../../GlossaryEntityContext';
-import { REDESIGN_COLORS } from '../../../constants';
-import CompactContext from '../../../../../shared/CompactContext';
-import { EntityType } from '../../../../../../types.generated';
+
+import { useUpdateNameMutation } from '@graphql/mutations.generated';
+import { DataHubPageModuleType, EntityType } from '@types';
 
 const EntityTitle = styled(Typography.Text)<{ $showEntityLink?: boolean }>`
     font-weight: 700;
-    color: ${REDESIGN_COLORS.TITLE_PURPLE};
+    color: ${(p) => p.theme.styles['primary-color']};
     line-height: normal;
 
     ${(props) =>
         props.$showEntityLink &&
         `
     :hover {
-        color: ${REDESIGN_COLORS.HOVER_PURPLE};
+        color: ${(p) => getColor('primary', 600, p.theme)};
     }
     `}
     &&& {
         margin-bottom: 0;
-        word-break: break-word;
+        white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
@@ -36,7 +42,7 @@ const EntityTitle = styled(Typography.Text)<{ $showEntityLink?: boolean }>`
         margin-left: 2px;
 
         & svg {
-            fill: #533fd1;
+            fill: ${(p) => p.theme.styles['primary-color']};
         }
     }
 `;
@@ -50,10 +56,12 @@ function EntityName(props: Props) {
     const refetch = useRefetch();
     const entityRegistry = useEntityRegistry();
     const { isInGlossaryContext, urnsToUpdate, setUrnsToUpdate } = useGlossaryEntityData();
+    const { setUpdatedDomain } = useDomainsContext();
     const { urn, entityType, entityData } = useEntityData();
     const entityName = entityData ? entityRegistry.getDisplayName(entityType, entityData) : '';
     const [updatedName, setUpdatedName] = useState(entityName);
     const [isEditing, setIsEditing] = useState(false);
+    const { reloadModules } = useModulesContext();
 
     const isCompact = React.useContext(CompactContext);
     const showEntityLink = isCompact && entityType !== EntityType.Query;
@@ -83,6 +91,34 @@ function EntityName(props: Props) {
                     const parentNodeToUpdate = getParentNodeToUpdate(entityData, entityType);
                     updateGlossarySidebar([parentNodeToUpdate], urnsToUpdate, setUrnsToUpdate);
                 }
+                if (setUpdatedDomain !== undefined) {
+                    const updatedDomain = {
+                        urn,
+                        type: EntityType.Domain,
+                        id: urn,
+                        properties: {
+                            name,
+                        },
+                    };
+                    setUpdatedDomain(updatedDomain);
+                }
+                // Reload modules as name of some asset could be changed in them
+                reloadModules(
+                    [
+                        DataHubPageModuleType.AssetCollection,
+                        DataHubPageModuleType.OwnedAssets,
+                        DataHubPageModuleType.Assets,
+                        DataHubPageModuleType.ChildHierarchy,
+                        DataHubPageModuleType.Domains,
+                    ],
+                    3000,
+                );
+                if (entityType === EntityType.GlossaryTerm) {
+                    reloadModules([DataHubPageModuleType.RelatedTerms], 3000);
+                }
+                if (entityType === EntityType.DataProduct) {
+                    reloadModules([DataHubPageModuleType.DataProducts], 3000);
+                }
             })
             .catch((e: unknown) => {
                 message.destroy();
@@ -92,6 +128,8 @@ function EntityName(props: Props) {
             });
     };
 
+    // Note: Bug with editable + ellipsis, if text is compressed, it never grows back
+    // imo we should just get rid of this editing feature, it looks bad
     const Title = isNameEditable ? (
         <EntityTitle
             disabled={isMutatingName}
@@ -101,11 +139,22 @@ function EntityName(props: Props) {
                 onStart: handleStartEditing,
             }}
             $showEntityLink={showEntityLink}
+            ellipsis={{
+                tooltip: { showArrow: false, color: 'white', overlayInnerStyle: { color: colors.gray[1700] } },
+            }}
+            key={updatedName}
         >
             {updatedName}
         </EntityTitle>
     ) : (
-        <EntityTitle $showEntityLink={showEntityLink}>{entityName}</EntityTitle>
+        <EntityTitle
+            $showEntityLink={showEntityLink}
+            ellipsis={{
+                tooltip: { showArrow: false, color: 'white', overlayInnerStyle: { color: colors.gray[1700] } },
+            }}
+        >
+            {entityName}
+        </EntityTitle>
     );
 
     // have entity link open new tab if in the chrome extension

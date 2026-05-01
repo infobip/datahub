@@ -13,7 +13,10 @@ from pydantic import Field, root_validator, validator
 from requests.models import HTTPError
 
 import datahub.emitter.mce_builder as builder
-from datahub.configuration.source_common import DatasetLineageProviderConfigBase
+from datahub.configuration.source_common import (
+    DatasetLineageProviderConfigBase,
+    LowerCaseDatasetUrnConfigMixin,
+)
 from datahub.ingestion.api.common import PipelineContext
 from datahub.ingestion.api.decorators import (
     SourceCapability,
@@ -61,7 +64,11 @@ logger = logging.getLogger(__name__)
 DATASOURCE_URN_RECURSION_LIMIT = 5
 
 
-class MetabaseConfig(DatasetLineageProviderConfigBase, StatefulIngestionConfigBase):
+class MetabaseConfig(
+    DatasetLineageProviderConfigBase,
+    StatefulIngestionConfigBase,
+    LowerCaseDatasetUrnConfigMixin,
+):
     # See the Metabase /api/session endpoint for details
     # https://www.metabase.com/docs/latest/api-documentation.html#post-apisession
     connect_uri: str = Field(default="localhost:3000", description="Metabase host URL.")
@@ -313,7 +320,7 @@ class MetabaseSource(StatefulIngestionSourceBase):
             return None
 
         dashboard_urn = builder.make_dashboard_urn(
-            self.platform, dashboard_details.get("id", "")
+            self.platform, str(dashboard_details.get("id", ""))
         )
         dashboard_snapshot = DashboardSnapshot(
             urn=dashboard_urn,
@@ -337,7 +344,7 @@ class MetabaseSource(StatefulIngestionSourceBase):
             card_id = card_info.get("card").get("id", "")
             if not card_id:
                 continue  # most likely a virtual card without an id (text or heading), not relevant.
-            chart_urn = builder.make_chart_urn(self.platform, card_id)
+            chart_urn = builder.make_chart_urn(self.platform, str(card_id))
             chart_urns.append(chart_urn)
 
         dashboard_info_class = DashboardInfoClass(
@@ -459,7 +466,7 @@ class MetabaseSource(StatefulIngestionSourceBase):
             )
             return None
 
-        chart_urn = builder.make_chart_urn(self.platform, card_id)
+        chart_urn = builder.make_chart_urn(self.platform, str(card_id))
         chart_snapshot = ChartSnapshot(
             urn=chart_urn,
             aspects=[],

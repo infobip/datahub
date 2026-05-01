@@ -1,12 +1,13 @@
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from typing import Dict, List, Optional, Set
 
 import pydantic
-from pydantic import Field, SecretStr, root_validator, validator
+from pydantic import Field, root_validator, validator
 
-from datahub.configuration.common import AllowDenyPattern, ConfigModel
+from datahub.configuration.common import AllowDenyPattern, ConfigModel, HiddenFromDocs
 from datahub.configuration.pattern_utils import UUID_REGEX
 from datahub.configuration.source_common import (
     EnvConfigMixin,
@@ -22,6 +23,7 @@ from datahub.ingestion.api.incremental_properties_helper import (
 from datahub.ingestion.glossary.classification_mixin import (
     ClassificationSourceConfigMixin,
 )
+from datahub.ingestion.source.snowflake.constants import SnowflakeEdition
 from datahub.ingestion.source.snowflake.snowflake_connection import (
     SnowflakeConnectionConfig,
 )
@@ -48,7 +50,13 @@ DEFAULT_TEMP_TABLES_PATTERNS = [
     rf".*\.SEGMENT_{UUID_REGEX}",  # segment
     rf".*\.STAGING_.*_{UUID_REGEX}",  # stitch
     r".*\.(GE_TMP_|GE_TEMP_|GX_TEMP_)[0-9A-F]{8}",  # great expectations
+    r".*\.SNOWPARK_TEMP_TABLE_.+",  # snowpark
 ]
+
+
+class QueryDedupStrategyType(Enum):
+    STANDARD = "STANDARD"
+    NONE = "NONE"
 
 
 class TagOption(StrEnum):
@@ -59,13 +67,10 @@ class TagOption(StrEnum):
 
 @dataclass(frozen=True)
 class DatabaseId:
-    database: str = Field(
-        description="Database created from share in consumer account."
-    )
-    platform_instance: Optional[str] = Field(
-        default=None,
-        description="Platform instance of consumer snowflake account.",
-    )
+    # Database created from share in consumer account
+    database: str
+    # Platform instance of consumer snowflake account
+    platform_instance: Optional[str] = None
 
 
 class SnowflakeShareConfig(ConfigModel):
@@ -100,7 +105,15 @@ class SnowflakeFilterConfig(SQLFilterConfig):
 
     stream_pattern: AllowDenyPattern = Field(
         default=AllowDenyPattern.allow_all(),
-        description="Regex patterns for streams to filter in ingestion. Note: Defaults to table_pattern if not specified. Specify regex to match the entire view name in database.schema.view format. e.g. to match all views starting with customer in Customer database and public schema, use the regex 'Customer.public.customer.*'",
+        description="Regex patterns for streams to filter in ingestion. Specify regex to match the entire view name in database.schema.view format. e.g. to match all views starting with customer in Customer database and public schema, use the regex 'Customer.public.customer.*'",
+    )
+
+    procedure_pattern: AllowDenyPattern = Field(
+        default=AllowDenyPattern.allow_all(),
+        description="Regex patterns for procedures to filter in ingestion. "
+        "Specify regex to match the entire procedure name in database.schema.procedure format. "
+        "e.g. to match all procedures starting with customer in Customer database and public schema,"
+        " use the regex 'Customer.public.customer.*'",
     )
 
     match_fully_qualified_names: bool = Field(
@@ -145,14 +158,11 @@ class SnowflakeIdentifierConfig(
 
     email_domain: Optional[str] = pydantic.Field(
         default=None,
-        description="Email domain of your organization so users can be displayed on UI appropriately.",
+        description="Email domain of your organization so users can be displayed on UI appropriately. This is used only if we cannot infer email ID.",
     )
 
-    email_as_user_identifier: bool = Field(
-        default=True,
-        description="Format user urns as an email, if the snowflake user's email is set. If `email_domain` is "
-        "provided, generates email addresses for snowflake users with unset emails, based on their "
-        "username.",
+    _email_as_user_identifier = pydantic_removed_field(
+        "email_as_user_identifier",
     )
 
 
@@ -203,6 +213,16 @@ class SnowflakeV2Config(
         description="If enabled, populates the ingested views' definitions.",
     )
 
+    fetch_views_from_information_schema: bool = Field(
+        default=False,
+        description="If enabled, uses information_schema.views to fetch view definitions instead of SHOW VIEWS command. "
+        "This alternative method can be more reliable for databases with large numbers of views (> 10K views), as the "
+        "SHOW VIEWS approach has proven unreliable and can lead to missing views in such scenarios. However, this method "
+        "requires OWNERSHIP privileges on views to retrieve their definitions. For views without ownership permissions "
+        "(where VIEW_DEFINITION is null/empty), the system will automatically fall back to using batched SHOW VIEWS queries "
+        "to populate the missing definitions.",
+    )
+
     include_technical_schema: bool = Field(
         default=True,
         description="If enabled, populates the snowflake technical schema and descriptions.",
@@ -223,7 +243,7 @@ class SnowflakeV2Config(
     )
 
     use_queries_v2: bool = Field(
-        default=False,
+        default=True,
         description="If enabled, uses the new queries extractor to extract queries from snowflake.",
     )
     include_queries: bool = Field(
@@ -241,6 +261,11 @@ class SnowflakeV2Config(
         "This is useful if you have a large number of schemas and want to avoid bulk fetching the schema for each table/view.",
     )
 
+    query_dedup_strategy: QueryDedupStrategyType = Field(
+        default=QueryDedupStrategyType.STANDARD,
+        description=f"Experimental: Choose the strategy for query deduplication (default value is appropriate for most use-cases; make sure you understand performance implications before changing it). Allowed values are: {', '.join([s.name for s in QueryDedupStrategyType])}",
+    )
+
     _check_role_grants_removed = pydantic_removed_field("check_role_grants")
     _provision_role_removed = pydantic_removed_field("provision_role")
 
@@ -254,10 +279,11 @@ class SnowflakeV2Config(
         description="If enabled along with `extract_tags`, extracts snowflake's key-value tags as DataHub structured properties instead of DataHub tags.",
     )
 
-    structured_properties_template_cache_invalidation_interval: int = Field(
-        hidden_from_docs=True,
-        default=60,
-        description="Interval in seconds to invalidate the structured properties template cache.",
+    structured_properties_template_cache_invalidation_interval: HiddenFromDocs[int] = (
+        Field(
+            default=60,
+            description="Interval in seconds to invalidate the structured properties template cache.",
+        )
     )
 
     include_external_url: bool = Field(
@@ -284,10 +310,16 @@ class SnowflakeV2Config(
         description="If enabled, streams will be ingested as separate entities from tables/views.",
     )
 
+    include_procedures: bool = Field(
+        default=True,
+        description="If enabled, procedures will be ingested as pipelines/tasks.",
+    )
+
     structured_property_pattern: AllowDenyPattern = Field(
         default=AllowDenyPattern.allow_all(),
         description=(
             "List of regex patterns for structured properties to include in ingestion."
+            " Applied to tags with form `<database>.<schema>.<tag_name>`."
             " Only used if `extract_tags` and `extract_tags_as_structured_properties` are enabled."
         ),
     )
@@ -300,7 +332,7 @@ class SnowflakeV2Config(
         "to ignore the temporary staging tables created by known ETL tools.",
     )
 
-    rename_upstreams_deny_pattern_to_temporary_table_pattern = pydantic_renamed_field(
+    rename_upstreams_deny_pattern_to_temporary_table_pattern = pydantic_renamed_field(  # type: ignore[pydantic-field]
         "upstreams_deny_pattern", "temporary_tables_pattern"
     )
 
@@ -312,6 +344,17 @@ class SnowflakeV2Config(
         " Map of share name -> details of share.",
     )
 
+    known_snowflake_edition: Optional[SnowflakeEdition] = Field(
+        default=None,
+        description="Explicitly specify the Snowflake edition (STANDARD or ENTERPRISE). If unset, the edition will be inferred automatically using 'SHOW TAGS'.",
+    )
+
+    # Allows empty containers to be ingested before datasets are added, avoiding permission errors
+    warn_no_datasets: HiddenFromDocs[bool] = Field(
+        default=False,
+        description="If True, warns when no datasets are found during ingestion. If False, ingestion fails when no datasets are found.",
+    )
+
     include_assertion_results: bool = Field(
         default=False,
         description="Whether to ingest assertion run results for assertions created using Datahub"
@@ -320,9 +363,30 @@ class SnowflakeV2Config(
 
     pushdown_deny_usernames: List[str] = Field(
         default=[],
-        description="List of snowflake usernames which will not be considered for lineage/usage/queries extraction. "
+        description="List of snowflake usernames (SQL LIKE patterns, e.g., 'SERVICE_%', '%_PROD', 'TEST_USER') which will NOT be considered for lineage/usage/queries extraction. "
         "This is primarily useful for improving performance by filtering out users with extremely high query volumes. "
         "Only applicable if `use_queries_v2` is enabled.",
+    )
+
+    pushdown_allow_usernames: List[str] = Field(
+        default=[],
+        description="List of snowflake usernames (SQL LIKE patterns, e.g., 'ANALYST_%', '%_USER', 'MAIN_ACCOUNT') which WILL be considered for lineage/usage/queries extraction. "
+        "This is primarily useful for improving performance by filtering in only specific users. "
+        "Only applicable if `use_queries_v2` is enabled. If not specified, all users not in deny list are included.",
+    )
+
+    push_down_database_pattern_access_history: bool = Field(
+        default=False,
+        description="If enabled, pushes down database pattern filtering to the access_history table for improved performance. "
+        "This filters on the accessed objects in access_history.",
+    )
+
+    additional_database_names_allowlist: List[str] = Field(
+        default=[],
+        description="Additional database names (no pattern matching) to be included in the access_history filter. "
+        "Only applies if push_down_database_pattern_access_history=True. "
+        "These databases will be included in the filter being pushed down regardless of database_pattern settings."
+        "This may be required in the case of _eg_ temporary tables being created in a different database than the ones in the database_name patterns.",
     )
 
     @validator("convert_urns_to_lowercase")
@@ -370,17 +434,6 @@ class SnowflakeV2Config(
             )
 
         return values
-
-    def get_sql_alchemy_url(
-        self,
-        database: Optional[str] = None,
-        username: Optional[str] = None,
-        password: Optional[SecretStr] = None,
-        role: Optional[str] = None,
-    ) -> str:
-        return SnowflakeConnectionConfig.get_sql_alchemy_url(
-            self, database=database, username=username, password=password, role=role
-        )
 
     @validator("shares")
     def validate_shares(

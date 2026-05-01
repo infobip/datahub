@@ -1,20 +1,22 @@
-import DataProcessInstanceSummary from '@src/app/entity/dataProcessInstance/profile/DataProcessInstanceSummary';
+import { TreeStructure } from '@phosphor-icons/react';
+import { ArrowsClockwise } from 'phosphor-react';
+import React from 'react';
+
 import { globalEntityRegistryV2 } from '@app/EntityRegistryProvider';
 import { GenericEntityProperties } from '@app/entity/shared/types';
-import { Entity as GraphQLEntity } from '@types';
 import { Entity, EntityCapabilityType, IconStyleType, PreviewType } from '@app/entityV2/Entity';
+import Preview from '@app/entityV2/dataProcessInstance/preview/Preview';
+import { EntityMenuItems } from '@app/entityV2/shared/EntityDropdown/EntityMenuActions';
 import { EntityProfile } from '@app/entityV2/shared/containers/profile/EntityProfile';
 import SidebarEntityHeader from '@app/entityV2/shared/containers/profile/sidebar/SidebarEntityHeader';
 import { getDataForEntityType } from '@app/entityV2/shared/containers/profile/utils';
-import { EntityMenuItems } from '@app/entityV2/shared/EntityDropdown/EntityMenuActions';
 import { LineageTab } from '@app/entityV2/shared/tabs/Lineage/LineageTab';
 import { PropertiesTab } from '@app/entityV2/shared/tabs/Properties/PropertiesTab';
-import { getDataProduct } from '@app/entityV2/shared/utils';
+import { SidebarTitleActionType, getDataProduct, getFirstSubType } from '@app/entityV2/shared/utils';
+import DataProcessInstanceSummary from '@src/app/entity/dataProcessInstance/profile/DataProcessInstanceSummary';
+
 import { GetDataProcessInstanceQuery, useGetDataProcessInstanceQuery } from '@graphql/dataProcessInstance.generated';
-import { ArrowsClockwise } from 'phosphor-react';
-import React from 'react';
-import { DataProcessInstance, EntityType, SearchResult } from '../../../types.generated';
-import Preview from './preview/Preview';
+import { DataProcessInstance, EntityType, Entity as GraphQLEntity, SearchResult } from '@types';
 
 const getParentEntities = (data: DataProcessInstance): GraphQLEntity[] => {
     const parentEntity = data?.relationships?.relationships?.find(
@@ -44,14 +46,7 @@ export class DataProcessInstanceEntity implements Entity<DataProcessInstance> {
             return <ArrowsClockwise style={{ fontSize, color: color || '#B37FEB' }} />;
         }
 
-        return (
-            <ArrowsClockwise
-                style={{
-                    fontSize,
-                    color: color || '#BFBFBF',
-                }}
-            />
-        );
+        return <ArrowsClockwise style={{ fontSize: fontSize || 'inherit', color: color || 'inherit' }} />;
     };
 
     isSearchEnabled = () => false;
@@ -90,6 +85,7 @@ export class DataProcessInstanceEntity implements Entity<DataProcessInstance> {
                 {
                     name: 'Lineage',
                     component: LineageTab,
+                    supportsFullsize: true,
                 },
                 {
                     name: 'Properties',
@@ -97,10 +93,23 @@ export class DataProcessInstanceEntity implements Entity<DataProcessInstance> {
                 },
             ]}
             sidebarSections={this.getSidebarSections()}
+            sidebarTabs={this.getSidebarTabs()}
         />
     );
 
     getSidebarSections = () => [{ component: SidebarEntityHeader }];
+
+    getSidebarTabs = () => [
+        {
+            name: 'Lineage',
+            component: LineageTab,
+            description: "View this data asset's upstream and downstream dependencies",
+            icon: TreeStructure,
+            properties: {
+                actionType: SidebarTitleActionType.LineageExplore,
+            },
+        },
+    ];
 
     getOverridePropertiesFromEntity = (processInstance?: DataProcessInstance | null): GenericEntityProperties => {
         const parent =
@@ -120,7 +129,7 @@ export class DataProcessInstanceEntity implements Entity<DataProcessInstance> {
         };
     };
 
-    renderPreview = (_: PreviewType, data: DataProcessInstance) => {
+    renderPreview = (previewType: PreviewType, data: DataProcessInstance) => {
         const genericProperties = this.getGenericEntityProperties(data);
         const parentEntities = getParentEntities(data);
         return (
@@ -128,7 +137,7 @@ export class DataProcessInstanceEntity implements Entity<DataProcessInstance> {
                 urn={data.urn}
                 data={genericProperties}
                 name={this.displayName(data)}
-                subType={data.subTypes?.typeNames?.[0]}
+                subType={getFirstSubType(data)}
                 description=""
                 platformName={genericProperties?.platform?.properties?.displayName ?? undefined}
                 platformLogo={genericProperties?.platform?.properties?.logoUrl}
@@ -138,6 +147,7 @@ export class DataProcessInstanceEntity implements Entity<DataProcessInstance> {
                 externalUrl={data.properties?.externalUrl}
                 parentEntities={parentEntities}
                 container={data.container || undefined}
+                previewType={previewType}
             />
         );
     };
@@ -151,7 +161,7 @@ export class DataProcessInstanceEntity implements Entity<DataProcessInstance> {
             urn: entity?.urn,
             name: this.displayName(entity),
             type: EntityType.DataProcessInstance,
-            subtype: entity?.subTypes?.typeNames?.[0],
+            subtype: getFirstSubType(entity),
             icon: properties?.platform?.properties?.logoUrl ?? undefined,
             platform: properties?.platform ?? undefined,
             container: entity?.container,

@@ -2,6 +2,8 @@ package com.linkedin.datahub.upgrade;
 
 import com.linkedin.gms.factory.auth.AuthorizerChainFactory;
 import com.linkedin.gms.factory.auth.DataHubAuthorizerFactory;
+import com.linkedin.gms.factory.event.ExternalEventsServiceFactory;
+import com.linkedin.gms.factory.event.KafkaConsumerPoolFactory;
 import com.linkedin.gms.factory.graphql.GraphQLEngineFactory;
 import com.linkedin.gms.factory.kafka.KafkaEventConsumerFactory;
 import com.linkedin.gms.factory.kafka.SimpleKafkaConsumerFactory;
@@ -21,6 +23,7 @@ import org.springframework.context.annotation.FilterType;
     basePackages = {
       "com.linkedin.gms.factory",
       "com.linkedin.datahub.upgrade.config",
+      "com.linkedin.datahub.upgrade.system.cdc",
       "com.linkedin.metadata.dao.producer"
     },
     excludeFilters = {
@@ -34,7 +37,9 @@ import org.springframework.context.annotation.FilterType;
             KafkaEventConsumerFactory.class,
             GraphQLEngineFactory.class,
             KafkaTraceReaderFactory.class,
-            TraceServiceFactory.class
+            TraceServiceFactory.class,
+            KafkaConsumerPoolFactory.class,
+            ExternalEventsServiceFactory.class
           })
     })
 public class UpgradeCliApplication {

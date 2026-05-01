@@ -1,15 +1,17 @@
-import React, { MouseEvent } from 'react';
-import { Empty, Select } from 'antd';
 import { CloseCircleFilled } from '@ant-design/icons';
+import { Empty, Select } from 'antd';
+import React, { MouseEvent } from 'react';
+
+import domainAutocompleteOptions from '@app/domainV2/DomainAutocompleteOptions';
+import DomainNavigator from '@app/domainV2/nestedDomains/domainNavigator/DomainNavigator';
+import useParentSelector from '@app/entityV2/shared/EntityDropdown/useParentSelector';
+import { ANTD_GRAY } from '@app/entityV2/shared/constants';
+import ClickOutside from '@app/shared/ClickOutside';
+import { BrowserWrapper } from '@app/shared/tags/AddTagsTermsModal';
+import { useEntityRegistry } from '@app/useEntityRegistry';
 import { useDomainsContext } from '@src/app/domainV2/DomainsContext';
-import { Domain, EntityType } from '../../../../types.generated';
-import domainAutocompleteOptions from '../../../domainV2/DomainAutocompleteOptions';
-import { useEntityRegistry } from '../../../useEntityRegistry';
-import ClickOutside from '../../../shared/ClickOutside';
-import { BrowserWrapper } from '../../../shared/tags/AddTagsTermsModal';
-import { ANTD_GRAY } from '../constants';
-import useParentSelector from './useParentSelector';
-import DomainNavigator from '../../../domain/nestedDomains/domainNavigator/DomainNavigator';
+
+import { Domain, EntityType } from '@types';
 
 // filter out entity itself and its children
 export function filterResultsForMove(entity: Domain, entityUrn: string) {
@@ -100,6 +102,7 @@ export default function DomainParentSelect({ selectedParentUrn, setSelectedParen
                 <DomainNavigator
                     domainUrnToHide={isMoving ? domainUrn : undefined}
                     selectDomainOverride={selectDomain}
+                    isCollapsed={false}
                 />
             </BrowserWrapper>
         </ClickOutside>

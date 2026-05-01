@@ -1,10 +1,12 @@
-import React from 'react';
 import { DeleteOutlined } from '@ant-design/icons';
-import { Dropdown, Menu, message, Modal } from 'antd';
-import { EntityType } from '../../types.generated';
-import { useEntityRegistry } from '../useEntityRegistry';
-import { useDeleteDomainMutation } from '../../graphql/domain.generated';
-import { MenuIcon } from '../entity/shared/EntityDropdown/EntityDropdown';
+import { Dropdown, Menu, Modal, message } from 'antd';
+import React from 'react';
+
+import { MenuIcon } from '@app/entity/shared/EntityDropdown/EntityDropdown';
+import { useEntityRegistry } from '@app/useEntityRegistry';
+
+import { useDeleteDomainMutation } from '@graphql/domain.generated';
+import { EntityType } from '@types';
 
 type Props = {
     urn: string;
@@ -28,7 +30,8 @@ export default function DomainItemMenu({ name, urn, onDelete }: Props) {
                     onDelete?.();
                 }
             })
-            .catch(() => {
+            .catch((e) => {
+                console.error('Issue deleting a domain:', e);
                 message.destroy();
                 message.error({ content: `Failed to delete Domain!: An unknown error occurred.`, duration: 3 });
             });

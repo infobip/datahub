@@ -1,17 +1,18 @@
 import { SorterResult } from 'antd/lib/table/interface';
 import * as diff from 'diff';
 
+import { SchemaDiffSummary } from '@app/entityV2/dataset/profile/schema/components/SchemaVersionSummary';
+import { KEY_SCHEMA_PREFIX, UNION_TOKEN, VERSION_PREFIX } from '@app/entityV2/dataset/profile/schema/utils/constants';
+import { ExtendedSchemaFields } from '@app/entityV2/dataset/profile/schema/utils/types';
+import { convertTagsForUpdate } from '@app/shared/tags/utils/convertTagsForUpdate';
+
 import {
     EditableSchemaFieldInfo,
     EditableSchemaMetadata,
     EditableSchemaMetadataUpdate,
     PlatformSchema,
     SchemaField,
-} from '../../../../../../types.generated';
-import { convertTagsForUpdate } from '../../../../../shared/tags/utils/convertTagsForUpdate';
-import { SchemaDiffSummary } from '../components/SchemaVersionSummary';
-import { KEY_SCHEMA_PREFIX, UNION_TOKEN, VERSION_PREFIX } from './constants';
-import { ExtendedSchemaFields } from './types';
+} from '@types';
 
 export function convertEditableSchemaMeta(
     editableSchemaMeta?: Array<EditableSchemaFieldInfo>,
@@ -67,6 +68,10 @@ export function downgradeV2FieldPath(fieldPath?: string | null) {
 
 export function pathMatchesNewPath(fieldPathA?: string | null, fieldPathB?: string | null) {
     return fieldPathA === fieldPathB || fieldPathA === downgradeV2FieldPath(fieldPathB);
+}
+
+export function pathMatchesInsensitiveToV2(fieldPathA?: string | null, fieldPathB?: string | null) {
+    return fieldPathA === fieldPathB || downgradeV2FieldPath(fieldPathA) === downgradeV2FieldPath(fieldPathB);
 }
 
 // should use pathMatchesExact when rendering editable info so the user edits the correct field

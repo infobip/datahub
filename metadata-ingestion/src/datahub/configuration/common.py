@@ -1,20 +1,25 @@
+import dataclasses
 import re
 import unittest.mock
 from abc import ABC, abstractmethod
 from enum import auto
 from typing import (
     IO,
+    TYPE_CHECKING,
+    Annotated,
     Any,
     ClassVar,
     Dict,
     List,
     Optional,
     Type,
+    TypeVar,
     Union,
     runtime_checkable,
 )
 
 import pydantic
+import pydantic_core
 from cached_property import cached_property
 from pydantic import BaseModel, Extra, ValidationError
 from pydantic.fields import Field
@@ -33,10 +38,15 @@ REDACT_KEYS = {
 }
 REDACT_SUFFIXES = {
     "_password",
+    "-password",
     "_secret",
+    "-secret",
     "_token",
+    "-token",
     "_key",
+    "-key",
     "_key_id",
+    "-key-id",
 }
 
 
@@ -76,6 +86,29 @@ def redact_raw_config(obj: Any) -> Any:
         return [redact_raw_config(v) for v in obj]
     else:
         return obj
+
+
+if TYPE_CHECKING:
+    AnyType = TypeVar("AnyType")
+    HiddenFromDocs = Annotated[AnyType, ...]
+else:
+    HiddenFromDocs = pydantic.json_schema.SkipJsonSchema
+
+LaxStr = Annotated[str, pydantic.BeforeValidator(lambda v: str(v))]
+
+
+@dataclasses.dataclass(frozen=True)
+class SupportedSources:
+    sources: List[str]
+
+    def __get_pydantic_json_schema__(
+        self,
+        core_schema: pydantic_core.core_schema.CoreSchema,
+        handler: pydantic.GetJsonSchemaHandler,
+    ) -> pydantic.json_schema.JsonSchemaValue:
+        json_schema = handler(core_schema)
+        json_schema.setdefault("schema_extra", {})["supported_sources"] = self.sources
+        return json_schema
 
 
 class ConfigModel(BaseModel):
@@ -130,7 +163,7 @@ class PermissiveConfigModel(ConfigModel):
     # It is usually used for argument bags that are passed through to third-party libraries.
 
     class Config:
-        if PYDANTIC_VERSION_2:
+        if PYDANTIC_VERSION_2:  # noqa: SIM108
             extra = "allow"
         else:
             extra = Extra.allow
@@ -196,6 +229,14 @@ class ConfigurationError(MetaError):
 
 class IgnorableError(MetaError):
     """An error that can be ignored."""
+
+
+class TraceTimeoutError(OperationalError):
+    """Failure to complete an API Trace within the timeout."""
+
+
+class TraceValidationError(OperationalError):
+    """Failure to complete the expected write operation."""
 
 
 @runtime_checkable
@@ -309,7 +350,7 @@ class KeyValuePattern(ConfigModel):
         return KeyValuePattern()
 
     def value(self, string: str) -> List[str]:
-        matching_keys = [key for key in self.rules.keys() if re.match(key, string)]
+        matching_keys = [key for key in self.rules if re.match(key, string)]
         if not matching_keys:
             return []
         elif self.first_match_only:
@@ -321,4 +362,4 @@ class KeyValuePattern(ConfigModel):
 
 
 class VersionedConfig(ConfigModel):
-    version: str = "1"
+    version: LaxStr = "1"

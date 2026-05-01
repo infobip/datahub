@@ -1,12 +1,15 @@
+import { ReadOutlined } from '@ant-design/icons';
 import React from 'react';
 import styled from 'styled-components';
-import { ReadOutlined } from '@ant-design/icons';
-import { Message } from '../../shared/Message';
-import { useEntityRegistry } from '../../useEntityRegistry';
-import { EntityType } from '../../../types.generated';
-import useListDomains from '../useListDomains';
-import EmptyDomainsSection from '../EmptyDomainsSection';
-import EmptyDomainDescription from '../EmptyDomainDescription';
+
+import EmptyDomainDescription from '@app/domainV2/EmptyDomainDescription';
+import EmptyDomainsSection from '@app/domainV2/EmptyDomainsSection';
+import useScrollDomains from '@app/domainV2/useScrollDomains';
+import Loading from '@app/shared/Loading';
+import { Message } from '@app/shared/Message';
+import { useEntityRegistry } from '@app/useEntityRegistry';
+
+import { EntityType } from '@types';
 
 const DomainsWrapper = styled.div`
     overflow: auto;
@@ -26,18 +29,21 @@ const ResultWrapper = styled.div`
     border: 1px solid #ebecf0;
 `;
 
+const LoadingWrapper = styled.div`
+    padding: 16px;
+`;
+
 interface Props {
     setIsCreatingDomain: React.Dispatch<React.SetStateAction<boolean>>;
 }
 export default function RootDomains({ setIsCreatingDomain }: Props) {
     const entityRegistry = useEntityRegistry();
-    const { loading, error, data, sortedDomains } = useListDomains({});
+    const { domains, hasInitialized, loading, error, scrollRef } = useScrollDomains({});
 
     return (
         <>
-            {!data && loading && <Message type="loading" content="Loading domains..." />}
             {error && <Message type="error" content="Failed to load domains. An unexpected error occurred." />}
-            {!loading && (!data || !data?.listDomains?.domains?.length) && (
+            {hasInitialized && domains.length === 0 && (
                 <EmptyDomainsSection
                     icon={<ReadOutlined />}
                     title="Organize your data"
@@ -46,11 +52,17 @@ export default function RootDomains({ setIsCreatingDomain }: Props) {
                 />
             )}
             <DomainsWrapper>
-                {sortedDomains?.map((domain) => (
+                {domains?.map((domain) => (
                     <ResultWrapper key={domain.urn}>
                         {entityRegistry.renderSearchResult(EntityType.Domain, { entity: domain, matchedFields: [] })}
                     </ResultWrapper>
                 ))}
+                {loading && (
+                    <LoadingWrapper>
+                        <Loading height={24} marginTop={0} />
+                    </LoadingWrapper>
+                )}
+                {domains.length > 0 && <div ref={scrollRef} />}
             </DomainsWrapper>
         </>
     );

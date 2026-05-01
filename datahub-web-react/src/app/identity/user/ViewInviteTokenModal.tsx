@@ -1,16 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import * as QueryString from 'query-string';
-import { useLocation } from 'react-router';
 import { UserOutlined } from '@ant-design/icons';
-import { message, Modal, Select, Typography } from 'antd';
 import { Button, Tooltip } from '@components';
+import { Modal, Select, Typography, message } from 'antd';
+import * as QueryString from 'query-string';
+import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router';
 import styled from 'styled-components/macro';
-import { PageRoutes } from '../../../conf/Global';
-import { useGetInviteTokenQuery, useListRolesQuery } from '../../../graphql/role.generated';
-import { DataHubRole } from '../../../types.generated';
-import { mapRoleIcon } from './UserUtils';
-import { useCreateInviteTokenMutation } from '../../../graphql/mutations.generated';
-import analytics, { EventType } from '../../analytics';
+
+import analytics, { EventType } from '@app/analytics';
+import { mapRoleIcon } from '@app/identity/user/UserUtils';
+import { PageRoutes } from '@conf/Global';
+import { resolveRuntimePath } from '@utils/runtimeBasePath';
+
+import { useCreateInviteTokenMutation } from '@graphql/mutations.generated';
+import { useGetInviteTokenQuery, useListRolesQuery } from '@graphql/role.generated';
+import { DataHubRole } from '@types';
 
 const ModalSection = styled.div`
     display: flex;
@@ -142,7 +145,7 @@ export default function ViewInviteTokenModal({ open, onClose }: Props) {
             });
     };
 
-    const inviteLink = `${baseUrl}${PageRoutes.SIGN_UP}?invite_token=${inviteToken}`;
+    const inviteLink = `${baseUrl}${resolveRuntimePath(`${PageRoutes.SIGN_UP}?invite_token=${inviteToken}`)}`;
 
     return (
         <Modal

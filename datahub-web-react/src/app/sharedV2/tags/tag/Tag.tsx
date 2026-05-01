@@ -1,16 +1,18 @@
-import { message, Modal } from 'antd';
-import styled from 'styled-components';
+import { Modal, message } from 'antd';
 import React, { useState } from 'react';
 import Highlight from 'react-highlighter';
+import styled from 'styled-components';
+
+import { StyledTag } from '@app/entityV2/shared/components/styled/StyledTag';
+import { HoverEntityTooltip } from '@app/recommendations/renderer/component/HoverEntityTooltip';
+import { useHasMatchedFieldByUrn } from '@app/search/context/SearchResultContext';
+import { TagProfileDrawer } from '@app/shared/tags/TagProfileDrawer';
+import { useEntityRegistry } from '@app/useEntityRegistry';
 import { useIsEmbeddedProfile } from '@src/app/shared/useEmbeddedProfileLinkProps';
-import { useRemoveTagMutation } from '../../../../graphql/mutations.generated';
-import { EntityType, SubResourceType, TagAssociation } from '../../../../types.generated';
-import { StyledTag } from '../../../entityV2/shared/components/styled/StyledTag';
-import { HoverEntityTooltip } from '../../../recommendations/renderer/component/HoverEntityTooltip';
-import { useEntityRegistry } from '../../../useEntityRegistry';
-import { TagProfileDrawer } from '../../../shared/tags/TagProfileDrawer';
-import { useHasMatchedFieldByUrn } from '../../../search/context/SearchResultContext';
-import LabelPropagationDetails from '../../propagation/LabelPropagationDetails';
+import { resolveRuntimePath } from '@utils/runtimeBasePath';
+
+import { useRemoveTagMutation } from '@graphql/mutations.generated';
+import { EntityType, SubResourceType, TagAssociation } from '@types';
 
 const TagLink = styled.span<{ $showOneAndCount?: boolean; $shouldNotAddBottomMargin?: boolean }>`
     display: flex;
@@ -85,6 +87,7 @@ export default function Tag({
     const [tagProfileDrawerVisible, setTagProfileDrawerVisible] = useState(false);
     const [addTagUrn, setAddTagUrn] = useState('');
     const displayName = entityRegistry.getDisplayName(EntityType.Tag, tag.tag);
+    const previewContext = { propagationDetails: { context, attribution: tag.attribution } };
 
     const showTagProfileDrawer = (urn: string) => {
         if (!readOnly) {
@@ -136,7 +139,7 @@ export default function Tag({
 
     return (
         <>
-            <HoverEntityTooltip entity={tag.tag} width={250}>
+            <HoverEntityTooltip entity={tag.tag} width={250} previewContext={previewContext}>
                 <TagLink
                     data-testid={`tag-${displayName}`}
                     $showOneAndCount={showOneAndCount}
@@ -145,7 +148,10 @@ export default function Tag({
                     <StyledTag
                         onClick={() => {
                             if (isEmbeddedProfile) {
-                                window.open(entityRegistry.getEntityUrl(EntityType.Tag, tag.tag.urn), '_blank');
+                                window.open(
+                                    resolveRuntimePath(entityRegistry.getEntityUrl(EntityType.Tag, tag.tag.urn)),
+                                    '_blank',
+                                );
                             } else if (!options?.shouldNotOpenDrawerOnClick) {
                                 showTagProfileDrawer(tag?.tag?.urn);
                             }
@@ -177,7 +183,6 @@ export default function Tag({
                                 </DisplayNameContainer>
                             )}
                         </Highlight>
-                        <LabelPropagationDetails entityType={EntityType.Tag} context={context} />
                     </StyledTag>
                 </TagLink>
             </HoverEntityTooltip>

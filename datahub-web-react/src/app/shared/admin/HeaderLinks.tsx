@@ -1,25 +1,26 @@
-import styled from 'styled-components/macro';
-import * as React from 'react';
 import {
     ApiOutlined,
     BarChartOutlined,
     BookOutlined,
     CommentOutlined,
-    SettingOutlined,
-    SolutionOutlined,
     DownOutlined,
     GlobalOutlined,
+    SettingOutlined,
+    SolutionOutlined,
     UnorderedListOutlined,
 } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
 import { Button, Dropdown, Tooltip } from 'antd';
-import { useAppConfig, useBusinessAttributesFlag } from '../../useAppConfig';
-import { ANTD_GRAY } from '../../entity/shared/constants';
-import { HOME_PAGE_INGESTION_ID } from '../../onboarding/config/HomePageOnboardingConfig';
-import { useToggleEducationStepIdsAllowList } from '../../onboarding/useToggleEducationStepIdsAllowList';
-import { PageRoutes } from '../../../conf/Global';
-import { useUserContext } from '../../context/useUserContext';
-import DomainIcon from '../../domain/DomainIcon';
+import * as React from 'react';
+import { Link } from 'react-router-dom';
+import styled from 'styled-components/macro';
+
+import { useUserContext } from '@app/context/useUserContext';
+import DomainIcon from '@app/domain/DomainIcon';
+import { ANTD_GRAY } from '@app/entity/shared/constants';
+import { HOME_PAGE_INGESTION_ID } from '@app/onboarding/config/HomePageOnboardingConfig';
+import { useToggleEducationStepIdsAllowList } from '@app/onboarding/useToggleEducationStepIdsAllowList';
+import { useAppConfig, useBusinessAttributesFlag } from '@app/useAppConfig';
+import { PageRoutes } from '@conf/Global';
 
 const LinkWrapper = styled.span`
     margin-right: 0px;
@@ -176,13 +177,6 @@ export function HeaderLinks(props: Props) {
                     </Button>
                 </LinkWrapper>
             </Dropdown>
-            <LinkWrapper>
-                <Link to={{ pathname: 'https://jira.infobip.com/ideas' }} target="_blank">
-                    <Button type="text">
-                        <CommentOutlined /> Feedback
-                    </Button>
-                </Link>
-            </LinkWrapper>
             {showIngestion && (
                 <LinkWrapper>
                     <Link to="/ingestion">
@@ -197,6 +191,14 @@ export function HeaderLinks(props: Props) {
                     </Link>
                 </LinkWrapper>
             )}
+            <LinkWrapper>
+
+                <a href="https://jira.infobip.com/ideas" target="_blank" rel="noopener noreferrer">
+                    <Button type="text">
+                        <CommentOutlined /> Feedback
+                    </Button>
+                </a>
+            </LinkWrapper>
             {showSettings && (
                 <LinkWrapper style={{ marginRight: 12 }}>
                     <Link to="/settings">

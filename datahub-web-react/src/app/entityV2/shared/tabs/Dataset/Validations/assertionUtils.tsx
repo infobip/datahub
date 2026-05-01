@@ -1,6 +1,13 @@
-import React from 'react';
-import QueryString from 'query-string';
 import { CheckCircleOutlined, CloseCircleOutlined, ExclamationCircleOutlined, StopOutlined } from '@ant-design/icons';
+import { Location } from 'history';
+import QueryString from 'query-string';
+import React from 'react';
+
+import { ERROR_COLOR_HEX, FAILURE_COLOR_HEX, SUCCESS_COLOR_HEX } from '@components/theme/foundations/colors';
+
+// TODO
+import { ANTD_GRAY } from '@app/entityV2/shared/constants';
+
 import {
     AssertionResult,
     AssertionResultErrorType,
@@ -8,15 +15,16 @@ import {
     AssertionStdParameter,
     AssertionStdParameterType,
     DatasetAssertionInfo,
-    StringMapEntry,
     Maybe,
-} from '../../../../../../types.generated';
-import AssertionSuccessIcon from '../../../../../../images/assertion_v2_success_dot.svg?react';
-import AssertionFailureIcon from '../../../../../../images/assertion_v2_failure_dot.svg?react';
-import AssertionErrorIcon from '../../../../../../images/assertion_error_dot.svg?react';
-import AssertionInitIcon from '../../../../../../images/assertion_init_dot.svg?react'; // TODO
-import AssertionNoResultsIcon from '../../../../../../images/assertion_no_results_dot.svg?react'; // TODO
-import { ANTD_GRAY } from '../../../constants';
+    StringMapEntry,
+} from '@types';
+
+import AssertionErrorIcon from '@images/assertion_error_dot.svg?react';
+import AssertionInitIcon from '@images/assertion_init_dot.svg?react';
+// TODO
+import AssertionNoResultsIcon from '@images/assertion_no_results_dot.svg?react';
+import AssertionFailureIcon from '@images/assertion_v2_failure_dot.svg?react';
+import AssertionSuccessIcon from '@images/assertion_v2_success_dot.svg?react';
 
 /**
  * Utility methods
@@ -52,9 +60,6 @@ export const getResultText = (result: AssertionResultType) => {
 /**
  * Returns the display color associated with an AssertionResultType
  */
-const SUCCESS_COLOR_HEX = '#4db31b';
-const FAILURE_COLOR_HEX = '#F5222D';
-const ERROR_COLOR_HEX = '#FAAD14';
 const INIT_COLOR_HEX = '#2F54EB';
 const NO_RESULTS_COLOR_HEX = ANTD_GRAY[8];
 
@@ -168,7 +173,7 @@ export const validateAssertionsHasInputFields = (info: DatasetAssertionInfo) => 
     throw new Error('Failed to find field path(s) for column assertion.');
 };
 
-export const getQueryParams = (param: string, location: any): string | null => {
+export const getQueryParams = (param: string, location: Location): string | null => {
     const params = QueryString.parse(location.search);
     return params[param] ? String(params[param]) : null;
 };

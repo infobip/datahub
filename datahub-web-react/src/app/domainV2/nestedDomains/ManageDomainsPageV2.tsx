@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { useShowNavBarRedesign } from '@src/app/useShowNavBarRedesign';
-import { Button } from '@src/alchemy-components';
+import { useHistory, useLocation } from 'react-router-dom';
 import styled from 'styled-components/macro';
+
+import CreateDomainModal from '@app/domainV2/CreateDomainModal';
+import { useDomainsContext as useDomainsContextV2 } from '@app/domainV2/DomainsContext';
+import RootDomains from '@app/domainV2/nestedDomains/RootDomains';
+import { OnboardingTour } from '@app/onboarding/OnboardingTour';
+import { DOMAINS_CREATE_DOMAIN_ID, DOMAINS_INTRO_ID } from '@app/onboarding/config/DomainsOnboardingConfig';
+import { Button } from '@src/alchemy-components';
 import { PageTitle } from '@src/alchemy-components/components/PageTitle';
-import { useApolloClient } from '@apollo/client';
-import RootDomains from './RootDomains';
-import { DOMAINS_CREATE_DOMAIN_ID, DOMAINS_INTRO_ID } from '../../onboarding/config/DomainsOnboardingConfig';
-import { OnboardingTour } from '../../onboarding/OnboardingTour';
-import CreateDomainModal from '../CreateDomainModal';
-import { updateListDomainsCache } from '../utils';
-import { useDomainsContext as useDomainsContextV2 } from '../DomainsContext';
+import { useShowNavBarRedesign } from '@src/app/useShowNavBarRedesign';
 
 const PageWrapper = styled.div<{ $isShowNavBarRedesign?: boolean }>`
     background-color: #ffffff;
@@ -33,12 +33,23 @@ const Header = styled.div`
 export default function ManageDomainsPageV2() {
     const { setEntityData } = useDomainsContextV2();
     const [isCreatingDomain, setIsCreatingDomain] = useState(false);
-    const client = useApolloClient();
     const isShowNavBarRedesign = useShowNavBarRedesign();
+    const location = useLocation();
+    const history = useHistory();
 
     useEffect(() => {
         setEntityData(null);
     }, [setEntityData]);
+
+    useEffect(() => {
+        const searchParams = new URLSearchParams(location.search);
+        const shouldCreate = searchParams.get('create') === 'true';
+        if (shouldCreate) {
+            setIsCreatingDomain(true);
+            searchParams.delete('create');
+            history.replace(`${location.pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`);
+        }
+    }, [location.search, location.pathname, history]);
 
     return (
         <PageWrapper $isShowNavBarRedesign={isShowNavBarRedesign}>
@@ -49,20 +60,13 @@ export default function ManageDomainsPageV2() {
                     id={DOMAINS_CREATE_DOMAIN_ID}
                     onClick={() => setIsCreatingDomain(true)}
                     data-testid="domains-new-domain-button"
-                    icon="Add"
+                    icon={{ icon: 'Add', source: 'material' }}
                 >
                     Create
                 </Button>
             </Header>
             <RootDomains setIsCreatingDomain={setIsCreatingDomain} />
-            {isCreatingDomain && (
-                <CreateDomainModal
-                    onClose={() => setIsCreatingDomain(false)}
-                    onCreate={(urn, id, name, description, parentDomain) =>
-                        updateListDomainsCache(client, urn, id, name, description, parentDomain)
-                    }
-                />
-            )}
+            {isCreatingDomain && <CreateDomainModal onClose={() => setIsCreatingDomain(false)} />}
         </PageWrapper>
     );
 }

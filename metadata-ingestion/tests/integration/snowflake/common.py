@@ -1,11 +1,11 @@
 import json
 import random
 from datetime import datetime, timezone
-from unittest.mock import MagicMock
 
 from datahub.configuration.common import AllowDenyPattern
 from datahub.configuration.time_window_config import BucketDuration
 from datahub.ingestion.source.snowflake import snowflake_query
+from datahub.ingestion.source.snowflake.snowflake_queries import QueryLogQueryBuilder
 from datahub.ingestion.source.snowflake.snowflake_query import SnowflakeQuery
 from datahub.utilities.prefix_batch_builder import PrefixGroup
 
@@ -173,6 +173,29 @@ large_sql_query = """WITH object_access_history AS
                                                """
 
 
+class RowCountList(list):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @property
+    def rowcount(self):
+        return len(self)
+
+
+def inject_rowcount(func):
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        if result is None or isinstance(result, RowCountList):
+            return result
+        if not isinstance(result, list):
+            raise ValueError(f"Mocked result is not a list: {result}")
+        result = RowCountList(result)
+        return result
+
+    return wrapper
+
+
+@inject_rowcount
 def default_query_results(  # noqa: C901
     query,
     num_tables=NUM_TABLES,
@@ -182,6 +205,8 @@ def default_query_results(  # noqa: C901
     num_ops=NUM_OPS,
     num_usages=NUM_USAGE,
 ):
+    if query == SnowflakeQuery.get_all_users():
+        return []
     if query == SnowflakeQuery.current_account():
         return [{"CURRENT_ACCOUNT()": "ABC12345"}]
     if query == SnowflakeQuery.current_region():
@@ -192,12 +217,20 @@ def default_query_results(  # noqa: C901
         return [{"CURRENT_ROLE()": "TEST_ROLE"}]
     elif query == SnowflakeQuery.current_version():
         return [{"CURRENT_VERSION()": "X.Y.Z"}]
-    elif query == SnowflakeQuery.current_database():
-        return [{"CURRENT_DATABASE()": "TEST_DB"}]
-    elif query == SnowflakeQuery.current_schema():
-        return [{"CURRENT_SCHEMA()": "TEST_SCHEMA"}]
     elif query == SnowflakeQuery.current_warehouse():
         return [{"CURRENT_WAREHOUSE()": "TEST_WAREHOUSE"}]
+    elif (
+        query
+        == QueryLogQueryBuilder(
+            start_time=datetime(year=2022, month=6, day=6, tzinfo=timezone.utc),
+            end_time=datetime(
+                year=2022, month=6, day=7, hour=7, minute=17, tzinfo=timezone.utc
+            ),
+            bucket_duration=BucketDuration.DAY,
+            deny_usernames=None,  # type: ignore[arg-type]
+        ).build_enriched_query_log_query()
+    ):
+        return []
     elif query == SnowflakeQuery.show_databases():
         return [
             {
@@ -479,8 +512,7 @@ def default_query_results(  # noqa: C901
             email_filter=AllowDenyPattern.allow_all(),
         )
     ):
-        mock = MagicMock()
-        mock.__iter__.return_value = [
+        return [
             {
                 "OBJECT_NAME": f"TEST_DB.TEST_SCHEMA.TABLE_{i}{random.randint(99, 999) if i > num_tables else ''}",
                 "BUCKET_START_TIME": datetime(2022, 6, 6, 0, 0, 0, 0).replace(
@@ -502,7 +534,6 @@ def default_query_results(  # noqa: C901
             }
             for i in range(num_usages)
         ]
-        return mock
     elif query in (
         snowflake_query.SnowflakeQuery.table_to_table_lineage_history_v2(
             start_time_millis=1654473600000,
@@ -628,8 +659,11 @@ def default_query_results(  # noqa: C901
                         {
                             "query_text": f"INSERT INTO TEST_DB.TEST_SCHEMA.TABLE_{op_idx} SELECT * FROM TEST_DB.TEST_SCHEMA.TABLE_2",
                             "query_id": f"01b2576e-0804-4957-0034-7d83066cd0ee{op_idx}",
-                            "start_time": datetime(2022, 6, 6, 0, 0, 0, 0).replace(
-                                tzinfo=timezone.utc
+                            "start_time": (
+                                datetime(2022, 6, 6, 0, 0, 0, 0)
+                                .replace(tzinfo=timezone.utc)
+                                .date()
+                                .isoformat()
                             ),
                         }
                     ]
@@ -638,37 +672,6 @@ def default_query_results(  # noqa: C901
             for op_idx in range(1, num_ops + 1)
         ]
     elif query in [
-        snowflake_query.SnowflakeQuery.view_dependencies(),
-    ]:
-        return [
-            {
-                "REFERENCED_OBJECT_DOMAIN": "table",
-                "REFERENCING_OBJECT_DOMAIN": "view",
-                "DOWNSTREAM_VIEW": "TEST_DB.TEST_SCHEMA.VIEW_2",
-                "VIEW_UPSTREAM": "TEST_DB.TEST_SCHEMA.TABLE_2",
-            }
-        ]
-    elif query in [
-        snowflake_query.SnowflakeQuery.view_dependencies_v2(),
-    ]:
-        # VIEW_2 has dependency on TABLE_2
-        return [
-            {
-                "DOWNSTREAM_TABLE_NAME": "TEST_DB.TEST_SCHEMA.VIEW_2",
-                "DOWNSTREAM_TABLE_DOMAIN": "view",
-                "UPSTREAM_TABLES": json.dumps(
-                    [
-                        {
-                            "upstream_object_name": "TEST_DB.TEST_SCHEMA.TABLE_2",
-                            "upstream_object_domain": "table",
-                        }
-                    ]
-                ),
-            }
-        ]
-    elif query in [
-        snowflake_query.SnowflakeQuery.view_dependencies_v2(),
-        snowflake_query.SnowflakeQuery.view_dependencies(),
         snowflake_query.SnowflakeQuery.show_external_tables(),
         snowflake_query.SnowflakeQuery.copy_lineage_history(
             start_time_millis=1654473600000, end_time_millis=1654621200000
@@ -753,5 +756,55 @@ def default_query_results(  # noqa: C901
                 "COLUMN_NAME": None,
                 "DOMAIN": "DATABASE",
             },
+        ]
+    elif query == SnowflakeQuery.procedures_for_database("TEST_DB"):
+        return [
+            {
+                "PROCEDURE_CATALOG": "TEST_DB",
+                "PROCEDURE_SCHEMA": "TEST_SCHEMA",
+                "PROCEDURE_NAME": "my_procedure",
+                "PROCEDURE_LANGUAGE": "SQL",
+                "ARGUMENT_SIGNATURE": "(arg1 VARCHAR, arg2 VARCHAR)",
+                "PROCEDURE_RETURN_TYPE": "VARCHAR",
+                "PROCEDURE_DEFINITION": "BEGIN RETURN 'Hello World'; END",
+                "CREATED": "2021-01-01T00:00:00.000Z",
+                "LAST_ALTERED": "2021-01-01T00:00:00.000Z",
+                "COMMENT": "This is a test procedure",
+            },
+            {
+                "PROCEDURE_CATALOG": "TEST_DB",
+                "PROCEDURE_SCHEMA": "TEST_SCHEMA",
+                "PROCEDURE_NAME": "my_procedure",
+                "PROCEDURE_LANGUAGE": "SQL",
+                "ARGUMENT_SIGNATURE": "(arg1 VARCHAR)",
+                "PROCEDURE_RETURN_TYPE": "VARCHAR",
+                "PROCEDURE_DEFINITION": "BEGIN RETURN 'Hello World'; END",
+                "CREATED": "2021-01-01T00:00:00.000Z",
+                "LAST_ALTERED": "2021-01-01T00:00:00.000Z",
+                "COMMENT": "This is a test procedure 2",
+            },
+        ]
+    elif query == SnowflakeQuery.get_dynamic_table_graph_history("TEST_DB"):
+        # Return empty result for dynamic table graph history in test environment
+        return []
+    elif query == SnowflakeQuery.show_dynamic_tables_for_database("TEST_DB"):
+        # Return dynamic table definitions for TABLE_2 which should be a dynamic table
+        return [
+            {
+                "created_on": datetime(2021, 6, 8, 0, 0, 0, 0),
+                "name": "TABLE_2",
+                "database_name": "TEST_DB",
+                "schema_name": "TEST_SCHEMA",
+                "owner": "ACCOUNTADMIN",
+                "comment": "Comment for Table",
+                "text": "CREATE DYNAMIC TABLE TEST_DB.TEST_SCHEMA.TABLE_2 TARGET_LAG = '1 HOUR' AS SELECT * FROM TEST_DB.TEST_SCHEMA.TABLE_1",
+                "target_lag": "1 HOUR",
+                "warehouse": "TEST_WAREHOUSE",
+                "refresh_mode": "AUTO",
+                "refresh_mode_reason": "DYNAMIC_TABLE_CONFIG",
+                "data_timestamp": datetime(2021, 6, 8, 0, 0, 0, 0),
+                "scheduling_state": "RUNNING",
+                "owner_role_type": "ROLE",
+            }
         ]
     raise ValueError(f"Unexpected query: {query}")

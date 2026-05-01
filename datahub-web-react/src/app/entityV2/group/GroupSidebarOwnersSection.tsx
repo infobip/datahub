@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
-import GroupOwnerSidebarSectionContent from './GroupOwnerSidebarSectionContent';
-import SectionActionButton from '../shared/containers/profile/sidebar/SectionActionButton';
-import { SidebarSection } from '../shared/containers/profile/sidebar/SidebarSection';
-import { Ownership } from '../../../types.generated';
+import React, { useState } from 'react';
+
+import GroupOwnerSidebarSectionContent from '@app/entityV2/group/GroupOwnerSidebarSectionContent';
+import SectionActionButton from '@app/entityV2/shared/containers/profile/sidebar/SectionActionButton';
+import { SidebarSection } from '@app/entityV2/shared/containers/profile/sidebar/SidebarSection';
+
+import { Ownership } from '@types';
 
 type Props = {
     ownership: Ownership;
@@ -29,7 +31,7 @@ export const GroupSidebarOwnersSection = ({ ownership, refetch, urn }: Props) =>
             }
             extra={
                 <SectionActionButton
-                    button={<PlusOutlined />}
+                    button={<PlusOutlined data-testid="add-owners-sidebar-button" />}
                     onClick={(event) => {
                         setShowAddOwnerModal(true);
                         event.stopPropagation();

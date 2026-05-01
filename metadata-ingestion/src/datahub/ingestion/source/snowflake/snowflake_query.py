@@ -8,7 +8,7 @@ from datahub.ingestion.source.snowflake.snowflake_config import (
 )
 from datahub.utilities.prefix_batch_builder import PrefixGroup
 
-SHOW_VIEWS_MAX_PAGE_SIZE = 10000
+SHOW_COMMAND_MAX_PAGE_SIZE = 10000
 SHOW_STREAM_MAX_PAGE_SIZE = 10000
 
 
@@ -38,17 +38,21 @@ class SnowflakeQuery:
         SnowflakeObjectDomain.MATERIALIZED_VIEW.capitalize(),
         SnowflakeObjectDomain.ICEBERG_TABLE.capitalize(),
         SnowflakeObjectDomain.STREAM.capitalize(),
+        SnowflakeObjectDomain.DYNAMIC_TABLE.capitalize(),
     }
 
     ACCESS_HISTORY_TABLE_VIEW_DOMAINS_FILTER = "({})".format(
         ",".join(f"'{domain}'" for domain in ACCESS_HISTORY_TABLE_VIEW_DOMAINS)
     )
-    ACCESS_HISTORY_TABLE_DOMAINS_FILTER = (
-        "("
-        f"'{SnowflakeObjectDomain.TABLE.capitalize()}',"
-        f"'{SnowflakeObjectDomain.VIEW.capitalize()}',"
-        f"'{SnowflakeObjectDomain.STREAM.capitalize()}',"
-        ")"
+
+    # Domains that can be downstream tables in lineage
+    DOWNSTREAM_TABLE_DOMAINS = {
+        SnowflakeObjectDomain.TABLE.capitalize(),
+        SnowflakeObjectDomain.DYNAMIC_TABLE.capitalize(),
+    }
+
+    DOWNSTREAM_TABLE_DOMAINS_FILTER = "({})".format(
+        ",".join(f"'{domain}'" for domain in DOWNSTREAM_TABLE_DOMAINS)
     )
 
     @staticmethod
@@ -70,14 +74,6 @@ class SnowflakeQuery:
     @staticmethod
     def current_warehouse() -> str:
         return "select CURRENT_WAREHOUSE()"
-
-    @staticmethod
-    def current_database() -> str:
-        return "select CURRENT_DATABASE()"
-
-    @staticmethod
-    def current_schema() -> str:
-        return "select CURRENT_SCHEMA()"
 
     @staticmethod
     def show_databases() -> str:
@@ -107,8 +103,8 @@ class SnowflakeQuery:
         order by database_name"""
 
     @staticmethod
-    def schemas_for_database(db_name: Optional[str]) -> str:
-        db_clause = f'"{db_name}".' if db_name is not None else ""
+    def schemas_for_database(db_name: str) -> str:
+        db_clause = f'"{db_name}".'
         return f"""
         SELECT schema_name AS "SCHEMA_NAME",
         created AS "CREATED",
@@ -119,8 +115,8 @@ class SnowflakeQuery:
         order by schema_name"""
 
     @staticmethod
-    def tables_for_database(db_name: Optional[str]) -> str:
-        db_clause = f'"{db_name}".' if db_name is not None else ""
+    def tables_for_database(db_name: str) -> str:
+        db_clause = f'"{db_name}".'
         return f"""
         SELECT table_catalog AS "TABLE_CATALOG",
         table_schema AS "TABLE_SCHEMA",
@@ -142,8 +138,8 @@ class SnowflakeQuery:
         order by table_schema, table_name"""
 
     @staticmethod
-    def tables_for_schema(schema_name: str, db_name: Optional[str]) -> str:
-        db_clause = f'"{db_name}".' if db_name is not None else ""
+    def tables_for_schema(schema_name: str, db_name: str) -> str:
+        db_clause = f'"{db_name}".'
         return f"""
         SELECT table_catalog AS "TABLE_CATALOG",
         table_schema AS "TABLE_SCHEMA",
@@ -163,6 +159,23 @@ class SnowflakeQuery:
         where table_schema='{schema_name}'
         and table_type in ('BASE TABLE', 'EXTERNAL TABLE')
         order by table_schema, table_name"""
+
+    @staticmethod
+    def procedures_for_database(db_name: str) -> str:
+        db_clause = f'"{db_name}".'
+        return f"""
+        SELECT procedure_catalog AS "PROCEDURE_CATALOG",
+        procedure_schema AS "PROCEDURE_SCHEMA",
+        procedure_name AS "PROCEDURE_NAME",
+        procedure_language AS "PROCEDURE_LANGUAGE",
+        argument_signature AS "ARGUMENT_SIGNATURE",
+        data_type AS "PROCEDURE_RETURN_TYPE",
+        procedure_definition AS "PROCEDURE_DEFINITION",
+        created AS "CREATED",
+        last_altered AS "LAST_ALTERED",
+        comment AS "COMMENT"
+        FROM {db_clause}information_schema.procedures
+        order by procedure_schema, procedure_name"""
 
     @staticmethod
     def get_all_tags():
@@ -233,7 +246,7 @@ class SnowflakeQuery:
     @staticmethod
     def show_views_for_database(
         db_name: str,
-        limit: int = SHOW_VIEWS_MAX_PAGE_SIZE,
+        limit: int = SHOW_COMMAND_MAX_PAGE_SIZE,
         view_pagination_marker: Optional[str] = None,
     ) -> str:
         # While there is an information_schema.views view, that only shows the view definition if the role
@@ -242,7 +255,7 @@ class SnowflakeQuery:
 
         # SHOW VIEWS can return a maximum of 10000 rows.
         # https://docs.snowflake.com/en/sql-reference/sql/show-views#usage-notes
-        assert limit <= SHOW_VIEWS_MAX_PAGE_SIZE
+        assert limit <= SHOW_COMMAND_MAX_PAGE_SIZE
 
         # To work around this, we paginate through the results using the FROM clause.
         from_clause = (
@@ -251,6 +264,33 @@ class SnowflakeQuery:
         return f"""\
 SHOW VIEWS IN DATABASE "{db_name}"
 LIMIT {limit} {from_clause};
+"""
+
+    @staticmethod
+    def get_views_for_database(db_name: str) -> str:
+        # We've seen some issues with the `SHOW VIEWS` query,
+        # particularly when it requires pagination.
+        # This is an experimental alternative query that might be more reliable.
+        return f"""\
+SELECT
+  TABLE_CATALOG as "VIEW_CATALOG",
+  TABLE_SCHEMA as "VIEW_SCHEMA",
+  TABLE_NAME as "VIEW_NAME",
+  COMMENT,
+  VIEW_DEFINITION,
+  CREATED,
+  LAST_ALTERED,
+  IS_SECURE
+FROM "{db_name}".information_schema.views
+WHERE TABLE_CATALOG = '{db_name}'
+  AND TABLE_SCHEMA != 'INFORMATION_SCHEMA'
+"""
+
+    @staticmethod
+    def get_views_for_schema(db_name: str, schema_name: str) -> str:
+        return f"""\
+{SnowflakeQuery.get_views_for_database(db_name).rstrip()}
+  AND TABLE_SCHEMA = '{schema_name}'
 """
 
     @staticmethod
@@ -365,26 +405,6 @@ WHERE table_schema='{schema_name}' AND {extra_clause}"""
         ORDER BY query_start_time DESC
         ;"""
 
-    @staticmethod
-    def view_dependencies() -> str:
-        return """
-        SELECT
-          concat(
-            referenced_database, '.', referenced_schema,
-            '.', referenced_object_name
-          ) AS "VIEW_UPSTREAM",
-          referenced_object_domain as "REFERENCED_OBJECT_DOMAIN",
-          concat(
-            referencing_database, '.', referencing_schema,
-            '.', referencing_object_name
-          ) AS "DOWNSTREAM_VIEW",
-          referencing_object_domain AS "REFERENCING_OBJECT_DOMAIN"
-        FROM
-          snowflake.account_usage.object_dependencies
-        WHERE
-          referencing_object_domain in ('VIEW', 'MATERIALIZED VIEW')
-        """
-
     # Note on use of `upstreams_deny_pattern` to ignore temporary tables:
     # Snowflake access history may include temporary tables in DIRECT_OBJECTS_ACCESSED and
     # OBJECTS_MODIFIED->columns->directSources. We do not need these temporary tables and filter these in the query.
@@ -407,32 +427,6 @@ WHERE table_schema='{schema_name}' AND {extra_clause}"""
                 end_time_millis,
                 upstreams_deny_pattern,
             )
-
-    @staticmethod
-    def view_dependencies_v2() -> str:
-        return """
-        SELECT
-            ARRAY_UNIQUE_AGG(
-                OBJECT_CONSTRUCT(
-                    'upstream_object_name', concat(
-                                    referenced_database, '.', referenced_schema,
-                                    '.', referenced_object_name
-                                ),
-                    'upstream_object_domain', referenced_object_domain
-                )
-                ) as "UPSTREAM_TABLES",
-          concat(
-            referencing_database, '.', referencing_schema,
-            '.', referencing_object_name
-          ) AS "DOWNSTREAM_TABLE_NAME",
-          ANY_VALUE(referencing_object_domain) AS "DOWNSTREAM_TABLE_DOMAIN"
-        FROM
-          snowflake.account_usage.object_dependencies
-        WHERE
-          referencing_object_domain in ('VIEW', 'MATERIALIZED VIEW')
-        GROUP BY
-            DOWNSTREAM_TABLE_NAME
-        """
 
     @staticmethod
     def show_external_tables() -> str:
@@ -730,7 +724,7 @@ WHERE table_schema='{schema_name}' AND {extra_clause}"""
                 AND t.query_start_time >= to_timestamp_ltz({start_time_millis}, 3)
                 AND t.query_start_time < to_timestamp_ltz({end_time_millis}, 3)
                 AND upstream_table_domain in {allowed_upstream_table_domains}
-                AND downstream_table_domain = '{SnowflakeObjectDomain.TABLE.capitalize()}'
+                AND downstream_table_domain in {SnowflakeQuery.DOWNSTREAM_TABLE_DOMAINS_FILTER}
                 {("AND " + upstream_sql_filter) if upstream_sql_filter else ""}
             ),
         column_upstream_jobs AS (
@@ -887,7 +881,7 @@ WHERE table_schema='{schema_name}' AND {extra_clause}"""
                 AND t.query_start_time >= to_timestamp_ltz({start_time_millis}, 3)
                 AND t.query_start_time < to_timestamp_ltz({end_time_millis}, 3)
                 AND upstream_table_domain in {allowed_upstream_table_domains}
-                AND downstream_table_domain = '{SnowflakeObjectDomain.TABLE.capitalize()}'
+                AND downstream_table_domain in {SnowflakeQuery.DOWNSTREAM_TABLE_DOMAINS_FILTER}
                 {("AND " + upstream_sql_filter) if upstream_sql_filter else ""}
             ),
         table_upstream_jobs_unique AS (
@@ -983,4 +977,38 @@ WHERE table_schema='{schema_name}' AND {extra_clause}"""
         from_clause = (
             f"""FROM '{stream_pagination_marker}'""" if stream_pagination_marker else ""
         )
-        return f"""SHOW STREAMS IN DATABASE {db_name} LIMIT {limit} {from_clause};"""
+        return f"""SHOW STREAMS IN DATABASE "{db_name}" LIMIT {limit} {from_clause};"""
+
+    @staticmethod
+    def show_dynamic_tables_for_database(
+        db_name: str,
+        limit: int = SHOW_COMMAND_MAX_PAGE_SIZE,
+        dynamic_table_pagination_marker: Optional[str] = None,
+    ) -> str:
+        """Get dynamic table definitions using SHOW DYNAMIC TABLES."""
+        assert limit <= SHOW_COMMAND_MAX_PAGE_SIZE
+
+        from_clause = (
+            f"""FROM '{dynamic_table_pagination_marker}'"""
+            if dynamic_table_pagination_marker
+            else ""
+        )
+        return f"""\
+    SHOW DYNAMIC TABLES IN DATABASE "{db_name}"
+    LIMIT {limit} {from_clause};
+    """
+
+    @staticmethod
+    def get_dynamic_table_graph_history(db_name: str) -> str:
+        """Get dynamic table dependency information from information schema."""
+        return f"""
+            SELECT   
+                name,
+                inputs,
+                target_lag_type,
+                target_lag_sec,
+                scheduling_state,
+                alter_trigger
+            FROM TABLE("{db_name}".INFORMATION_SCHEMA.DYNAMIC_TABLE_GRAPH_HISTORY())
+            ORDER BY name
+        """

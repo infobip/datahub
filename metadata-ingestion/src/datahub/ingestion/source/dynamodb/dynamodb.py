@@ -12,7 +12,7 @@ from typing import (
     Union,
 )
 
-from pydantic.fields import Field
+from pydantic import Field, PositiveInt
 
 from datahub.configuration.common import AllowDenyPattern
 from datahub.configuration.source_common import DatasetSourceConfigMixin
@@ -73,7 +73,6 @@ from datahub.utilities.registries.domain_registry import DomainRegistry
 
 MAX_ITEMS_TO_RETRIEVE = 100
 PAGE_SIZE = 100
-MAX_SCHEMA_SIZE = 300
 MAX_PRIMARY_KEYS_SIZE = 100
 FIELD_DELIMITER = "."
 
@@ -105,6 +104,10 @@ class DynamoDBConfig(
         default=None,
         description="[Advanced] The primary keys of items of a table in dynamodb format the user would like to include in schema. "
         'Refer "Advanced Configurations" section for more details',
+    )
+
+    max_schema_size: PositiveInt = Field(
+        default=300, description="Maximum number of fields to include in the schema."
     )
 
     table_pattern: AllowDenyPattern = Field(
@@ -246,6 +249,7 @@ class DynamoDBSource(StatefulIngestionSourceBase):
             platform=self.platform,
             platform_instance=platform_instance,
             name=dataset_name,
+            env=self.config.env,
         )
         dataset_properties = DatasetPropertiesClass(
             name=table_name,
@@ -361,7 +365,7 @@ class DynamoDBSource(StatefulIngestionSourceBase):
         if self.config.include_table_item is None:
             return
         dataset_name = f"{region}.{table_name}"
-        if dataset_name not in self.config.include_table_item.keys():
+        if dataset_name not in self.config.include_table_item:
             return
         primary_key_list = self.config.include_table_item.get(dataset_name)
         assert isinstance(primary_key_list, List)
@@ -454,51 +458,53 @@ class DynamoDBSource(StatefulIngestionSourceBase):
     ) -> SchemaMetadataClass:
         """ "
         To construct the schema metadata, it will first sort the schema by the occurrence of attribute names
-        in descending order and truncate the schema by MAX_SCHEMA_SIZE, and then start to construct the
+        in descending order and truncate the schema by max_schema_size, and then start to construct the
         schema metadata sorted by attribute name
         """
 
         canonical_schema: List[SchemaField] = []
         schema_size = len(schema.values())
         table_fields = list(schema.values())
-        if schema_size > MAX_SCHEMA_SIZE:
+        if schema_size > self.config.max_schema_size:
             # downsample the schema, using frequency as the sort key
             self.report.report_warning(
                 title="Schema Size Too Large",
-                message=f"Downsampling the table schema because MAX_SCHEMA_SIZE threshold is {MAX_SCHEMA_SIZE}",
+                message=f"Downsampling the table schema because `max_schema_size` threshold is {self.config.max_schema_size}",
                 context=f"Collection: {dataset_urn}",
             )
 
             # Add this information to the custom properties so user can know they are looking at down sampled schema
             dataset_properties.customProperties["schema.downsampled"] = "True"
             dataset_properties.customProperties["schema.totalFields"] = f"{schema_size}"
-        # append each schema field, schema will be sorted by count descending and delimited_name ascending and sliced to only include MAX_SCHEMA_SIZE items
+        # append each schema field, schema will be sorted by count descending and delimited_name ascending and sliced to only include max_schema_size items
+        primary_keys = []
         for schema_field in sorted(
             table_fields,
             key=lambda x: (
                 -x["count"],
                 x["delimited_name"],
             ),  # Negate `count` for descending order, `delimited_name` stays the same for ascending
-        )[0:MAX_SCHEMA_SIZE]:
+        )[: self.config.max_schema_size]:
             field_path = schema_field["delimited_name"]
             native_data_type = self.get_native_type(schema_field["type"], table_name)
             type = self.get_field_type(schema_field["type"], table_name)
-            description = None
             nullable = True
             if field_path in primary_key_dict:
-                description = (
+                # primary key should not be nullable
+                type_key = (
                     "Partition Key"
                     if primary_key_dict.get(field_path) == "HASH"
                     else "Sort Key"
                 )
-                # primary key should not be nullable
+                dataset_properties.customProperties[type_key] = field_path
                 nullable = False
+                primary_keys.append(field_path)
 
             field = SchemaField(
                 fieldPath=field_path,
                 nativeDataType=native_data_type,
                 type=type,
-                description=description,
+                description=None,
                 nullable=nullable,
                 recursive=False,
             )
@@ -512,6 +518,7 @@ class DynamoDBSource(StatefulIngestionSourceBase):
             hash="",
             platformSchema=SchemalessClass(),
             fields=canonical_schema,
+            primaryKeys=primary_keys,
         )
         return schema_metadata
 

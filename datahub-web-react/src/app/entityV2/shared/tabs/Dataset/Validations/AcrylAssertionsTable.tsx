@@ -1,19 +1,24 @@
+import { Checkbox, Empty, Table, TableProps } from 'antd';
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { Checkbox, Empty, Table, TableProps } from 'antd';
-import { Assertion, AssertionRunStatus, DataContract } from '../../../../../../types.generated';
-import { useEntityData } from '../../../../../entity/shared/EntityContext';
-import { ActionsColumn, DetailsColumn } from './AcrylAssertionsTableColumns';
-import { AssertionProfileDrawer } from './assertion/profile/AssertionProfileDrawer';
-import { ANTD_GRAY } from '../../../constants';
-import { useOpenAssertionDetailModal } from './assertion/builder/hooks';
-import { getEntityUrnForAssertion, getSiblingWithUrn } from './acrylUtils';
+
+import { useEntityData } from '@app/entity/shared/EntityContext';
+import { ANTD_GRAY } from '@app/entityV2/shared/constants';
+import {
+    ActionsColumn,
+    DetailsColumn,
+} from '@app/entityV2/shared/tabs/Dataset/Validations/AcrylAssertionsTableColumns';
+import { getEntityUrnForAssertion, getSiblingWithUrn } from '@app/entityV2/shared/tabs/Dataset/Validations/acrylUtils';
+import { useOpenAssertionDetailModal } from '@app/entityV2/shared/tabs/Dataset/Validations/assertion/builder/hooks';
+import { AssertionProfileDrawer } from '@app/entityV2/shared/tabs/Dataset/Validations/assertion/profile/AssertionProfileDrawer';
+
+import { Assertion, AssertionRunStatus, DataContract } from '@types';
 
 type StyledTableProps = {
     showSelect?: boolean;
 } & TableProps<any>;
 
-export const StyledTable = styled(Table)<StyledTableProps>`
+const BaseStyledTable = styled(Table)<StyledTableProps>`
     ${(props) => !props.showSelect && `margin-left: -50px;`}
     max-width: none;
     overflow: inherit;
@@ -22,6 +27,9 @@ export const StyledTable = styled(Table)<StyledTableProps>`
         font-weight: 600;
         font-size: 12px;
         color: ${ANTD_GRAY[8]};
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     &&
         .ant-table-thead
@@ -35,6 +43,9 @@ export const StyledTable = styled(Table)<StyledTableProps>`
         .ant-table-tbody > tr > td {
             border: none;
             ${(props) => props.showSelect && `padding: 16px 20px;`}
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
     }
     &&& .ant-table-cell {
@@ -50,7 +61,18 @@ export const StyledTable = styled(Table)<StyledTableProps>`
     &&& .acryl-selected-assertions-table-row {
         background-color: ${ANTD_GRAY[4]};
     }
+    &&& .ant-table-fixed-right {
+        background-color: inherit;
+    }
+    &&& .ant-table-tbody > tr > td.ant-table-cell-fix-right {
+        background-color: inherit;
+    }
+    &&& .ant-table-thead > tr > th.ant-table-cell-fix-right {
+        background-color: inherit;
+    }
 `;
+
+export const StyledTable = BaseStyledTable as <T = any>(props: StyledTableProps & TableProps<T>) => JSX.Element;
 
 const DetailsColumnWrapper = styled.div`
     display: flex;

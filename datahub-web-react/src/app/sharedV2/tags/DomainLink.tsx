@@ -1,13 +1,15 @@
+import { CloseOutlined } from '@ant-design/icons';
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CloseOutlined } from '@ant-design/icons';
 import styled from 'styled-components';
-import { Domain as DomainEntity, EntityType } from '../../../types.generated';
-import { HoverEntityTooltip } from '../../recommendations/renderer/component/HoverEntityTooltip';
-import { useEntityRegistry } from '../../useEntityRegistry';
-import { ANTD_GRAY } from '../../entity/shared/constants';
-import { DomainColoredIcon } from '../../entityV2/shared/links/DomainColoredIcon';
-import { useEmbeddedProfileLinkProps } from '../../shared/useEmbeddedProfileLinkProps';
+
+import { ANTD_GRAY } from '@app/entity/shared/constants';
+import { DomainColoredIcon } from '@app/entityV2/shared/links/DomainColoredIcon';
+import { HoverEntityTooltip } from '@app/recommendations/renderer/component/HoverEntityTooltip';
+import { useEmbeddedProfileLinkProps } from '@app/shared/useEmbeddedProfileLinkProps';
+import { useEntityRegistry } from '@app/useEntityRegistry';
+
+import { Domain as DomainEntity, EntityType } from '@types';
 
 const DomainLinkContainer = styled(Link)`
     display: inline-block;
@@ -15,7 +17,6 @@ const DomainLinkContainer = styled(Link)`
 
 const DomainWrapper = styled.span`
     display: inline-block;
-    margin-bottom: 8px;
 `;
 
 const CloseButton = styled.div`
@@ -39,7 +40,7 @@ const StyledTag = styled.div<{ fontSize?: number }>`
     display: flex;
     align-items: center;
     justify-content: start;
-    gap: 5px;
+    gap: 6px;
 `;
 
 interface DomainContentProps {
@@ -49,15 +50,16 @@ interface DomainContentProps {
     onClose?: (e: any) => void;
     tagStyle?: any | undefined;
     fontSize?: number;
+    iconSize?: number;
 }
 
-function DomainContent({ domain, name, closable, onClose, tagStyle, fontSize }: DomainContentProps) {
+export function DomainContent({ domain, name, closable, onClose, tagStyle, fontSize, iconSize }: DomainContentProps) {
     const entityRegistry = useEntityRegistry();
     const displayName = name || entityRegistry.getDisplayName(EntityType.Domain, domain);
 
     return (
         <StyledTag style={tagStyle} fontSize={fontSize}>
-            <DomainColoredIcon domain={domain} size={28} />
+            <DomainColoredIcon domain={domain} size={iconSize || 24} fontSize={16} />
             {displayName}
             {closable && (
                 <CloseButton onClick={onClose}>
@@ -76,16 +78,26 @@ export type Props = {
     tagStyle?: any | undefined;
     readOnly?: boolean;
     fontSize?: number;
+    enableTooltip?: boolean;
 };
 
-export const DomainLink = ({ domain, name, closable, onClose, tagStyle, readOnly, fontSize }: Props): JSX.Element => {
+export const DomainLink = ({
+    domain,
+    name,
+    closable,
+    onClose,
+    tagStyle,
+    readOnly,
+    fontSize,
+    enableTooltip = true,
+}: Props): JSX.Element => {
     const entityRegistry = useEntityRegistry();
     const linkProps = useEmbeddedProfileLinkProps();
     const urn = domain?.urn;
 
     if (readOnly) {
         return (
-            <HoverEntityTooltip entity={domain}>
+            <HoverEntityTooltip entity={domain} canOpen={enableTooltip}>
                 <DomainWrapper>
                     <DomainContent
                         domain={domain}
@@ -101,7 +113,7 @@ export const DomainLink = ({ domain, name, closable, onClose, tagStyle, readOnly
     }
 
     return (
-        <HoverEntityTooltip entity={domain}>
+        <HoverEntityTooltip entity={domain} canOpen={enableTooltip}>
             <DomainLinkContainer to={entityRegistry.getEntityUrl(EntityType.Domain, urn)} {...linkProps}>
                 <DomainContent
                     domain={domain}

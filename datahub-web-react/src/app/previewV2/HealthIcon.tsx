@@ -1,22 +1,31 @@
+import { Popover, colors } from '@components';
+import { CheckCircle, WarningCircle } from 'phosphor-react';
 import React from 'react';
-import { Popover } from '@components';
 import styled from 'styled-components';
-import { CheckCircleOutlined } from '@ant-design/icons';
-import AmbulanceIcon from '../../images/ambulance-icon.svg?react';
-import { isHealthy, isUnhealthy } from '../shared/health/healthUtils';
-import { COLORS } from '../sharedV2/colors';
-import HealthPopover from './HealthPopover';
-import { Health } from '../../types.generated';
+
+import HealthPopover from '@app/previewV2/HealthPopover';
+import { isHealthy, isUnhealthy } from '@app/shared/health/healthUtils';
+
+import { Health } from '@types';
 
 const IconContainer = styled.div`
     display: flex;
     align-items: center;
-    font-size: 112.5%;
 `;
 
-const HealthyIcon = styled(CheckCircleOutlined)`
-    color: ${COLORS.green_6};
+const UnhealthyIcon = styled(WarningCircle)`
+    color: ${colors.red[500]};
+    font-size: 20px;
 `;
+
+const HealthyIcon = styled(CheckCircle)`
+    color: ${colors.green[500]};
+    font-size: 20px;
+`;
+
+const popoverStyles = {
+    zIndex: 1200,
+};
 
 interface Props {
     urn: string;
@@ -28,15 +37,20 @@ interface Props {
 const HealthIcon = ({ urn, health, baseUrl, className }: Props) => {
     let icon: JSX.Element;
     if (isUnhealthy(health)) {
-        icon = <AmbulanceIcon />;
+        icon = <UnhealthyIcon weight="regular" />;
     } else if (isHealthy(health)) {
-        icon = <HealthyIcon />;
+        icon = <HealthyIcon weight="regular" />;
     } else {
         return null;
     }
 
     return (
-        <Popover content={<HealthPopover health={health} baseUrl={baseUrl} />} placement="bottom" showArrow={false}>
+        <Popover
+            content={<HealthPopover health={health} baseUrl={baseUrl} />}
+            placement="bottom"
+            showArrow={false}
+            overlayStyle={popoverStyles}
+        >
             <IconContainer className={className} data-testid={`${urn}-health-icon`}>
                 {icon}
             </IconContainer>

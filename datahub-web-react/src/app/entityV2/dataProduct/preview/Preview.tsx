@@ -1,10 +1,13 @@
-import { GenericEntityProperties } from '@app/entity/shared/types';
 import React from 'react';
-import { EntityType, Owner, GlobalTags, GlossaryTerms, Domain, EntityPath } from '../../../../types.generated';
-import DefaultPreviewCard from '../../../previewV2/DefaultPreviewCard';
-import { useEntityRegistry } from '../../../useEntityRegistry';
-import { EntityMenuActions, IconStyleType, PreviewType } from '../../Entity';
-import { EntityMenuItems } from '../../shared/EntityDropdown/EntityMenuActions';
+
+import { GenericEntityProperties } from '@app/entity/shared/types';
+import { EntityMenuActions, IconStyleType, PreviewType } from '@app/entityV2/Entity';
+import { EntityMenuItems } from '@app/entityV2/shared/EntityDropdown/EntityMenuActions';
+import { getParentEntities } from '@app/entityV2/shared/containers/profile/header/getParentEntities';
+import DefaultPreviewCard from '@app/previewV2/DefaultPreviewCard';
+import { useEntityRegistry } from '@app/useEntityRegistry';
+
+import { Domain, EntityPath, EntityType, GlobalTags, GlossaryTerms, Owner } from '@types';
 
 interface Props {
     urn: string;
@@ -20,7 +23,7 @@ interface Props {
     degree?: number;
     paths?: EntityPath[];
     headerDropdownItems?: Set<EntityMenuItems>;
-    previewType?: PreviewType;
+    previewType: PreviewType;
     actions?: EntityMenuActions;
 }
 
@@ -56,7 +59,7 @@ export const Preview = ({
             tags={globalTags || undefined}
             owners={owners}
             domain={domain}
-            parentEntities={domain ? [domain] : []}
+            parentEntities={data ? getParentEntities(data, EntityType.DataProduct) : []}
             glossaryTerms={glossaryTerms || undefined}
             entityCount={entityCount}
             externalUrl={externalUrl}

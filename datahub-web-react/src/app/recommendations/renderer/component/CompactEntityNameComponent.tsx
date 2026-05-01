@@ -2,12 +2,14 @@ import { ArrowRightOutlined } from '@ant-design/icons';
 import { TooltipPlacement } from 'antd/es/tooltip';
 import React from 'react';
 import styled from 'styled-components/macro';
-import { Entity, EntityType, SchemaFieldEntity } from '../../../../types.generated';
-import { IconStyleType } from '../../../entity/Entity';
-import { ANTD_GRAY } from '../../../entity/shared/constants';
-import { useEntityRegistry } from '../../../useEntityRegistry';
-import { EntityPreviewTag } from './EntityPreviewTag';
-import { HoverEntityTooltip } from './HoverEntityTooltip';
+
+import { IconStyleType } from '@app/entity/Entity';
+import { ANTD_GRAY } from '@app/entity/shared/constants';
+import { EntityPreviewTag } from '@app/recommendations/renderer/component/EntityPreviewTag';
+import { HoverEntityTooltip } from '@app/recommendations/renderer/component/HoverEntityTooltip';
+import { useEntityRegistry } from '@app/useEntityRegistry';
+
+import { Entity, EntityType, SchemaFieldEntity } from '@types';
 
 const NameWrapper = styled.span<{ addMargin: boolean }>`
     display: inline-flex;
@@ -28,6 +30,7 @@ type CompactEntityNameProps = {
     placement?: TooltipPlacement;
     onClick?: () => void;
     linkUrlParams?: Record<string, string | boolean>;
+    showMargin?: boolean;
 };
 
 export const CompactEntityNameComponent = ({
@@ -37,6 +40,7 @@ export const CompactEntityNameComponent = ({
     placement,
     onClick,
     linkUrlParams,
+    showMargin = true,
 }: CompactEntityNameProps) => {
     const entityRegistry = useEntityRegistry();
 
@@ -78,6 +82,7 @@ export const CompactEntityNameComponent = ({
                         onClick={onClick}
                         columnName={columnName}
                         dataTestId={`compact-entity-link-${processedEntity.urn}`}
+                        showMargin={showMargin}
                     />
                 </span>
             </HoverEntityTooltip>

@@ -2,13 +2,18 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
+import click
+import click.testing
 import requests
+import tenacity
 from joblib import Parallel, delayed
+from packaging import version
 from requests.structures import CaseInsensitiveDict
 
 from datahub.cli import cli_utils, env_utils
+from datahub.entrypoints import datahub
 from datahub.ingestion.run.pipeline import Pipeline
 from tests.consistency_utils import wait_for_writes_to_sync
 
@@ -38,16 +43,28 @@ def get_admin_credentials():
     )
 
 
+def get_base_path():
+    base_path = os.getenv("DATAHUB_BASE_PATH", "")
+    return "" if base_path == "/" else base_path
+
+
+def get_gms_base_path():
+    base_gms_path = os.getenv("DATAHUB_GMS_BASE_PATH", "")
+    return "" if base_gms_path == "/" else base_gms_path
+
+
 def get_root_urn():
     return "urn:li:corpuser:datahub"
 
 
 def get_gms_url():
-    return os.getenv("DATAHUB_GMS_URL") or "http://localhost:8080"
+    return os.getenv("DATAHUB_GMS_URL") or f"http://localhost:8080{get_gms_base_path()}"
 
 
 def get_frontend_url():
-    return os.getenv("DATAHUB_FRONTEND_URL") or "http://localhost:9002"
+    return (
+        os.getenv("DATAHUB_FRONTEND_URL") or f"http://localhost:9002{get_base_path()}"
+    )
 
 
 def get_kafka_broker_url():
@@ -56,7 +73,10 @@ def get_kafka_broker_url():
 
 def get_kafka_schema_registry():
     #  internal registry "http://localhost:8080/schema-registry/api/"
-    return os.getenv("DATAHUB_KAFKA_SCHEMA_REGISTRY_URL") or "http://localhost:8081"
+    return (
+        os.getenv("DATAHUB_KAFKA_SCHEMA_REGISTRY_URL")
+        or f"http://localhost:8080{get_gms_base_path()}/schema-registry/api"
+    )
 
 
 def get_mysql_url():
@@ -98,7 +118,25 @@ def check_endpoint(auth_session, url):
         raise SystemExit(f"{url}: is Not reachable \nErr: {e}")
 
 
-def ingest_file_via_rest(auth_session, filename: str) -> Pipeline:
+def run_datahub_cmd(
+    command: List[str],
+    *,
+    input: Optional[str] = None,
+    env: Optional[Dict[str, str]] = None,
+) -> click.testing.Result:
+    # TODO: Unify this with the run_datahub_cmd in the metadata-ingestion directory.
+    click_version: str = click.__version__  # type: ignore
+    if version.parse(click_version) >= version.parse("8.2.0"):
+        runner = click.testing.CliRunner()
+    else:
+        # Once we're pinned to click >= 8.2.0, we can remove this.
+        runner = click.testing.CliRunner(mix_stderr=False)  # type: ignore
+    return runner.invoke(datahub, command, input=input, env=env)
+
+
+def ingest_file_via_rest(
+    auth_session, filename: str, mode: str = "ASYNC_BATCH"
+) -> Pipeline:
     pipeline = Pipeline.create(
         {
             "source": {
@@ -110,6 +148,7 @@ def ingest_file_via_rest(auth_session, filename: str) -> Pipeline:
                 "config": {
                     "server": auth_session.gms_url(),
                     "token": auth_session.gms_token(),
+                    "mode": mode,
                 },
             },
         }
@@ -239,6 +278,11 @@ class TestSessionWrapper:
                 if name in ("get", "head", "post", "put", "delete", "option", "patch"):
                     if "headers" not in kwargs:
                         kwargs["headers"] = CaseInsensitiveDict()
+                    else:
+                        # Clone the headers dict to prevent mutation of caller's data
+                        # This fixes test pollution where shared header dicts get contaminated
+                        kwargs["headers"] = dict(kwargs["headers"])
+
                     kwargs["headers"].update(
                         {"Authorization": f"Bearer {self._gms_token}"}
                     )
@@ -274,6 +318,11 @@ class TestSessionWrapper:
             print("TestSessionWrapper sync wait.")
             wait_for_writes_to_sync()
 
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(10),
+        wait=tenacity.wait_exponential(multiplier=1, min=4, max=30),
+        retry=tenacity.retry_if_exception_type(Exception),
+    )
     def _generate_gms_token(self):
         actor_urn = self._upstream.cookies["actor"]
         json = {
@@ -318,3 +367,5 @@ class TestSessionWrapper:
                 f"{self._frontend_url}/api/v2/graphql", json=json
             )
             response.raise_for_status()
+            # Clear the token ID after successful revocation to prevent double-call issues
+            self._gms_token_id = None

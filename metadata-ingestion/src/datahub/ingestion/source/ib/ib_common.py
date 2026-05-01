@@ -3,6 +3,7 @@ import sys
 from abc import abstractmethod
 from typing import Iterable, Optional
 
+from pydantic import field_validator
 from pydantic.fields import Field
 from redash_toolbelt import Redash
 from requests.adapters import HTTPAdapter
@@ -57,6 +58,14 @@ class IBRedashSourceConfig(StatefulIngestionConfigBase):
         "during pagination. ",
     )
     stateful_ingestion: Optional[IBRedashSourceStatefulIngestionConfig] = None
+
+    @field_validator("query_id", "exp_query_id", mode="before")
+    @classmethod
+    def coerce_to_str(cls, v: object) -> object:
+        # Pydantic v2 no longer coerces int to str — recipe YAMLs pass these as integers
+        if v is not None:
+            return str(v)
+        return v
 
 
 class IBRedashSource(StatefulIngestionSourceBase):

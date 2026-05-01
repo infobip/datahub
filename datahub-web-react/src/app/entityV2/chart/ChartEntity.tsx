@@ -8,50 +8,58 @@ import {
     UnorderedListOutlined,
     WarningOutlined,
 } from '@ant-design/icons';
+import { ListBullets, TreeStructure } from '@phosphor-icons/react';
 import * as React from 'react';
-import { GetChartQuery, useGetChartQuery, useUpdateChartMutation } from '../../../graphql/chart.generated';
-import { Chart, EntityType, LineageDirection, SearchResult } from '../../../types.generated';
-import { GenericEntityProperties } from '../../entity/shared/types';
-import { LOOKER_URN, MODE, MODE_URN } from '../../ingest/source/builder/constants';
-import { MatchedFieldList } from '../../searchV2/matches/MatchedFieldList';
-import { matchedInputFieldRenderer } from '../../searchV2/matches/matchedInputFieldRenderer';
-import { capitalizeFirstLetterOnly } from '../../shared/textUtil';
-import { Entity, EntityCapabilityType, IconStyleType, PreviewType } from '../Entity';
-import { EntityMenuItems } from '../shared/EntityDropdown/EntityMenuActions';
-import { SubType, TYPE_ICON_CLASS_NAME } from '../shared/components/subtypes';
-import { EntityProfile } from '../shared/containers/profile/EntityProfile';
-import { SidebarAboutSection } from '../shared/containers/profile/sidebar/AboutSection/SidebarAboutSection';
-import SidebarChartHeaderSection from '../shared/containers/profile/sidebar/Chart/Header/SidebarChartHeaderSection';
-import DataProductSection from '../shared/containers/profile/sidebar/DataProduct/DataProductSection';
-import { SidebarDomainSection } from '../shared/containers/profile/sidebar/Domain/SidebarDomainSection';
-import SidebarLineageSection from '../shared/containers/profile/sidebar/Lineage/SidebarLineageSection';
-import { SidebarOwnerSection } from '../shared/containers/profile/sidebar/Ownership/sidebar/SidebarOwnerSection';
-import SidebarEntityHeader from '../shared/containers/profile/sidebar/SidebarEntityHeader';
-import { SidebarGlossaryTermsSection } from '../shared/containers/profile/sidebar/SidebarGlossaryTermsSection';
-import { SidebarTagsSection } from '../shared/containers/profile/sidebar/SidebarTagsSection';
-import StatusSection from '../shared/containers/profile/sidebar/shared/StatusSection';
-import { getDataForEntityType } from '../shared/containers/profile/utils';
-import EmbeddedProfile from '../shared/embed/EmbeddedProfile';
-import SidebarStructuredProperties from '../shared/sidebarSection/SidebarStructuredProperties';
-import { SUMMARY_TAB_ICON } from '../shared/summary/HeaderComponents';
-import { DocumentationTab } from '../shared/tabs/Documentation/DocumentationTab';
-import { EmbedTab } from '../shared/tabs/Embed/EmbedTab';
-import { ChartDashboardsTab } from '../shared/tabs/Entity/ChartDashboardsTab';
-import { InputFieldsTab } from '../shared/tabs/Entity/InputFieldsTab';
-import TabNameWithCount from '../shared/tabs/Entity/TabNameWithCount';
-import { IncidentTab } from '../shared/tabs/Incident/IncidentTab';
-import { LineageTab } from '../shared/tabs/Lineage/LineageTab';
-import { PropertiesTab } from '../shared/tabs/Properties/PropertiesTab';
-import { SidebarTitleActionType, getDashboardLastUpdatedMs, getDataProduct, isOutputPort } from '../shared/utils';
-import { ChartPreview } from './preview/ChartPreview';
-import { ChartStatsSummarySubHeader } from './profile/stats/ChartStatsSummarySubHeader';
-import ChartSummaryTab from './summary/ChartSummaryTab';
-import SidebarNotesSection from '../shared/sidebarSection/SidebarNotesSection';
+
+import { GenericEntityProperties } from '@app/entity/shared/types';
+import { Entity, EntityCapabilityType, IconStyleType, PreviewType } from '@app/entityV2/Entity';
+import { ChartPreview } from '@app/entityV2/chart/preview/ChartPreview';
+import { ChartStatsSummarySubHeader } from '@app/entityV2/chart/profile/stats/ChartStatsSummarySubHeader';
+import ChartSummaryTab from '@app/entityV2/chart/summary/ChartSummaryTab';
+import { EntityMenuItems } from '@app/entityV2/shared/EntityDropdown/EntityMenuActions';
+import { SubType, TYPE_ICON_CLASS_NAME } from '@app/entityV2/shared/components/subtypes';
+import { EntityProfile } from '@app/entityV2/shared/containers/profile/EntityProfile';
+import { SidebarAboutSection } from '@app/entityV2/shared/containers/profile/sidebar/AboutSection/SidebarAboutSection';
+import { SidebarApplicationSection } from '@app/entityV2/shared/containers/profile/sidebar/Applications/SidebarApplicationSection';
+import SidebarChartHeaderSection from '@app/entityV2/shared/containers/profile/sidebar/Chart/Header/SidebarChartHeaderSection';
+import DataProductSection from '@app/entityV2/shared/containers/profile/sidebar/DataProduct/DataProductSection';
+import { SidebarDomainSection } from '@app/entityV2/shared/containers/profile/sidebar/Domain/SidebarDomainSection';
+import SidebarLineageSection from '@app/entityV2/shared/containers/profile/sidebar/Lineage/SidebarLineageSection';
+import { SidebarOwnerSection } from '@app/entityV2/shared/containers/profile/sidebar/Ownership/sidebar/SidebarOwnerSection';
+import SidebarEntityHeader from '@app/entityV2/shared/containers/profile/sidebar/SidebarEntityHeader';
+import { SidebarGlossaryTermsSection } from '@app/entityV2/shared/containers/profile/sidebar/SidebarGlossaryTermsSection';
+import { SidebarTagsSection } from '@app/entityV2/shared/containers/profile/sidebar/SidebarTagsSection';
+import StatusSection from '@app/entityV2/shared/containers/profile/sidebar/shared/StatusSection';
+import { getDataForEntityType } from '@app/entityV2/shared/containers/profile/utils';
+import EmbeddedProfile from '@app/entityV2/shared/embed/EmbeddedProfile';
+import SidebarNotesSection from '@app/entityV2/shared/sidebarSection/SidebarNotesSection';
+import SidebarStructuredProperties from '@app/entityV2/shared/sidebarSection/SidebarStructuredProperties';
+import { SUMMARY_TAB_ICON } from '@app/entityV2/shared/summary/HeaderComponents';
+import { DocumentationTab } from '@app/entityV2/shared/tabs/Documentation/DocumentationTab';
+import { EmbedTab } from '@app/entityV2/shared/tabs/Embed/EmbedTab';
+import { ChartDashboardsTab } from '@app/entityV2/shared/tabs/Entity/ChartDashboardsTab';
+import { InputFieldsTab } from '@app/entityV2/shared/tabs/Entity/InputFieldsTab';
+import { IncidentTab } from '@app/entityV2/shared/tabs/Incident/IncidentTab';
+import { LineageTab } from '@app/entityV2/shared/tabs/Lineage/LineageTab';
+import { PropertiesTab } from '@app/entityV2/shared/tabs/Properties/PropertiesTab';
+import {
+    SidebarTitleActionType,
+    getDashboardLastUpdatedMs,
+    getDataProduct,
+    getFirstSubType,
+    isOutputPort,
+} from '@app/entityV2/shared/utils';
+import { LOOKER_URN, MODE, MODE_URN } from '@app/ingest/source/builder/constants';
+import { MatchedFieldList } from '@app/searchV2/matches/MatchedFieldList';
+import { matchedInputFieldRenderer } from '@app/searchV2/matches/matchedInputFieldRenderer';
+import { capitalizeFirstLetterOnly } from '@app/shared/textUtil';
+
+import { GetChartQuery, useGetChartQuery, useUpdateChartMutation } from '@graphql/chart.generated';
+import { Chart, EntityType, LineageDirection, SearchResult } from '@types';
 
 const PREVIEW_SUPPORTED_PLATFORMS = [LOOKER_URN, MODE_URN];
 
 const headerDropdownItems = new Set([
-    EntityMenuItems.EXTERNAL_URL,
     EntityMenuItems.SHARE,
     EntityMenuItems.UPDATE_DEPRECATION,
     EntityMenuItems.ANNOUNCE,
@@ -86,10 +94,7 @@ export class ChartEntity implements Entity<Chart> {
         return (
             <LineChartOutlined
                 className={TYPE_ICON_CLASS_NAME}
-                style={{
-                    fontSize,
-                    color: color || '#BFBFBF',
-                }}
+                style={{ fontSize: fontSize || 'inherit', color: color || 'inherit' }}
             />
         );
     };
@@ -170,6 +175,7 @@ export class ChartEntity implements Entity<Chart> {
                     properties: {
                         defaultDirection: LineageDirection.Upstream,
                     },
+                    supportsFullsize: true,
                 },
                 {
                     name: 'Properties',
@@ -187,9 +193,8 @@ export class ChartEntity implements Entity<Chart> {
                 },
                 {
                     name: 'Incidents',
-                    getDynamicName: (_, chart, loading) => {
-                        const activeIncidentCount = chart?.chart?.activeIncidents?.total;
-                        return <TabNameWithCount name="Incidents" count={activeIncidentCount} loading={loading} />;
+                    getCount: (_, chart, loading) => {
+                        return !loading ? chart?.chart?.activeIncidents?.total : undefined;
                     },
                     icon: WarningOutlined,
                     component: IncidentTab,
@@ -223,6 +228,9 @@ export class ChartEntity implements Entity<Chart> {
             component: SidebarDomainSection,
         },
         {
+            component: SidebarApplicationSection,
+        },
+        {
             component: DataProductSection,
         },
         {
@@ -244,7 +252,7 @@ export class ChartEntity implements Entity<Chart> {
             name: 'Lineage',
             component: LineageTab,
             description: "View this data asset's upstream and downstream dependencies",
-            icon: PartitionOutlined,
+            icon: TreeStructure,
             properties: {
                 actionType: SidebarTitleActionType.LineageExplore,
             },
@@ -253,7 +261,7 @@ export class ChartEntity implements Entity<Chart> {
             name: 'Properties',
             component: PropertiesTab,
             description: 'View additional properties about this asset',
-            icon: UnorderedListOutlined,
+            icon: ListBullets,
         },
     ];
 
@@ -269,7 +277,7 @@ export class ChartEntity implements Entity<Chart> {
         };
     };
 
-    renderPreview = (_: PreviewType, data: Chart) => {
+    renderPreview = (previewType: PreviewType, data: Chart) => {
         const genericProperties = this.getGenericEntityProperties(data);
 
         return (
@@ -287,10 +295,11 @@ export class ChartEntity implements Entity<Chart> {
                 domain={data.domain?.domain}
                 dataProduct={getDataProduct(genericProperties?.dataProduct)}
                 parentContainers={data.parentContainers}
-                subType={data.subTypes?.typeNames?.[0]}
+                subType={getFirstSubType(data)}
                 headerDropdownItems={headerDropdownItems}
                 browsePaths={data.browsePathV2 || undefined}
                 externalUrl={data.properties?.externalUrl}
+                previewType={previewType}
             />
         );
     };
@@ -302,7 +311,7 @@ export class ChartEntity implements Entity<Chart> {
             <ChartPreview
                 urn={data.urn}
                 data={genericProperties}
-                subType={data.subTypes?.typeNames?.[0]}
+                subType={getFirstSubType(data)}
                 platform={data?.platform?.properties?.displayName || capitalizeFirstLetterOnly(data?.platform?.name)}
                 platformInstanceId={data.dataPlatformInstance?.instanceId}
                 name={data.properties?.name}
@@ -330,6 +339,7 @@ export class ChartEntity implements Entity<Chart> {
                 isOutputPort={isOutputPort(result)}
                 headerDropdownItems={headerDropdownItems}
                 browsePaths={data.browsePathV2 || undefined}
+                previewType={PreviewType.SEARCH}
             />
         );
     };
@@ -348,7 +358,7 @@ export class ChartEntity implements Entity<Chart> {
             type: EntityType.Chart,
             icon: entity?.platform?.properties?.logoUrl || undefined,
             platform: entity?.platform,
-            subtype: entity?.subTypes?.typeNames?.[0] || undefined,
+            subtype: getFirstSubType(entity) || undefined,
             deprecation: entity?.deprecation,
         };
     };
@@ -377,6 +387,7 @@ export class ChartEntity implements Entity<Chart> {
             EntityCapabilityType.TEST,
             EntityCapabilityType.LINEAGE,
             EntityCapabilityType.HEALTH,
+            EntityCapabilityType.APPLICATIONS,
         ]);
     };
 

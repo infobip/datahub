@@ -17,6 +17,7 @@ import com.linkedin.entity.EnvelopedAspect;
 import com.linkedin.metadata.aspect.batch.AspectsBatch;
 import com.linkedin.metadata.entity.EntityService;
 import com.linkedin.metadata.entity.IngestResult;
+import com.linkedin.metadata.search.client.CacheEvictionService;
 import com.linkedin.platformresource.PlatformResourceInfo;
 import com.linkedin.secret.DataHubSecretValue;
 import com.linkedin.util.Pair;
@@ -38,6 +39,7 @@ public class DataHubIcebergWarehouse {
   public static final String DATAPLATFORM_INSTANCE_ICEBERG_WAREHOUSE_ASPECT_NAME =
       "icebergWarehouseInfo";
 
+  public static final String ICEBERG_PROPERTY_PREFIX = "TBLPROPERTIES:";
   private final EntityService entityService;
 
   private final SecretService secretService;
@@ -48,24 +50,35 @@ public class DataHubIcebergWarehouse {
 
   @Getter private final String platformInstance;
 
-  @VisibleForTesting
-  DataHubIcebergWarehouse(
+  private final CacheEvictionService cacheEvictionService;
+
+  // When evicting a iceberg entity urn, these are additional urns that need to be evicted since
+  // they are a way to
+  // ge to the newly modified iceberg entity
+  private final List<Urn> commonUrnsToEvict;
+
+  public DataHubIcebergWarehouse(
       String platformInstance,
       IcebergWarehouseInfo icebergWarehouse,
       EntityService entityService,
       SecretService secretService,
+      CacheEvictionService cacheEvictionService,
       OperationContext operationContext) {
     this.platformInstance = platformInstance;
     this.icebergWarehouse = icebergWarehouse;
     this.entityService = entityService;
     this.secretService = secretService;
+    this.cacheEvictionService = cacheEvictionService;
     this.operationContext = operationContext;
+
+    commonUrnsToEvict = List.of(Utils.platformInstanceUrn(platformInstance), Utils.platformUrn());
   }
 
   public static DataHubIcebergWarehouse of(
       String platformInstance,
       EntityService entityService,
       SecretService secretService,
+      CacheEvictionService cacheEvictionService,
       OperationContext operationContext) {
     Urn platformInstanceUrn = Utils.platformInstanceUrn(platformInstance);
     RecordTemplate warehouseAspect =
@@ -80,7 +93,12 @@ public class DataHubIcebergWarehouse {
 
     IcebergWarehouseInfo icebergWarehouse = new IcebergWarehouseInfo(warehouseAspect.data());
     return new DataHubIcebergWarehouse(
-        platformInstance, icebergWarehouse, entityService, secretService, operationContext);
+        platformInstance,
+        icebergWarehouse,
+        entityService,
+        secretService,
+        cacheEvictionService,
+        operationContext);
   }
 
   public CredentialProvider.StorageProviderCredentials getStorageProviderCredentials() {
@@ -270,7 +288,7 @@ public class DataHubIcebergWarehouse {
 
     entityService.deleteUrn(operationContext, resourceUrn);
     entityService.deleteUrn(operationContext, datasetUrn.get());
-
+    invalidateCacheEntries(List.of(datasetUrn.get()));
     return result;
   }
 
@@ -281,7 +299,15 @@ public class DataHubIcebergWarehouse {
 
     createResource(datasetUrn, tableIdentifier, view, icebergBatch);
 
+    Urn namespaceUrn = containerUrn(getPlatformInstance(), tableIdentifier.namespace());
+    invalidateCacheEntries(List.of(datasetUrn, namespaceUrn));
     return datasetUrn;
+  }
+
+  void invalidateCacheEntries(List<Urn> urns) {
+    ArrayList<Urn> urnsToEvict = new ArrayList<>(urns);
+    urnsToEvict.addAll(commonUrnsToEvict);
+    cacheEvictionService.evict(urnsToEvict);
   }
 
   public void renameDataset(TableIdentifier fromTableId, TableIdentifier toTableId, boolean view) {
@@ -301,6 +327,18 @@ public class DataHubIcebergWarehouse {
         new DatasetProperties()
             .setName(toTableId.name())
             .setQualifiedName(fullTableName(platformInstance, toTableId));
+
+    RecordTemplate fromDatasetPropertiesRecord =
+        entityService.getLatestAspect(operationContext, datasetUrn, DATASET_PROPERTIES_ASPECT_NAME);
+    if (fromDatasetPropertiesRecord != null) {
+      DatasetProperties fromDatasetProperties =
+          new DatasetProperties(fromDatasetPropertiesRecord.data());
+      datasetProperties.setCustomProperties(fromDatasetProperties.getCustomProperties());
+    } else {
+      // For rename, this should never be null, because at minimum, the name and qualified name
+      // must be set via datasetProperties
+      log.error("Internal error: existing dataset properties not found for dataset {}", datasetUrn);
+    }
 
     IcebergBatch.EntityBatch datasetBatch =
         icebergBatch.updateEntity(datasetUrn, DATASET_ENTITY_NAME);
@@ -332,6 +370,15 @@ public class DataHubIcebergWarehouse {
     }
 
     entityService.deleteUrn(operationContext, resourceUrn(fromTableId));
+
+    Urn fromNamespaceUrn = containerUrn(getPlatformInstance(), fromTableId.namespace());
+
+    List<Urn> urnsToInvalidate = new ArrayList<>(List.of(datasetUrn, fromNamespaceUrn));
+    if (!fromTableId.namespace().equals(toTableId.namespace())) {
+      Urn toNamespaceUrn = containerUrn(getPlatformInstance(), fromTableId.namespace());
+      urnsToInvalidate.add(toNamespaceUrn);
+    }
+    invalidateCacheEntries(urnsToInvalidate);
   }
 
   private RuntimeException noSuchEntity(boolean view, TableIdentifier tableIdentifier) {

@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.linkedin.mxe.SystemMetadata;
+import com.linkedin.restli.server.RestLiServiceException;
 import io.datahubproject.metadata.context.OperationContext;
 import io.datahubproject.test.metadata.context.TestOperationContexts;
 import mock.MockEntityRegistry;
@@ -107,7 +108,7 @@ public class AspectResourceTest {
             .urn(urn)
             .aspectName(mcp.getAspectName())
             .recordTemplate(mcp.getAspect())
-            .auditStamp(new AuditStamp())
+            .auditStamp(opContext.getAuditStamp())
             .metadataChangeProposal(mcp)
             .build(opContext.getAspectRetriever());
     IngestAspectsResult txResult = IngestAspectsResult.builder()
@@ -115,31 +116,31 @@ public class AspectResourceTest {
                     UpdateAspectResult.builder()
                             .urn(urn)
                             .newValue(new DatasetProperties().setName("name1"))
-                            .auditStamp(new AuditStamp())
+                            .auditStamp(opContext.getAuditStamp())
                             .request(req)
                             .build(),
                     UpdateAspectResult.builder()
                             .urn(urn)
                             .newValue(new DatasetProperties().setName("name2"))
-                            .auditStamp(new AuditStamp())
+                            .auditStamp(opContext.getAuditStamp())
                             .request(req)
                             .build(),
                     UpdateAspectResult.builder()
                             .urn(urn)
                             .newValue(new DatasetProperties().setName("name3"))
-                            .auditStamp(new AuditStamp())
+                            .auditStamp(opContext.getAuditStamp())
                             .request(req)
                             .build(),
                     UpdateAspectResult.builder()
                             .urn(urn)
                             .newValue(new DatasetProperties().setName("name4"))
-                            .auditStamp(new AuditStamp())
+                            .auditStamp(opContext.getAuditStamp())
                             .request(req)
                             .build(),
                     UpdateAspectResult.builder()
                             .urn(urn)
                             .newValue(new DatasetProperties().setName("name5"))
-                            .auditStamp(new AuditStamp())
+                            .auditStamp(opContext.getAuditStamp())
                             .request(req)
                             .build()))
             .build();
@@ -150,7 +151,7 @@ public class AspectResourceTest {
     verifyNoMoreInteractions(producer);
   }
 
-  @Test
+  @Test(expectedExceptions = RestLiServiceException.class, expectedExceptionsMessageRegExp = "Unknown aspect notAnAspect for entity dataset")
   public void testNoValidateAsync() throws URISyntaxException {
     OperationContext noValidateOpContext = TestOperationContexts.systemContextNoValidate();
     aspectResource.setSystemOperationContext(noValidateOpContext);
@@ -170,10 +171,5 @@ public class AspectResourceTest {
     Actor actor = new Actor(ActorType.USER, "user");
     when(mockAuthentication.getActor()).thenReturn(actor);
     aspectResource.ingestProposal(mcp, "true");
-    verify(producer, times(1)).produceMetadataChangeProposal(any(OperationContext.class), eq(urn), argThat(arg -> arg.getMetadataChangeProposal().equals(mcp)));
-    verifyNoMoreInteractions(producer);
-    verifyNoMoreInteractions(aspectDao);
-    reset(producer, aspectDao);
-    aspectResource.setSystemOperationContext(opContext);
   }
 }

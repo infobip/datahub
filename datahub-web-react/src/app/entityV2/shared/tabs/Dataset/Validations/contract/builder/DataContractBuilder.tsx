@@ -1,19 +1,39 @@
-import React, { useState } from 'react';
-import { message, Button } from 'antd';
-import styled from 'styled-components';
+import { Button, message } from 'antd';
 import lodash from 'lodash';
+import React, { useState } from 'react';
+import styled from 'styled-components';
+
+import { ANTD_GRAY } from '@app/entityV2/shared/constants';
+import {
+    createAssertionGroups,
+    tryExtractMonitorDetailsFromAssertionsWithMonitorsQuery,
+} from '@app/entityV2/shared/tabs/Dataset/Validations/acrylUtils';
+import { DataContractAssertionGroupSelect } from '@app/entityV2/shared/tabs/Dataset/Validations/contract/builder/DataContractAssertionGroupSelect';
+import {
+    DEFAULT_BUILDER_STATE,
+    DataContractBuilderState,
+    DataContractCategoryType,
+} from '@app/entityV2/shared/tabs/Dataset/Validations/contract/builder/types';
+import { buildUpsertDataContractMutationVariables } from '@app/entityV2/shared/tabs/Dataset/Validations/contract/builder/utils';
+import { DATA_QUALITY_ASSERTION_TYPES } from '@app/entityV2/shared/tabs/Dataset/Validations/contract/utils';
 import { useGetDatasetAssertionsWithRunEventsQuery } from '@src/graphql/dataset.generated';
-import { DataContract, AssertionType, Assertion } from '../../../../../../../../types.generated';
-import { DataContractBuilderState, DataContractCategoryType, DEFAULT_BUILDER_STATE } from './types';
-import { buildUpsertDataContractMutationVariables } from './utils';
-import { useUpsertDataContractMutation } from '../../../../../../../../graphql/contract.generated';
-import { createAssertionGroups, tryExtractMonitorDetailsFromAssertionsWithMonitorsQuery } from '../../acrylUtils';
-import { DataContractAssertionGroupSelect } from './DataContractAssertionGroupSelect';
-import { ANTD_GRAY } from '../../../../../constants';
-import { DATA_QUALITY_ASSERTION_TYPES } from '../utils';
+
+import { useUpsertDataContractMutation } from '@graphql/contract.generated';
+import { Assertion, AssertionType, DataContract } from '@types';
+
+const BuilderContainer = styled.div`
+    display: flex;
+    flex-direction: column;
+    max-height: 70vh;
+    height: 70vh;
+    overflow: hidden;
+`;
 
 const AssertionsSection = styled.div`
     border: 0.5px solid ${ANTD_GRAY[4]};
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
 `;
 
 const HeaderText = styled.div`
@@ -25,7 +45,10 @@ const HeaderText = styled.div`
 const ActionContainer = styled.div`
     display: flex;
     justify-content: space-between;
-    margin-top: 16px;
+    flex-shrink: 0;
+    padding: 16px 20px;
+    border-top: 1px solid ${ANTD_GRAY[4]};
+    margin-top: 0;
 `;
 
 const CancelButton = styled(Button)`
@@ -33,7 +56,7 @@ const CancelButton = styled(Button)`
 `;
 
 const SaveButton = styled(Button)`
-    margin-right: 20px;
+    margin-right: 0;
 `;
 
 type Props = {
@@ -141,7 +164,7 @@ export const DataContractBuilder = ({ entityUrn, initialState, onSubmit, onCance
     const hasAssertions = freshnessAssertions.length || schemaAssertions.length || dataQualityAssertions.length;
 
     return (
-        <>
+        <BuilderContainer>
             {(hasAssertions && <HeaderText>Select the assertions that will make up your contract.</HeaderText>) || (
                 <HeaderText>Add a few assertions on this entity to create a data contract out of them.</HeaderText>
             )}
@@ -186,6 +209,6 @@ export const DataContractBuilder = ({ entityUrn, initialState, onSubmit, onCance
                     </SaveButton>
                 </div>
             </ActionContainer>
-        </>
+        </BuilderContainer>
     );
 };

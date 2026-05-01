@@ -1,11 +1,12 @@
-import { SearchOutlined } from '@ant-design/icons';
-import React from 'react';
+import React, { useState } from 'react';
+import { useDebounce } from 'react-use';
+
+import { MatchLabelText, SearchContainer, StyledInput } from '@app/entityV2/shared/components/search/styledComponents';
 import { pluralize } from '@src/app/shared/textUtil';
-import { MatchLabelText, SearchContainer, StyledInput } from './styledComponents';
 
 interface InlineListSearchProps {
     searchText: string;
-    debouncedSetFilterText: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    debouncedSetFilterText: (value: string) => void;
     matchResultCount: number;
     numRows: number;
     options?: {
@@ -25,18 +26,27 @@ export const InlineListSearch: React.FC<InlineListSearchProps> = ({
     entityTypeName,
     options,
 }) => {
+    const [localSearchText, setLocalSearchText] = useState(searchText);
+
+    useDebounce(
+        () => {
+            debouncedSetFilterText(localSearchText);
+        },
+        500,
+        [localSearchText],
+    );
+
     return (
         <SearchContainer>
             <StyledInput
-                bordered={false}
-                value={searchText}
+                value={localSearchText}
                 placeholder={options?.placeholder || 'Search...'}
-                onChange={debouncedSetFilterText}
-                allowClear
-                prefix={!options?.hidePrefix && <SearchOutlined />}
+                onChange={(e) => setLocalSearchText(e.target.value)}
+                icon={options?.hidePrefix ? undefined : { icon: 'MagnifyingGlass', source: 'phosphor' }}
+                label=""
             />
             {searchText && !options?.hideMatchCountText && (
-                <MatchLabelText>
+                <MatchLabelText data-testid="inline-search-matched-result-text">
                     Matched {matchResultCount} {pluralize(matchResultCount, entityTypeName)} of {numRows}
                 </MatchLabelText>
             )}

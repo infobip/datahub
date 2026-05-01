@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime
+from unittest.mock import patch
 
 import moto.s3
 import pytest
@@ -11,7 +12,11 @@ from pydantic import ValidationError
 
 from datahub.ingestion.run.pipeline import Pipeline, PipelineContext
 from datahub.ingestion.source.s3.source import S3Source
-from tests.test_helpers import mce_helpers
+from datahub.testing import mce_helpers
+
+logging.getLogger("boto3").setLevel(logging.INFO)
+logging.getLogger("botocore").setLevel(logging.INFO)
+logging.getLogger("s3transfer").setLevel(logging.INFO)
 
 FROZEN_TIME = "2020-04-14 07:00:00"
 
@@ -88,6 +93,13 @@ def s3_client(s3):
         yield conn
 
 
+def get_descriptive_id(source_tuple):
+    source_dir, source_file = source_tuple
+    dir_name = os.path.basename(source_dir)
+    base_name = source_file.replace(".json", "")
+    return f"{dir_name}_{base_name}"
+
+
 @pytest.fixture(scope="module", autouse=True)
 def s3_populate(pytestconfig, s3_resource, s3_client, bucket_names):
     for bucket_name in bucket_names:
@@ -159,7 +171,9 @@ s3_source_files = [(S3_SOURCE_FILES_PATH, p) for p in os.listdir(S3_SOURCE_FILES
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("source_file_tuple", shared_source_files + s3_source_files)
+@pytest.mark.parametrize(
+    "source_file_tuple", shared_source_files + s3_source_files, ids=get_descriptive_id
+)
 def test_data_lake_s3_ingest(
     pytestconfig, s3_populate, source_file_tuple, tmp_path, mock_time
 ):
@@ -196,7 +210,64 @@ def test_data_lake_s3_ingest(
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("source_file_tuple", shared_source_files)
+@pytest.mark.parametrize(
+    "source_file_tuple", shared_source_files + s3_source_files, ids=get_descriptive_id
+)
+def test_data_lake_gcs_ingest(
+    pytestconfig, s3_populate, source_file_tuple, tmp_path, mock_time
+):
+    source_dir, source_file = source_file_tuple
+    test_resources_dir = pytestconfig.rootpath / "tests/integration/s3/"
+
+    f = open(os.path.join(source_dir, source_file))
+    source = json.load(f)
+
+    config_dict = {}
+
+    source["type"] = "gcs"
+    source["config"]["credential"] = {
+        "hmac_access_id": source["config"]["aws_config"]["aws_access_key_id"],
+        "hmac_access_secret": source["config"]["aws_config"]["aws_secret_access_key"],
+    }
+    for path_spec in source["config"]["path_specs"]:
+        path_spec["include"] = path_spec["include"].replace("s3://", "gs://")
+    source["config"].pop("aws_config")
+    source["config"].pop("profiling", None)
+    source["config"].pop("sort_schema_fields", None)
+    source["config"].pop("use_s3_bucket_tags", None)
+    source["config"].pop("use_s3_content_type", None)
+    source["config"].pop("use_s3_object_tags", None)
+
+    config_dict["source"] = source
+    config_dict["sink"] = {
+        "type": "file",
+        "config": {
+            "filename": f"{tmp_path}/{source_file}",
+        },
+    }
+
+    config_dict["run_id"] = source_file
+
+    with patch("datahub.ingestion.source.gcs.gcs_source.GCS_ENDPOINT_URL", None):
+        pipeline = Pipeline.create(config_dict)
+    pipeline.run()
+    pipeline.raise_from_status()
+
+    # Verify the output.
+    mce_helpers.check_golden_file(
+        pytestconfig,
+        output_path=f"{tmp_path}/{source_file}",
+        golden_path=f"{test_resources_dir}/golden-files/gcs/golden_mces_{source_file}",
+        ignore_paths=[
+            r"root\[\d+\]\['aspect'\]\['json'\]\['lastUpdatedTimestamp'\]",
+        ],
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "source_file_tuple", shared_source_files, ids=get_descriptive_id
+)
 def test_data_lake_local_ingest(
     pytestconfig, touch_local_files, source_file_tuple, tmp_path, mock_time
 ):

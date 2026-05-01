@@ -1,10 +1,12 @@
-import analytics, { EventType } from '@app/analytics';
-import { useEntityRegistry } from '@app/useEntityRegistry';
 import { Modal } from '@components';
-import { useUnlinkAssetVersionMutation } from '@graphql/versioning.generated';
-import { EntityType } from '@types';
 import { message } from 'antd';
 import React from 'react';
+
+import analytics, { EventType } from '@app/analytics';
+import { useEntityRegistry } from '@app/useEntityRegistry';
+
+import { useUnlinkAssetVersionMutation } from '@graphql/versioning.generated';
+import { EntityType } from '@types';
 
 interface Props {
     urn: string;
@@ -52,8 +54,8 @@ export default function UnlinkAssetVersionModal({ urn, entityType, closeModal, v
             title="Are you sure?"
             subtitle="Would you like to unlink this version?"
             buttons={[
-                { text: 'No', variant: 'text', onClick: closeModal },
-                { text: 'Yes', variant: 'filled', onClick: handleUnlink },
+                { text: 'No', variant: 'text', onClick: closeModal, key: 'no' },
+                { text: 'Yes', variant: 'filled', onClick: handleUnlink, key: 'yes' },
             ]}
             onCancel={closeModal}
         />

@@ -3,27 +3,39 @@ import LanguageIcon from '@mui/icons-material/Language';
 import { Pagination, Spin, Typography } from 'antd';
 import React from 'react';
 import styled from 'styled-components';
-import { SearchCfg } from '../../../../../../conf';
-import {
-    DataHubView,
-    FacetFilterInput,
-    FacetMetadata,
-    SearchResults as SearchResultType,
-} from '../../../../../../types.generated';
-import { EntityAndType } from '../../../../../entity/shared/types';
-import { SearchFiltersSection } from '../../../../../search/SearchFiltersSection';
-import { UnionType } from '../../../../../search/utils/constants';
-import { combineSiblingsInSearchResults } from '../../../../../searchV2/utils/combineSiblingsInSearchResults';
-import { useIsShowSeparateSiblingsEnabled } from '../../../../../useAppConfig';
-import { ANTD_GRAY, REDESIGN_COLORS } from '../../../constants';
-import { EntityActionProps, EntitySearchResults } from './EntitySearchResults';
-import MatchingViewsLabel from './MatchingViewsLabel';
 
-const SearchBody = styled.div`
+import { EntityAndType } from '@app/entity/shared/types';
+import {
+    EntityActionProps,
+    EntitySearchResults,
+} from '@app/entityV2/shared/components/styled/search/EntitySearchResults';
+import MatchingViewsLabel from '@app/entityV2/shared/components/styled/search/MatchingViewsLabel';
+import { ANTD_GRAY, REDESIGN_COLORS } from '@app/entityV2/shared/constants';
+import { SearchFiltersSection } from '@app/search/SearchFiltersSection';
+import { UnionType } from '@app/search/utils/constants';
+import { combineSiblingsInSearchResults } from '@app/searchV2/utils/combineSiblingsInSearchResults';
+import { useIsShowSeparateSiblingsEnabled } from '@app/useAppConfig';
+import { SearchCfg } from '@src/conf';
+
+import { DataHubView, FacetFilterInput, FacetMetadata, SearchResults as SearchResultType } from '@types';
+
+const SearchBody = styled.div<{ showFilters?: boolean }>`
     height: 100%;
-    overflow-y: auto;
-    display: flex;
+    overflow: hidden;
     background-color: ${REDESIGN_COLORS.BACKGROUND};
+    display: grid;
+    grid-template-rows: 92% auto;
+    grid-template-columns: ${(p) => (p.showFilters ? '0.2fr auto' : '1fr')};
+    grid-template-areas: ${(p) =>
+        p.showFilters
+            ? `
+                 "filters results"
+                 "footer  footer"
+               `
+            : `
+                 "results"
+                 "footer"
+               `};
 `;
 
 const PaginationInfo = styled(Typography.Text)`
@@ -31,6 +43,7 @@ const PaginationInfo = styled(Typography.Text)`
 `;
 
 const FiltersContainer = styled.div`
+    grid-area: filters;
     background-color: ${REDESIGN_COLORS.WHITE};
     display: flex;
     flex-direction: column;
@@ -42,6 +55,7 @@ const FiltersContainer = styled.div`
 `;
 
 const ResultContainer = styled.div`
+    grid-area: results;
     height: auto;
     overflow: auto;
     flex: 1;
@@ -52,6 +66,7 @@ const ResultContainer = styled.div`
 `;
 
 const PaginationInfoContainer = styled.span`
+    grid-area: footer;
     padding: 8px;
     padding-left: 16px;
     border-top: 1px solid;
@@ -59,7 +74,6 @@ const PaginationInfoContainer = styled.span`
     display: flex;
     justify-content: space-between;
     align-items: center;
-    overflow: auto;
 `;
 
 const StyledPagination = styled(Pagination)`
@@ -91,11 +105,11 @@ const ViewsContainer = styled.div`
 `;
 
 const Pill = styled.div<{ selected?: boolean }>`
-    border: 1px solid ${(props) => (props.selected ? REDESIGN_COLORS.TITLE_PURPLE : `#797F98`)};
+    border: 1px solid ${(props) => (props.selected ? props.theme.styles['primary-color'] : `#797F98`)};
     white-space: nowrap;
     border-radius: 20px;
     padding: 5px 16px;
-    color: ${(props) => (props.selected ? REDESIGN_COLORS.TITLE_PURPLE : '#797F98')};
+    color: ${(props) => (props.selected ? props.theme.styles['primary-color'] : '#797F98')};
     cursor: pointer;
     display: flex;
     gap: 0.5rem;
@@ -104,7 +118,7 @@ const Pill = styled.div<{ selected?: boolean }>`
 `;
 
 const Count = styled.div<{ selected: boolean }>`
-    background-color: ${(props) => (props.selected ? REDESIGN_COLORS.HOVER_PURPLE : '#A3A7B9')};
+    background-color: ${(props) => (props.selected ? props.theme.styles['primary-color'] : '#A3A7B9')};
     color: ${REDESIGN_COLORS.WHITE};
     border-radius: 20px;
     min-width: 25px;
@@ -119,7 +133,7 @@ const Count = styled.div<{ selected: boolean }>`
 
 const LanguageIconStyle = styled(LanguageIcon)<{ selected?: boolean }>`
     font-size: 18px !important;
-    color: ${(props) => (props.selected ? REDESIGN_COLORS.TITLE_PURPLE : '#797F98')};
+    color: ${(props) => (props.selected ? props.theme.styles['primary-color'] : '#797F98')};
 `;
 
 const ViewLabel = styled.span`
@@ -199,7 +213,7 @@ export const EmbeddedListSearchResults = ({
 
     return (
         <>
-            <SearchBody>
+            <SearchBody showFilters={!!showFilters}>
                 {!!showFilters && (
                     <FiltersContainer>
                         <SearchFiltersSection
@@ -262,34 +276,34 @@ export const EmbeddedListSearchResults = ({
                         />
                     )}
                 </ResultContainer>
-            </SearchBody>
-            <PaginationInfoContainer>
-                <PaginationInfo>
-                    <b>
-                        {lastResultIndex > 0 ? (page - 1) * pageSize + 1 : 0} - {lastResultIndex}
-                    </b>{' '}
-                    of <b>{totalResults}</b>
-                </PaginationInfo>
-                <StyledPagination
-                    current={page}
-                    pageSize={numResultsPerPage}
-                    total={totalResults}
-                    showLessItems
-                    onChange={onChangePage}
-                    showSizeChanger={totalResults > SearchCfg.RESULTS_PER_PAGE}
-                    onShowSizeChange={(_currNum, newNum) => setNumResultsPerPage(newNum)}
-                    pageSizeOptions={['10', '20', '50', '100']}
-                />
-                {applyView ? (
-                    <MatchingViewsLabel
-                        view={view}
-                        selectedViewUrn={selectedViewUrn}
-                        setSelectedViewUrn={setSelectedViewUrn}
+                <PaginationInfoContainer>
+                    <PaginationInfo>
+                        <b>
+                            {lastResultIndex > 0 ? (page - 1) * pageSize + 1 : 0} - {lastResultIndex}
+                        </b>{' '}
+                        of <b>{totalResults}</b>
+                    </PaginationInfo>
+                    <StyledPagination
+                        current={page}
+                        pageSize={numResultsPerPage}
+                        total={totalResults}
+                        showLessItems
+                        onChange={onChangePage}
+                        showSizeChanger={totalResults > SearchCfg.RESULTS_PER_PAGE}
+                        onShowSizeChange={(_currNum, newNum) => setNumResultsPerPage(newNum)}
+                        pageSizeOptions={['10', '20', '50', '100']}
                     />
-                ) : (
-                    <span />
-                )}
-            </PaginationInfoContainer>
+                    {applyView ? (
+                        <MatchingViewsLabel
+                            view={view}
+                            selectedViewUrn={selectedViewUrn}
+                            setSelectedViewUrn={setSelectedViewUrn}
+                        />
+                    ) : (
+                        <span />
+                    )}
+                </PaginationInfoContainer>
+            </SearchBody>
         </>
     );
 };

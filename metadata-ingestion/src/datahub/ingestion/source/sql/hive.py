@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
-from pydantic.class_validators import validator
+from pydantic import validator
 from pydantic.fields import Field
 
 # This import verifies that the dependencies are available.
@@ -14,6 +14,7 @@ from pyhive import hive  # noqa: F401
 from pyhive.sqlalchemy_hive import HiveDate, HiveDecimal, HiveDialect, HiveTimestamp
 from sqlalchemy.engine.reflection import Inspector
 
+from datahub.configuration.common import HiddenFromDocs
 from datahub.emitter.mce_builder import (
     make_data_platform_urn,
     make_dataplatform_instance_urn,
@@ -139,7 +140,7 @@ class StoragePathParser:
                 path = f"{parsed.netloc}/{parsed.path.lstrip('/')}"
 
             elif platform == StoragePlatform.AZURE:
-                if scheme in ("abfs", "abfss"):
+                if scheme in ("abfs", "abfss", "wasbs"):
                     # Format: abfss://container@account.dfs.core.windows.net/path
                     container = parsed.netloc.split("@")[0]
                     path = f"{container}/{parsed.path.lstrip('/')}"
@@ -153,7 +154,7 @@ class StoragePathParser:
 
             elif platform == StoragePlatform.DBFS:
                 # For DBFS, use path as-is
-                path = parsed.path.lstrip("/")
+                path = "/" + parsed.path.lstrip("/")
 
             elif platform == StoragePlatform.LOCAL:
                 # For local files, use full path
@@ -169,7 +170,6 @@ class StoragePathParser:
             # Clean up the path
             path = path.rstrip("/")  # Remove trailing slashes
             path = re.sub(r"/+", "/", path)  # Normalize multiple slashes
-            path = f"/{path}"
 
             return platform, path
 
@@ -637,8 +637,13 @@ def get_view_definition_patched(self, connection, view_name, schema=None, **kw):
             self.identifier_preparer.quote_identifier(schema),
             self.identifier_preparer.quote_identifier(view_name),
         )
-    row = connection.execute(f"SHOW CREATE TABLE {full_table}").fetchone()
-    return row[0]
+    # Hive responds to the SHOW CREATE TABLE with the full view DDL,
+    # including the view definition. However, for multiline view definitions,
+    # it returns multiple rows (of one column each), each with a part of the definition.
+    # Any whitespace at the beginning/end of each view definition line is lost.
+    rows = connection.execute(f"SHOW CREATE TABLE {full_table}").fetchall()
+    parts = [row[0] for row in rows]
+    return "\n".join(parts)
 
 
 HiveDialect.get_view_names = get_view_names_patched
@@ -647,10 +652,10 @@ HiveDialect.get_view_definition = get_view_definition_patched
 
 class HiveConfig(TwoTierSQLAlchemyConfig):
     # defaults
-    scheme: str = Field(default="hive", hidden_from_docs=True)
+    scheme: HiddenFromDocs[str] = Field(default="hive")
 
     # Overriding as table location lineage is richer implementation here than with include_table_location_lineage
-    include_table_location_lineage: bool = Field(default=False, hidden_from_docs=True)
+    include_table_location_lineage: HiddenFromDocs[bool] = Field(default=False)
 
     emit_storage_lineage: bool = Field(
         default=False,
@@ -777,6 +782,7 @@ class HiveSource(TwoTierSQLAlchemySource):
             column,
             inspector,
             pk_constraints,
+            partition_keys=partition_keys,
         )
 
         if self._COMPLEX_TYPE.match(fields[0].nativeDataType) and isinstance(
@@ -821,12 +827,8 @@ class HiveSource(TwoTierSQLAlchemySource):
 
         try:
             view_definition = inspector.get_view_definition(view, schema)
-            if view_definition is None:
-                view_definition = ""
-            else:
-                # Some dialects return a TextClause instead of a raw string,
-                # so we need to convert them to a string.
-                view_definition = str(view_definition)
+            # Some dialects return a TextClause instead of a raw string, so we need to convert them to a string.
+            view_definition = str(view_definition) if view_definition else ""
         except NotImplementedError:
             view_definition = ""
 
@@ -853,3 +855,30 @@ class HiveSource(TwoTierSQLAlchemySource):
                 default_db=default_db,
                 default_schema=default_schema,
             )
+
+    def get_partitions(
+        self, inspector: Inspector, schema: str, table: str
+    ) -> Optional[List[str]]:
+        partition_columns: List[dict] = inspector.get_indexes(
+            table_name=table, schema=schema
+        )
+        for partition_column in partition_columns:
+            if partition_column.get("column_names"):
+                return partition_column.get("column_names")
+
+        return []
+
+    def get_table_properties(
+        self, inspector: Inspector, schema: str, table: str
+    ) -> Tuple[Optional[str], Dict[str, str], Optional[str]]:
+        (description, properties, location) = super().get_table_properties(
+            inspector, schema, table
+        )
+
+        new_properties = {}
+        for key, value in properties.items():
+            if key and key[-1] == ":":
+                new_properties[key[:-1]] = value
+            else:
+                new_properties[key] = value
+        return (description, new_properties, location)

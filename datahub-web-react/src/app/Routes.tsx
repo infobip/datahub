@@ -1,15 +1,17 @@
-import React from 'react';
-import { Switch, Route, RouteProps } from 'react-router-dom';
 import { useReactiveVar } from '@apollo/client';
-import AppProviders from './AppProviders';
-import { LogIn } from './auth/LogIn';
-import { SignUp } from './auth/SignUp';
-import { ResetCredentials } from './auth/ResetCredentials';
-import { NoPageFound } from './shared/NoPageFound';
-import { PageRoutes } from '../conf/Global';
-import { isLoggedInVar } from './auth/checkAuthStatus';
-import { useTrackPageView } from './analytics';
-import { ProtectedRoutes } from './ProtectedRoutes';
+import React from 'react';
+import { Route, RouteProps, Switch, useLocation } from 'react-router-dom';
+
+import AppProviders from '@app/AppProviders';
+import { ProtectedRoutes } from '@app/ProtectedRoutes';
+import { useTrackPageView } from '@app/analytics';
+import { LogIn } from '@app/auth/LogIn';
+import { ResetCredentials } from '@app/auth/ResetCredentials';
+import { SignUp } from '@app/auth/SignUp';
+import { isLoggedInVar } from '@app/auth/checkAuthStatus';
+import { NoPageFound } from '@app/shared/NoPageFound';
+import { PageRoutes } from '@conf/Global';
+import { resolveRuntimePath } from '@utils/runtimeBasePath';
 
 const ProtectedRoute = ({
     isLoggedIn,
@@ -17,9 +19,13 @@ const ProtectedRoute = ({
 }: {
     isLoggedIn: boolean;
 } & RouteProps) => {
-    const currentPath = window.location.pathname + window.location.search;
+    const location = useLocation();
+    const currentPath = location.pathname + location.search;
     if (!isLoggedIn) {
-        window.location.replace(`${PageRoutes.AUTHENTICATE}?redirect_uri=${encodeURIComponent(currentPath)}`);
+        // use window.location.replace to make an http request to frontend server, history.replace is for client-side navigation in React
+        window.location.replace(
+            `${resolveRuntimePath(PageRoutes.AUTHENTICATE)}?redirect_uri=${encodeURIComponent(currentPath)}`,
+        );
         return null;
     }
     return <Route {...props} />;

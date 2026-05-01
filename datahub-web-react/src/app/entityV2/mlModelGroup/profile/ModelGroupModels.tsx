@@ -1,16 +1,19 @@
+import { Table, Typography } from 'antd';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import styled from 'styled-components';
+
 import { useBaseEntity } from '@app/entity/shared/EntityContext';
 import { EmptyTab } from '@app/entityV2/shared/components/styled/EmptyTab';
 import { InfoItem } from '@app/entityV2/shared/components/styled/InfoItem';
 import { notEmpty } from '@app/entityV2/shared/utils';
+import { TimestampPopover } from '@app/sharedV2/TimestampPopover';
 import { useEntityRegistry } from '@app/useEntityRegistry';
+import { Pill } from '@src/alchemy-components/components/Pills';
+import { colors } from '@src/alchemy-components/theme';
+
 import { GetMlModelGroupQuery } from '@graphql/mlModelGroup.generated';
 import { EntityType } from '@types';
-import { Typography, Table } from 'antd';
-import React from 'react';
-import styled from 'styled-components';
-import { colors } from '@src/alchemy-components/theme';
-import { Pill } from '@src/alchemy-components/components/Pills';
-import moment from 'moment';
 
 const InfoItemContainer = styled.div<{ justifyContent }>`
     display: flex;
@@ -29,7 +32,7 @@ const NameContainer = styled.div`
     align-items: center;
 `;
 
-const NameLink = styled.a`
+const NameLink = styled(Link)`
     font-weight: 700;
     color: inherit;
     font-size: 0.9rem;
@@ -65,10 +68,18 @@ const VersionContainer = styled.div`
     align-items: center;
 `;
 
+const TruncatedDescription = styled.div<{ isExpanded: boolean }>`
+    display: -webkit-box;
+    -webkit-line-clamp: ${({ isExpanded }) => (isExpanded ? 'unset' : '3')};
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+`;
+
 export default function MLGroupModels() {
     const baseEntity = useBaseEntity<GetMlModelGroupQuery>();
     const entityRegistry = useEntityRegistry();
     const modelGroup = baseEntity?.mlModelGroup;
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
     const models =
         baseEntity?.mlModelGroup?.incoming?.relationships
@@ -85,7 +96,7 @@ export default function MLGroupModels() {
             width: 300,
             render: (_: any, record) => (
                 <NameContainer>
-                    <NameLink href={entityRegistry.getEntityUrl(EntityType.Mlmodel, record.urn)}>
+                    <NameLink to={entityRegistry.getEntityUrl(EntityType.Mlmodel, record.urn)}>
                         {record?.properties?.propertiesName || record?.name}
                     </NameLink>
                 </NameContainer>
@@ -104,11 +115,7 @@ export default function MLGroupModels() {
             key: 'createdAt',
             width: 150,
             render: (_: any, record: any) => (
-                <Typography.Text>
-                    {record.properties?.createdTS?.time
-                        ? moment(record.properties.createdTS.time).format('YYYY-MM-DD HH:mm:ss')
-                        : '-'}
-                </Typography.Text>
+                <TimestampPopover timestamp={record.properties?.createdTS?.time} title="Created At" showPopover />
             ),
         },
         {
@@ -128,8 +135,8 @@ export default function MLGroupModels() {
             },
         },
         {
-            title: 'Tags',
-            key: 'tags',
+            title: 'Properties',
+            key: 'properties',
             width: 200,
             render: (_: any, record: any) => {
                 const tags = record.properties?.tags || [];
@@ -151,8 +158,33 @@ export default function MLGroupModels() {
             render: (_: any, record: any) => {
                 const editableDesc = record.editableProperties?.description;
                 const originalDesc = record.description;
+                const description = editableDesc || originalDesc;
 
-                return <Typography.Text>{editableDesc || originalDesc || '-'}</Typography.Text>;
+                if (!description) return '-';
+
+                const isExpanded = expandedRows.has(record.urn);
+                const isLong = description.length > 150;
+
+                if (!isLong) return <Typography.Text>{description}</Typography.Text>;
+
+                return (
+                    <>
+                        <TruncatedDescription isExpanded={isExpanded}>{description}</TruncatedDescription>
+                        <Typography.Link
+                            onClick={() => {
+                                const newExpanded = new Set(expandedRows);
+                                if (isExpanded) {
+                                    newExpanded.delete(record.urn);
+                                } else {
+                                    newExpanded.add(record.urn);
+                                }
+                                setExpandedRows(newExpanded);
+                            }}
+                        >
+                            {isExpanded ? 'Show less' : 'Read more'}
+                        </Typography.Link>
+                    </>
+                );
             },
         },
     ];
@@ -162,18 +194,10 @@ export default function MLGroupModels() {
             <Typography.Title level={3}>Model Group Details</Typography.Title>
             <InfoItemContainer justifyContent="left">
                 <InfoItem title="Created At">
-                    <InfoItemContent>
-                        {modelGroup?.properties?.created?.time
-                            ? moment(modelGroup.properties.created.time).format('YYYY-MM-DD HH:mm:ss')
-                            : '-'}
-                    </InfoItemContent>
+                    <TimestampPopover timestamp={modelGroup?.properties?.created?.time} title="Created At" />
                 </InfoItem>
                 <InfoItem title="Last Modified At">
-                    <InfoItemContent>
-                        {modelGroup?.properties?.lastModified?.time
-                            ? moment(modelGroup.properties.lastModified.time).format('YYYY-MM-DD HH:mm:ss')
-                            : '-'}
-                    </InfoItemContent>
+                    <TimestampPopover timestamp={modelGroup?.properties?.lastModified?.time} title="Last Modified At" />
                 </InfoItem>
                 {modelGroup?.properties?.created?.actor && (
                     <InfoItem title="Created By">

@@ -24,7 +24,7 @@
         "border-radius-navbar-redesign": "12px"
     },
     "assets": {
-        "logoUrl": "/assets/logo.png"
+        "logoUrl": "assets/logo.png"
     },
     "content": {
         "title": "DataHub",
@@ -38,12 +38,12 @@
             "items": [
                 {
                     "label": "DataHub Project",
-                    "path": "https://datahubproject.io",
+                    "path": "https://docs.datahub.com",
                     "shouldOpenInNewTab": true
                 },
                 {
                     "label": "DataHub Docs",
-                    "path": "https://datahubproject.io/docs",
+                    "path": "https://docs.datahub.com/docs",
                     "shouldOpenInNewTab": true
                 },
                 {

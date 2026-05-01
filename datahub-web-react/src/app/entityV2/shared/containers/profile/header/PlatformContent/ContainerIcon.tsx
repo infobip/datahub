@@ -1,10 +1,13 @@
 import { FolderOpenOutlined } from '@ant-design/icons';
-import { GenericEntityProperties } from '@app/entity/shared/types';
 import { Maybe } from 'graphql/jsutils/Maybe';
 import React from 'react';
 import styled from 'styled-components';
+
+import { GenericEntityProperties } from '@app/entity/shared/types';
+import { TYPE_ICON_CLASS_NAME, getSubTypeIcon } from '@app/entityV2/shared/components/subtypes';
+import { getFirstSubType } from '@app/entityV2/shared/utils';
+
 import { Container } from '@types';
-import { getSubTypeIcon, TYPE_ICON_CLASS_NAME } from '../../../../components/subtypes';
 
 const IconWrapper = styled.span`
     line-height: 0;
@@ -28,6 +31,6 @@ export default function ContainerIcon({ container }: Props): JSX.Element {
 }
 
 export function ContainerIconBase({ container }: Props): JSX.Element {
-    const subtype = container?.subTypes?.typeNames?.[0].toLowerCase();
+    const subtype = getFirstSubType(container)?.toLowerCase();
     return (subtype && getSubTypeIcon(subtype)) || <DefaultIcon />;
 }

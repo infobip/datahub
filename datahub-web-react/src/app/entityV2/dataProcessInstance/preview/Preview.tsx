@@ -1,21 +1,23 @@
-import { GenericEntityProperties } from '@app/entity/shared/types';
-import DefaultPreviewCard from '@app/previewV2/DefaultPreviewCard';
 import React from 'react';
+
+import { GenericEntityProperties } from '@app/entity/shared/types';
+import { IconStyleType, PreviewType } from '@app/entityV2/Entity';
+import DefaultPreviewCard from '@app/previewV2/DefaultPreviewCard';
+import { useEntityRegistry } from '@app/useEntityRegistry';
+
 import {
+    Container,
     DataProduct,
     Deprecation,
     Domain,
-    Entity as GeneratedEntity,
     EntityPath,
     EntityType,
+    Entity as GeneratedEntity,
     GlobalTags,
     Health,
     Owner,
     SearchInsight,
-    Container,
-} from '../../../../types.generated';
-import { useEntityRegistry } from '../../../useEntityRegistry';
-import { IconStyleType } from '../../Entity';
+} from '@types';
 
 export default function Preview({
     urn,
@@ -39,6 +41,7 @@ export default function Preview({
     paths,
     health,
     parentEntities,
+    previewType,
 }: {
     urn: string;
     name: string;
@@ -61,6 +64,7 @@ export default function Preview({
     paths?: EntityPath[];
     health?: Health[] | null;
     parentEntities?: Array<GeneratedEntity> | null;
+    previewType: PreviewType;
 }): JSX.Element {
     const entityRegistry = useEntityRegistry();
     return (
@@ -90,6 +94,7 @@ export default function Preview({
             paths={paths}
             health={health || undefined}
             parentEntities={parentEntities}
+            previewType={previewType}
         />
     );
 }

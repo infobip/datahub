@@ -1,5 +1,7 @@
-import React, { forwardRef, useEffect, useImperativeHandle } from 'react';
+import { EditorComponent, Remirror, TableComponents, ThemeProvider, useRemirror } from '@remirror/react';
 import DOMPurify from 'dompurify';
+import React, { forwardRef, useEffect, useImperativeHandle } from 'react';
+import { useMount } from 'react-use';
 import {
     BlockquoteExtension,
     BoldExtension,
@@ -7,6 +9,7 @@ import {
     CodeBlockExtension,
     CodeExtension,
     DropCursorExtension,
+    FontSizeExtension,
     HardBreakExtension,
     HeadingExtension,
     HistoryExtension,
@@ -21,18 +24,19 @@ import {
     TableExtension,
     UnderlineExtension,
 } from 'remirror/extensions';
-import { EditorComponent, Remirror, useRemirror, ThemeProvider, TableComponents } from '@remirror/react';
-import { useMount } from 'react-use';
-import { EditorContainer, EditorTheme } from './EditorTheme';
-import { htmlToMarkdown } from './extensions/htmlToMarkdown';
-import { markdownToHtml } from './extensions/markdownToHtml';
-import { CodeBlockToolbar } from './toolbar/CodeBlockToolbar';
-import { FloatingToolbar } from './toolbar/FloatingToolbar';
-import { Toolbar } from './toolbar/Toolbar';
-import { OnChangeMarkdown } from './OnChangeMarkdown';
-import { TableCellMenu } from './toolbar/TableCellMenu';
-import { DataHubMentionsExtension } from './extensions/mentions/DataHubMentionsExtension';
-import { MentionsComponent } from './extensions/mentions/MentionsComponent';
+
+import { EditorContainer, EditorTheme } from '@components/components/Editor/EditorTheme';
+import { OnChangeMarkdown } from '@components/components/Editor/OnChangeMarkdown';
+import { htmlToMarkdown } from '@components/components/Editor/extensions/htmlToMarkdown';
+import { markdownToHtml } from '@components/components/Editor/extensions/markdownToHtml';
+import { DataHubMentionsExtension } from '@components/components/Editor/extensions/mentions/DataHubMentionsExtension';
+import { MentionsComponent } from '@components/components/Editor/extensions/mentions/MentionsComponent';
+import { CodeBlockToolbar } from '@components/components/Editor/toolbar/CodeBlockToolbar';
+import { FloatingToolbar } from '@components/components/Editor/toolbar/FloatingToolbar';
+import { TableCellMenu } from '@components/components/Editor/toolbar/TableCellMenu';
+import { Toolbar } from '@components/components/Editor/toolbar/Toolbar';
+
+import { notEmpty } from '@app/entityV2/shared/utils';
 
 type EditorProps = {
     readOnly?: boolean;
@@ -41,10 +45,12 @@ type EditorProps = {
     className?: string;
     doNotFocus?: boolean;
     placeholder?: string;
+    hideHighlightToolbar?: boolean;
+    toolbarStyles?: React.CSSProperties;
 };
 
 export const Editor = forwardRef((props: EditorProps, ref) => {
-    const { content, readOnly, onChange, className, placeholder } = props;
+    const { content, readOnly, onChange, className, placeholder, hideHighlightToolbar, toolbarStyles } = props;
     const { manager, state, getContext } = useRemirror({
         extensions: () => [
             new BlockquoteExtension(),
@@ -67,6 +73,7 @@ export const Editor = forwardRef((props: EditorProps, ref) => {
             new UnderlineExtension(),
             new StrikeExtension(),
             new TableExtension({ resizable: false }),
+            new FontSizeExtension({}),
             ...(readOnly ? [] : [new HistoryExtension({})]),
         ],
         content,
@@ -81,7 +88,7 @@ export const Editor = forwardRef((props: EditorProps, ref) => {
         }
     });
     useEffect(() => {
-        if (readOnly && content) {
+        if (readOnly && notEmpty(content)) {
             manager.store.commands.setContent(content);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,9 +106,9 @@ export const Editor = forwardRef((props: EditorProps, ref) => {
                 >
                     {!readOnly && (
                         <>
-                            <Toolbar />
+                            <Toolbar styles={toolbarStyles} />
                             <CodeBlockToolbar />
-                            <FloatingToolbar />
+                            {!hideHighlightToolbar && <FloatingToolbar />}
                             <TableComponents tableCellMenuProps={{ Component: TableCellMenu }} />
                             <MentionsComponent />
                             {onChange && <OnChangeMarkdown onChange={onChange} />}

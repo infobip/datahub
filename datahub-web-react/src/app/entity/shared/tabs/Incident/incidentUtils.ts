@@ -1,6 +1,5 @@
-import { GetEntityIncidentsDocument } from '../../../../../graphql/incident.generated';
-
-import { IncidentType, IncidentState, Incident } from '../../../../../types.generated';
+import { GetEntityIncidentsDocument } from '@graphql/incident.generated';
+import { Incident, IncidentState, IncidentType } from '@types';
 
 export const PAGE_SIZE = 100;
 
@@ -117,7 +116,7 @@ export const getIncidentsStatusSummary = (incidents: Array<Incident>) => {
     };
     incidents.forEach((assertion) => {
         if (incidents.length) {
-            const resultType = assertion.status.state;
+            const resultType = assertion.incidentStatus?.state;
             if (IncidentState.Active === resultType) {
                 summary.activeIncident++;
             }

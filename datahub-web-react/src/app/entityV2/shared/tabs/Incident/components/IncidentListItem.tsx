@@ -1,23 +1,29 @@
-import React, { useState } from 'react';
-import styled from 'styled-components';
-import { Dropdown, List, Menu, message, Tag, Typography } from 'antd';
-import { Tooltip, Popover, Button } from '@components';
 import { CheckCircleFilled, CheckOutlined, MoreOutlined, WarningFilled } from '@ant-design/icons';
+import { Popover, Tooltip } from '@components';
+import { Button, Dropdown, List, Menu, Tag, Typography, message } from 'antd';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { EntityType, IncidentState, IncidentType } from '../../../../../../types.generated';
-import { FAILURE_COLOR_HEX, getNameFromType, SUCCESS_COLOR_HEX } from '../incidentUtils';
-import { useGetUserQuery } from '../../../../../../graphql/user.generated';
-import { useEntityRegistry } from '../../../../../useEntityRegistry';
-import { toLocalDateTimeString, toRelativeTimeString } from '../../../../../shared/time/timeUtils';
-import { useEntityData, useRefetch } from '../../../../../entity/shared/EntityContext';
-import analytics, { EntityActionType, EventType } from '../../../../../analytics';
-import { useUpdateIncidentStatusMutation } from '../../../../../../graphql/mutations.generated';
-import { ResolveIncidentModal } from './ResolveIncidentModal';
-import handleGraphQLError from '../../../../../shared/handleGraphQLError';
-import CompactMarkdownViewer from '../../Documentation/components/CompactMarkdownViewer';
+import styled from 'styled-components';
+
+import analytics, { EntityActionType, EventType } from '@app/analytics';
+import { useEntityData, useRefetch } from '@app/entity/shared/EntityContext';
+import CompactMarkdownViewer from '@app/entityV2/shared/tabs/Documentation/components/CompactMarkdownViewer';
+import { ResolveIncidentModal } from '@app/entityV2/shared/tabs/Incident/components/ResolveIncidentModal';
+import {
+    FAILURE_COLOR_HEX,
+    SUCCESS_COLOR_HEX,
+    getNameFromType,
+} from '@app/entityV2/shared/tabs/Incident/incidentUtils';
+import handleGraphQLError from '@app/shared/handleGraphQLError';
+import { toLocalDateTimeString, toRelativeTimeString } from '@app/shared/time/timeUtils';
+import { useEntityRegistry } from '@app/useEntityRegistry';
+
+import { useUpdateIncidentStatusMutation } from '@graphql/mutations.generated';
+import { useGetUserQuery } from '@graphql/user.generated';
+import { EntityType, Incident, IncidentState, IncidentType } from '@types';
 
 type Props = {
-    incident: any;
+    incident: Incident;
     refetch?: () => Promise<any>;
 };
 
@@ -122,6 +128,18 @@ const IncidentResolvedContainer = styled.div`
     margin-right: 30px;
 `;
 
+const IncidentResolvedButton = styled(Button)`
+    background: #ffffff;
+    border: 1px solid #d9d9d9;
+    box-sizing: border-box;
+    box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.1);
+    border-radius: 5px;
+    color: #262626;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 20px;
+`;
+
 const MenuIcon = styled(MoreOutlined)`
     display: flex;
     justify-content: center;
@@ -147,17 +165,17 @@ export default function IncidentListItem({ incident, refetch }: Props) {
 
     // Fetching the most recent actor's data.
     const { data: createdActor } = useGetUserQuery({
-        variables: { urn: incident.created.actor, groupsCount: 0 },
+        variables: { urn: incident.created.actor || '', groupsCount: 0 },
         fetchPolicy: 'cache-first',
     });
     const { data: lastUpdatedActor } = useGetUserQuery({
-        variables: { urn: incident.status.lastUpdated.actor, groupsCount: 0 },
+        variables: { urn: incident.incidentStatus?.lastUpdated.actor || '', groupsCount: 0 },
         fetchPolicy: 'cache-first',
     });
 
     // Converting the created time into UTC
-    const createdDate = incident.created.time && new Date(incident.created.time);
-    const lastModifiedDate = incident.status.lastUpdated.time && new Date(incident.status.lastUpdated.time);
+    const createdDate = new Date(incident.created.time).getTime();
+    const lastModifiedDate = new Date(incident.incidentStatus?.lastUpdated.time || incident.created.time).getTime();
 
     // Updating the incident status on button click
     const updateIncidentStatus = (state: IncidentState, resolvedMessage: string) => {
@@ -214,19 +232,19 @@ export default function IncidentListItem({ incident, refetch }: Props) {
                             <TitleContainer>
                                 <IncidentTitle>{incident.title}</IncidentTitle>
                                 <IncidentTypeTag>
-                                    {incident.type === IncidentType.Custom
+                                    {incident.incidentType === IncidentType.Custom
                                         ? incident.customType
-                                        : getNameFromType(incident.type)}
+                                        : getNameFromType(incident.incidentType)}
                                 </IncidentTypeTag>
                             </TitleContainer>
                             <DescriptionContainer>
                                 <IncidentDescriptionLabel>Description</IncidentDescriptionLabel>
-                                <CompactMarkdownViewer content={incident?.description} />
-                                {incident.status.state === IncidentState.Resolved ? (
+                                <CompactMarkdownViewer content={incident?.description || ''} />
+                                {incident.incidentStatus?.state === IncidentState.Resolved ? (
                                     <>
                                         <IncidentDescriptionLabel>Resolution Note</IncidentDescriptionLabel>
                                         <IncidentDescriptionText>
-                                            {incident?.status?.message || 'No additional details'}
+                                            {incident?.incidentStatus?.message || 'No additional details'}
                                         </IncidentDescriptionText>
                                     </>
                                 ) : null}
@@ -250,22 +268,24 @@ export default function IncidentListItem({ incident, refetch }: Props) {
                             </DescriptionContainer>
                         </div>
                     </IncidentHeaderContainer>
-                    {incident.status.state === IncidentState.Resolved ? (
+                    {incident.incidentStatus?.state === IncidentState.Resolved ? (
                         <IncidentResolvedTextContainer>
                             <Popover
                                 overlayStyle={{ maxWidth: 240 }}
                                 placement="left"
                                 title={<Typography.Text strong>Note</Typography.Text>}
                                 content={
-                                    incident?.status?.message === null ? (
+                                    incident?.incidentStatus?.message === null ? (
                                         <Typography.Text type="secondary">No additional details</Typography.Text>
                                     ) : (
-                                        <Typography.Text type="secondary">{incident?.status?.message}</Typography.Text>
+                                        <Typography.Text type="secondary">
+                                            {incident?.incidentStatus?.message}
+                                        </Typography.Text>
                                     )
                                 }
                             >
                                 <IncidentResolvedText>
-                                    {incident?.status?.lastUpdated && (
+                                    {incident?.incidentStatus?.lastUpdated && (
                                         <Tooltip showArrow={false} title={toLocalDateTimeString(lastModifiedDate)}>
                                             Resolved {toRelativeTimeString(lastModifiedDate)} by{' '}
                                         </Tooltip>
@@ -294,10 +314,13 @@ export default function IncidentListItem({ incident, refetch }: Props) {
                         </IncidentResolvedTextContainer>
                     ) : (
                         <IncidentResolvedContainer>
-                            <Button onClick={() => handleResolved()} data-testid="resolve-incident">
-                                <CheckOutlined />
+                            <IncidentResolvedButton
+                                icon={<CheckOutlined />}
+                                onClick={() => handleResolved()}
+                                data-testid="resolve-incident"
+                            >
                                 Resolve
-                            </Button>
+                            </IncidentResolvedButton>
                             <WarningFilled style={{ fontSize: '28px', marginLeft: '16px', color: FAILURE_COLOR_HEX }} />
                         </IncidentResolvedContainer>
                     )}

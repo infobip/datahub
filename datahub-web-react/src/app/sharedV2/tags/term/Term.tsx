@@ -2,11 +2,12 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 
-import { EntityType, GlossaryTermAssociation } from '../../../../types.generated';
-import { HoverEntityTooltip } from '../../../recommendations/renderer/component/HoverEntityTooltip';
-import { useEntityRegistry } from '../../../useEntityRegistry';
-import TermContent from './TermContent';
-import { useEmbeddedProfileLinkProps } from '../../../shared/useEmbeddedProfileLinkProps';
+import { HoverEntityTooltip } from '@app/recommendations/renderer/component/HoverEntityTooltip';
+import { useEmbeddedProfileLinkProps } from '@app/shared/useEmbeddedProfileLinkProps';
+import TermContent from '@app/sharedV2/tags/term/TermContent';
+import { useEntityRegistry } from '@app/useEntityRegistry';
+
+import { EntityType, GlossaryTermAssociation } from '@types';
 
 const TermLink = styled(Link)<{ $showOneAndCount?: boolean }>`
     display: inline-block;
@@ -48,10 +49,11 @@ export default function Term(props: Props) {
     const { term, readOnly, showOneAndCount } = props;
     const entityRegistry = useEntityRegistry();
     const linkProps = useEmbeddedProfileLinkProps();
+    const previewContext = { propagationDetails: { context: props.context, attribution: term.attribution } };
 
     if (readOnly) {
         return (
-            <HoverEntityTooltip entity={term.term}>
+            <HoverEntityTooltip entity={term.term} previewContext={previewContext}>
                 <TermWrapper $showOneAndCount={showOneAndCount}>
                     <TermContent {...props} />
                 </TermWrapper>
@@ -60,7 +62,7 @@ export default function Term(props: Props) {
     }
 
     return (
-        <HoverEntityTooltip entity={term.term} width={250}>
+        <HoverEntityTooltip entity={term.term} width={250} previewContext={previewContext}>
             <TermLink
                 to={entityRegistry.getEntityUrl(EntityType.GlossaryTerm, term.term.urn)}
                 key={term.term.urn}

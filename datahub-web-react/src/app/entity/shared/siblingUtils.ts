@@ -1,8 +1,13 @@
-import { useEntityData } from '@app/entity/shared/EntityContext';
 import merge from 'deepmerge';
-import { keyBy, unionBy, values } from 'lodash';
+import { keyBy, unionBy, uniqWith, values } from 'lodash';
 import * as QueryString from 'query-string';
 import { useLocation } from 'react-router-dom';
+
+import { downgradeV2FieldPath } from '@app/entity/dataset/profile/schema/utils/utils';
+import { useEntityData } from '@app/entity/shared/EntityContext';
+import { GenericEntityProperties } from '@app/entity/shared/types';
+import { useIsShowSeparateSiblingsEnabled } from '@app/useAppConfig';
+
 import {
     Dataset,
     Entity,
@@ -10,13 +15,10 @@ import {
     HealthStatus,
     HealthStatusType,
     Maybe,
-    ScrollResults,
     Operation,
+    ScrollResults,
     SiblingProperties,
-} from '../../../types.generated';
-import { GenericEntityProperties } from './types';
-import { useIsShowSeparateSiblingsEnabled } from '../../useAppConfig';
-import { downgradeV2FieldPath } from '../dataset/profile/schema/utils/utils';
+} from '@types';
 
 export function stripSiblingsFromEntity(entity: any) {
     return {
@@ -27,7 +29,7 @@ export function stripSiblingsFromEntity(entity: any) {
     };
 }
 
-function cleanHelper(obj, visited) {
+export function cleanHelper(obj, visited) {
     if (visited.has(obj)) return obj;
     visited.add(obj);
 
@@ -36,7 +38,7 @@ function cleanHelper(obj, visited) {
         if (v && typeof v === 'object') {
             cleanHelper(v, visited);
         }
-        if ((v && typeof v === 'object' && !Object.keys(v).length) || v === null || v === undefined || v === '') {
+        if ((v && typeof v === 'object' && !Object.keys(v).length) || v === null || v === undefined) {
             if (Array.isArray(object)) {
                 // do nothing
             } else if (Object.getOwnPropertyDescriptor(object, k)?.configurable) {
@@ -123,8 +125,13 @@ const mergeStructuredProperties = (destinationArray, sourceArray, _options) => {
     return unionBy(sourceArray, destinationArray, 'structuredProperty.urn');
 };
 
-const mergeOwners = (destinationArray, sourceArray, _options) => {
-    return unionBy(destinationArray, sourceArray, 'owner.urn');
+export const mergeOwners = (destinationArray, sourceArray, _options) => {
+    return uniqWith([...destinationArray, ...sourceArray], (ownerA, ownerB) => {
+        if (!ownerA.ownershipType?.urn && !ownerB.ownershipType?.urn) {
+            return ownerA.owner?.urn === ownerB.owner?.urn && ownerA.type === ownerB.type;
+        }
+        return ownerA.owner?.urn === ownerB.owner?.urn && ownerA.ownershipType?.urn === ownerB.ownershipType?.urn;
+    });
 };
 
 const mergeFields = (destinationArray, sourceArray, _options) => {

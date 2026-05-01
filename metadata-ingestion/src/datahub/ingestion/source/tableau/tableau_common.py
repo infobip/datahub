@@ -65,6 +65,7 @@ workbook_graphql_query = """
       projectName
       owner {
         username
+        email
       }
       description
       uri
@@ -107,6 +108,7 @@ sheet_graphql_query = """
         luid
         owner {
           username
+          email
         }
     }
     datasourceFields {
@@ -185,6 +187,7 @@ dashboard_graphql_query = """
         luid
         owner {
           username
+          email
         }
     }
 }
@@ -268,6 +271,7 @@ embedded_datasource_graphql_query = """
         luid
         owner {
           username
+          email
         }
     }
 }
@@ -424,6 +428,7 @@ published_datasource_graphql_query = """
     }
     owner {
       username
+      email
     }
     description
     uri
@@ -579,10 +584,12 @@ def get_platform(connection_type: str) -> str:
         platform = "oracle"
     elif connection_type in ("tbio", "teradata"):
         platform = "teradata"
-    elif connection_type in ("sqlserver"):
+    elif connection_type in ("sqlserver",):
         platform = "mssql"
-    elif connection_type in ("athena"):
+    elif connection_type in ("athena",):
         platform = "athena"
+    elif connection_type in ("googlebigquery",):
+        platform = "bigquery"
     elif connection_type.endswith("_jdbc"):
         # e.g. convert trino_jdbc -> trino
         platform = connection_type[: -len("_jdbc")]
@@ -774,7 +781,7 @@ def get_overridden_info(
     if (
         lineage_overrides is not None
         and lineage_overrides.platform_override_map is not None
-        and original_platform in lineage_overrides.platform_override_map.keys()
+        and original_platform in lineage_overrides.platform_override_map
     ):
         platform = lineage_overrides.platform_override_map[original_platform]
 
@@ -782,7 +789,7 @@ def get_overridden_info(
         lineage_overrides is not None
         and lineage_overrides.database_override_map is not None
         and upstream_db is not None
-        and upstream_db in lineage_overrides.database_override_map.keys()
+        and upstream_db in lineage_overrides.database_override_map
     ):
         upstream_db = lineage_overrides.database_override_map[upstream_db]
 
@@ -902,7 +909,7 @@ def get_unique_custom_sql(custom_sql_list: List[dict]) -> List[dict]:
             "name": custom_sql.get("name"),
             # We assume that this is unsupported custom sql if "actual tables that this query references"
             # are missing from api result.
-            "isUnsupportedCustomSql": True if not custom_sql.get("tables") else False,
+            "isUnsupportedCustomSql": not custom_sql.get("tables"),
             "query": custom_sql.get("query"),
             "connectionType": custom_sql.get("connectionType"),
             "columns": custom_sql.get("columns"),

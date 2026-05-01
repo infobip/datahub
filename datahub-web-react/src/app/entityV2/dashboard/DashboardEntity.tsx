@@ -9,49 +9,54 @@ import {
     UnorderedListOutlined,
     WarningOutlined,
 } from '@ant-design/icons';
+import { ListBullets, TreeStructure } from '@phosphor-icons/react';
 import * as React from 'react';
+
+import { GenericEntityProperties } from '@app/entity/shared/types';
+import { Entity, EntityCapabilityType, IconStyleType, PreviewType } from '@app/entityV2/Entity';
+import { DashboardPreview } from '@app/entityV2/dashboard/preview/DashboardPreview';
+import { DashboardStatsSummarySubHeader } from '@app/entityV2/dashboard/profile/DashboardStatsSummarySubHeader';
+import DashboardSummaryTab from '@app/entityV2/dashboard/summary/DashboardSummaryTab';
+import { EntityMenuItems } from '@app/entityV2/shared/EntityDropdown/EntityMenuActions';
+import { TYPE_ICON_CLASS_NAME } from '@app/entityV2/shared/components/subtypes';
+import { EntityProfile } from '@app/entityV2/shared/containers/profile/EntityProfile';
+import { SidebarAboutSection } from '@app/entityV2/shared/containers/profile/sidebar/AboutSection/SidebarAboutSection';
+import { SidebarApplicationSection } from '@app/entityV2/shared/containers/profile/sidebar/Applications/SidebarApplicationSection';
+import SidebarDashboardHeaderSection from '@app/entityV2/shared/containers/profile/sidebar/Dashboard/Header/SidebarDashboardHeaderSection';
+import DataProductSection from '@app/entityV2/shared/containers/profile/sidebar/DataProduct/DataProductSection';
+import { SidebarDomainSection } from '@app/entityV2/shared/containers/profile/sidebar/Domain/SidebarDomainSection';
+import SidebarLineageSection from '@app/entityV2/shared/containers/profile/sidebar/Lineage/SidebarLineageSection';
+import { SidebarOwnerSection } from '@app/entityV2/shared/containers/profile/sidebar/Ownership/sidebar/SidebarOwnerSection';
+import SidebarEntityHeader from '@app/entityV2/shared/containers/profile/sidebar/SidebarEntityHeader';
+import { SidebarGlossaryTermsSection } from '@app/entityV2/shared/containers/profile/sidebar/SidebarGlossaryTermsSection';
+import { SidebarTagsSection } from '@app/entityV2/shared/containers/profile/sidebar/SidebarTagsSection';
+import StatusSection from '@app/entityV2/shared/containers/profile/sidebar/shared/StatusSection';
+import { getDataForEntityType } from '@app/entityV2/shared/containers/profile/utils';
+import EmbeddedProfile from '@app/entityV2/shared/embed/EmbeddedProfile';
+import SidebarNotesSection from '@app/entityV2/shared/sidebarSection/SidebarNotesSection';
+import SidebarStructuredProperties from '@app/entityV2/shared/sidebarSection/SidebarStructuredProperties';
+import { SUMMARY_TAB_ICON } from '@app/entityV2/shared/summary/HeaderComponents';
+import { DocumentationTab } from '@app/entityV2/shared/tabs/Documentation/DocumentationTab';
+import { EmbedTab } from '@app/entityV2/shared/tabs/Embed/EmbedTab';
+import { DashboardChartsTab } from '@app/entityV2/shared/tabs/Entity/DashboardChartsTab';
+import { DashboardDatasetsTab } from '@app/entityV2/shared/tabs/Entity/DashboardDatasetsTab';
+import { IncidentTab } from '@app/entityV2/shared/tabs/Incident/IncidentTab';
+import { LineageTab } from '@app/entityV2/shared/tabs/Lineage/LineageTab';
+import { PropertiesTab } from '@app/entityV2/shared/tabs/Properties/PropertiesTab';
 import {
-    GetDashboardQuery,
-    useGetDashboardQuery,
-    useUpdateDashboardMutation,
-} from '../../../graphql/dashboard.generated';
-import { Dashboard, EntityType, LineageDirection, SearchResult } from '../../../types.generated';
-import { GenericEntityProperties } from '../../entity/shared/types';
-import { LOOKER_URN, MODE_URN } from '../../ingest/source/builder/constants';
-import { matchedInputFieldRenderer } from '../../search/matches/matchedInputFieldRenderer';
-import { MatchedFieldList } from '../../searchV2/matches/MatchedFieldList';
-import { capitalizeFirstLetterOnly } from '../../shared/textUtil';
-import { Entity, EntityCapabilityType, IconStyleType, PreviewType } from '../Entity';
-import { EntityMenuItems } from '../shared/EntityDropdown/EntityMenuActions';
-import { TYPE_ICON_CLASS_NAME } from '../shared/components/subtypes';
-import { EntityProfile } from '../shared/containers/profile/EntityProfile';
-import { SidebarAboutSection } from '../shared/containers/profile/sidebar/AboutSection/SidebarAboutSection';
-import SidebarDashboardHeaderSection from '../shared/containers/profile/sidebar/Dashboard/Header/SidebarDashboardHeaderSection';
-import DataProductSection from '../shared/containers/profile/sidebar/DataProduct/DataProductSection';
-import { SidebarDomainSection } from '../shared/containers/profile/sidebar/Domain/SidebarDomainSection';
-import SidebarLineageSection from '../shared/containers/profile/sidebar/Lineage/SidebarLineageSection';
-import { SidebarOwnerSection } from '../shared/containers/profile/sidebar/Ownership/sidebar/SidebarOwnerSection';
-import SidebarEntityHeader from '../shared/containers/profile/sidebar/SidebarEntityHeader';
-import { SidebarGlossaryTermsSection } from '../shared/containers/profile/sidebar/SidebarGlossaryTermsSection';
-import { SidebarTagsSection } from '../shared/containers/profile/sidebar/SidebarTagsSection';
-import StatusSection from '../shared/containers/profile/sidebar/shared/StatusSection';
-import { getDataForEntityType } from '../shared/containers/profile/utils';
-import EmbeddedProfile from '../shared/embed/EmbeddedProfile';
-import SidebarStructuredProperties from '../shared/sidebarSection/SidebarStructuredProperties';
-import { SUMMARY_TAB_ICON } from '../shared/summary/HeaderComponents';
-import { DocumentationTab } from '../shared/tabs/Documentation/DocumentationTab';
-import { EmbedTab } from '../shared/tabs/Embed/EmbedTab';
-import { DashboardChartsTab } from '../shared/tabs/Entity/DashboardChartsTab';
-import { DashboardDatasetsTab } from '../shared/tabs/Entity/DashboardDatasetsTab';
-import TabNameWithCount from '../shared/tabs/Entity/TabNameWithCount';
-import { IncidentTab } from '../shared/tabs/Incident/IncidentTab';
-import { LineageTab } from '../shared/tabs/Lineage/LineageTab';
-import { PropertiesTab } from '../shared/tabs/Properties/PropertiesTab';
-import { SidebarTitleActionType, getDashboardLastUpdatedMs, getDataProduct, isOutputPort } from '../shared/utils';
-import { DashboardPreview } from './preview/DashboardPreview';
-import { DashboardStatsSummarySubHeader } from './profile/DashboardStatsSummarySubHeader';
-import DashboardSummaryTab from './summary/DashboardSummaryTab';
-import SidebarNotesSection from '../shared/sidebarSection/SidebarNotesSection';
+    SidebarTitleActionType,
+    getDashboardLastUpdatedMs,
+    getDataProduct,
+    getFirstSubType,
+    isOutputPort,
+} from '@app/entityV2/shared/utils';
+import { LOOKER_URN, MODE_URN } from '@app/ingest/source/builder/constants';
+import { matchedInputFieldRenderer } from '@app/search/matches/matchedInputFieldRenderer';
+import { MatchedFieldList } from '@app/searchV2/matches/MatchedFieldList';
+import { capitalizeFirstLetterOnly } from '@app/shared/textUtil';
+
+import { GetDashboardQuery, useGetDashboardQuery, useUpdateDashboardMutation } from '@graphql/dashboard.generated';
+import { Dashboard, EntityType, LineageDirection, SearchResult } from '@types';
 
 const PREVIEW_SUPPORTED_PLATFORMS = [LOOKER_URN, MODE_URN];
 
@@ -60,7 +65,6 @@ const PREVIEW_SUPPORTED_PLATFORMS = [LOOKER_URN, MODE_URN];
  */
 
 const headerDropdownItems = new Set([
-    EntityMenuItems.EXTERNAL_URL,
     EntityMenuItems.SHARE,
     EntityMenuItems.UPDATE_DEPRECATION,
     EntityMenuItems.ANNOUNCE,
@@ -89,14 +93,7 @@ export class DashboardEntity implements Entity<Dashboard> {
             );
         }
 
-        return (
-            <DashboardOutlined
-                style={{
-                    fontSize,
-                    color: color || '#BFBFBF',
-                }}
-            />
-        );
+        return <DashboardOutlined style={{ fontSize: fontSize || 'inherit', color: color || 'inherit' }} />;
     };
 
     isSearchEnabled = () => true;
@@ -177,6 +174,7 @@ export class DashboardEntity implements Entity<Dashboard> {
                     properties: {
                         defaultDirection: LineageDirection.Upstream,
                     },
+                    supportsFullsize: true,
                 },
                 {
                     name: 'Properties',
@@ -187,9 +185,8 @@ export class DashboardEntity implements Entity<Dashboard> {
                     name: 'Incidents',
                     icon: WarningOutlined,
                     component: IncidentTab,
-                    getDynamicName: (_, dashboard, loading) => {
-                        const activeIncidentCount = dashboard?.dashboard?.activeIncidents?.total;
-                        return <TabNameWithCount name="Incidents" count={activeIncidentCount} loading={loading} />;
+                    getCount: (_, dashboard) => {
+                        return dashboard?.dashboard?.activeIncidents?.total;
                     },
                 },
             ]}
@@ -221,6 +218,9 @@ export class DashboardEntity implements Entity<Dashboard> {
             component: SidebarDomainSection,
         },
         {
+            component: SidebarApplicationSection,
+        },
+        {
             component: DataProductSection,
         },
         {
@@ -242,7 +242,7 @@ export class DashboardEntity implements Entity<Dashboard> {
             name: 'Lineage',
             component: LineageTab,
             description: "View this data asset's upstream and downstream dependencies",
-            icon: PartitionOutlined,
+            icon: TreeStructure,
             properties: {
                 defaultDirection: LineageDirection.Upstream,
                 actionType: SidebarTitleActionType.LineageExplore,
@@ -252,7 +252,7 @@ export class DashboardEntity implements Entity<Dashboard> {
             name: 'Properties',
             component: PropertiesTab,
             description: 'View additional properties about this asset',
-            icon: UnorderedListOutlined,
+            icon: ListBullets,
         },
     ];
 
@@ -291,7 +291,7 @@ export class DashboardEntity implements Entity<Dashboard> {
                 statsSummary={data.statsSummary}
                 lastUpdatedMs={getDashboardLastUpdatedMs(data.properties)}
                 createdMs={data.properties?.created?.time}
-                subtype={data.subTypes?.typeNames?.[0]}
+                subtype={getFirstSubType(data)}
                 headerDropdownItems={headerDropdownItems}
                 previewType={previewType}
                 browsePaths={data.browsePathV2 || undefined}
@@ -332,12 +332,13 @@ export class DashboardEntity implements Entity<Dashboard> {
                         matchSuffix="on a contained chart"
                     />
                 }
-                subtype={data.subTypes?.typeNames?.[0]}
+                subtype={getFirstSubType(data)}
                 degree={(result as any).degree}
                 paths={(result as any).paths}
                 isOutputPort={isOutputPort(result)}
                 headerDropdownItems={headerDropdownItems}
                 browsePaths={data.browsePathV2 || undefined}
+                previewType={PreviewType.SEARCH}
             />
         );
     };
@@ -357,7 +358,7 @@ export class DashboardEntity implements Entity<Dashboard> {
             urn: entity.urn,
             name: entity.properties?.name || entity.urn,
             type: EntityType.Dashboard,
-            subtype: entity?.subTypes?.typeNames?.[0] || undefined,
+            subtype: getFirstSubType(entity) || undefined,
             icon: entity?.platform?.properties?.logoUrl || undefined,
             platform: entity?.platform,
             deprecation: entity?.deprecation,
@@ -388,6 +389,7 @@ export class DashboardEntity implements Entity<Dashboard> {
             EntityCapabilityType.TEST,
             EntityCapabilityType.LINEAGE,
             EntityCapabilityType.HEALTH,
+            EntityCapabilityType.APPLICATIONS,
         ]);
     };
 

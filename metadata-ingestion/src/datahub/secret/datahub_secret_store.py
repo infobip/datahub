@@ -3,7 +3,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, validator
 
-from datahub.ingestion.graph.client import DatahubClientConfig, DataHubGraph
+from datahub.ingestion.graph.client import DataHubGraph
+from datahub.ingestion.graph.config import DatahubClientConfig
 from datahub.secret.datahub_secrets_client import DataHubSecretsClient
 from datahub.secret.secret_store import SecretStore
 
@@ -64,3 +65,6 @@ class DataHubSecretStore(SecretStore):
     def create(cls, config: Any) -> "DataHubSecretStore":
         config = DataHubSecretStoreConfig.parse_obj(config)
         return cls(config)
+
+    def close(self) -> None:
+        self.client.graph.close()

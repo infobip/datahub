@@ -92,10 +92,15 @@ class DatahubRestHook(BaseHook):
 
     def make_emitter(self) -> "DataHubRestEmitter":
         import datahub.emitter.rest_emitter
+        from datahub.ingestion.graph.config import ClientMode
 
         host, token, extra_args = self._get_config_v2()
         return datahub.emitter.rest_emitter.DataHubRestEmitter(
-            host, token, **extra_args
+            host,
+            token,
+            client_mode=ClientMode.INGESTION,
+            datahub_component="airflow-plugin",
+            **extra_args,
         )
 
     def make_graph(self) -> "DataHubGraph":
@@ -320,7 +325,6 @@ class DatahubCompositeHook(BaseHook):
         self.datahub_conn_ids = datahub_conn_ids
 
     def make_emitter(self) -> CompositeEmitter:
-        print(f"Create emitters for {self.datahub_conn_ids}")
         return CompositeEmitter(
             [
                 self._get_underlying_hook(conn_id).make_emitter()
@@ -341,7 +345,6 @@ class DatahubCompositeHook(BaseHook):
         emitter = self.make_emitter()
 
         for item in items:
-            print(f"emitting item {item}")
             emitter.emit(item)
 
     def _get_underlying_hook(self, conn_id: str) -> DatahubGenericHook:

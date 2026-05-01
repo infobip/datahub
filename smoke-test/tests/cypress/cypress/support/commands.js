@@ -23,6 +23,14 @@ export function getTimestampMillisNumDaysAgo(numDays) {
 }
 
 const SKIP_ONBOARDING_TOUR_KEY = "skipOnboardingTour";
+const SKIP_WELCOME_MODAL_KEY = "skipWelcomeModal";
+
+function notFirstTimeVisit() {
+  cy.window().then((win) => {
+    win.localStorage.setItem(SKIP_ONBOARDING_TOUR_KEY, "true");
+    win.localStorage.setItem(SKIP_WELCOME_MODAL_KEY, "true");
+  });
+}
 
 Cypress.Commands.add("login", () => {
   cy.request({
@@ -33,29 +41,43 @@ Cypress.Commands.add("login", () => {
       password: Cypress.env("ADMIN_PASSWORD"),
     },
     retryOnStatusCodeFailure: true,
-  }).then(() => localStorage.setItem(SKIP_ONBOARDING_TOUR_KEY, "true"));
+  }).then(() => notFirstTimeVisit());
 });
 
 Cypress.Commands.add("loginWithCredentials", (username, password) => {
   cy.visit("/login");
-  if ((username, password)) {
-    cy.get("input[data-testid=username]").type(username);
-    cy.get("input[data-testid=password]").type(password);
-  } else {
-    cy.get("input[data-testid=username]").type(Cypress.env("ADMIN_USERNAME"));
-    cy.get("input[data-testid=password]").type(Cypress.env("ADMIN_PASSWORD"));
-  }
+  cy.get("input[data-testid=username]").type(
+    username || Cypress.env("ADMIN_USERNAME"),
+    { delay: 0 },
+  );
+  cy.get("input[data-testid=password]").type(
+    password || Cypress.env("ADMIN_PASSWORD"),
+    { delay: 0 },
+  );
   cy.contains("Sign In").click();
   cy.get(".ant-avatar-circle").should("be.visible");
-  localStorage.setItem(SKIP_ONBOARDING_TOUR_KEY, "true");
+  notFirstTimeVisit();
 });
 
 Cypress.Commands.add("visitWithLogin", (url) => {
   cy.visit(url);
   cy.get("input[data-testid=username]").type(Cypress.env("ADMIN_USERNAME"));
   cy.get("input[data-testid=password]").type(Cypress.env("ADMIN_PASSWORD"));
-  localStorage.setItem(SKIP_ONBOARDING_TOUR_KEY, "true");
+  notFirstTimeVisit();
   cy.contains("Sign In").click();
+});
+
+// Login commands for onboarding tour testing (without setting skipOnboardingTour)
+Cypress.Commands.add("loginForOnboarding", () => {
+  cy.request({
+    method: "POST",
+    url: "/logIn",
+    body: {
+      username: Cypress.env("ADMIN_USERNAME"),
+      password: Cypress.env("ADMIN_PASSWORD"),
+    },
+    retryOnStatusCodeFailure: true,
+  });
 });
 
 Cypress.Commands.add("deleteUrn", (urn) => {
@@ -114,6 +136,11 @@ Cypress.Commands.add("goToOwnershipTypesSettings", () => {
 Cypress.Commands.add("goToHomePagePostSettings", () => {
   cy.visit("/settings/posts");
   cy.waitTextVisible("Home Page Posts");
+});
+
+Cypress.Commands.add("goToHomePagePostSettingsV1", () => {
+  cy.visit("/settings/posts");
+  cy.waitTestIdVisible("managePostsV1");
 });
 
 Cypress.Commands.add("goToHomePagePostSettingsV2", () => {
@@ -201,6 +228,10 @@ Cypress.Commands.add("goToDomain", (urn) => {
   cy.visit(`/domain/${urn}`);
 });
 
+Cypress.Commands.add("goToApplication", (urn) => {
+  cy.visit(`/application/${urn}`);
+});
+
 Cypress.Commands.add("goToAnalytics", () => {
   cy.visit("/analytics");
   cy.contains("Data Landscape Summary", { timeout: 10000 });
@@ -266,7 +297,9 @@ Cypress.Commands.add("addViaFormModal", (text, modelHeader) => {
 
 Cypress.Commands.add("addViaModal", (text, modelHeader, value, dataTestId) => {
   cy.waitTextVisible(modelHeader);
-  cy.get(".ant-input-affix-wrapper > input[type='text']").first().type(text);
+  cy.get(".ant-modal-content .ant-input-affix-wrapper > input[type='text']")
+    .first()
+    .type(text);
   cy.get(`[data-testid="${dataTestId}"]`).click();
   cy.contains(value).should("be.visible");
 });
@@ -288,6 +321,10 @@ Cypress.Commands.add("ensureTextNotPresent", (text) => {
 
 Cypress.Commands.add("ensureElementPresent", (element) => {
   cy.get(element).should("be.visible");
+});
+
+Cypress.Commands.add("ensureElementWithTestIdPresent", (testId) => {
+  cy.get(selectorWithtestId(testId)).should("be.visible");
 });
 
 Cypress.Commands.add("waitTextPresent", (text) => {
@@ -429,6 +466,15 @@ Cypress.Commands.add(
   },
 );
 
+Cypress.Commands.add(
+  "removeApplicationFromDataset",
+  (urn, dataset_name, application_urn) => {
+    cy.goToDataset(urn, dataset_name);
+    cy.get(`.sidebar-application-section .anticon-close`).click();
+    cy.clickOptionWithText("Yes");
+  },
+);
+
 Cypress.Commands.add("openEntityTab", (tab) => {
   const selector = `div[id$="${tab}"]:nth-child(1)`;
   cy.get(selector).click();
@@ -524,17 +570,31 @@ Cypress.Commands.add("setIsThemeV2Enabled", (isEnabled) => {
         res.body.data.appConfig.featureFlags.themeV2Default = isEnabled;
         res.body.data.appConfig.featureFlags.showNavBarRedesign = isEnabled;
       });
+    } else if (hasOperationName(req, "getMe")) {
+      req.alias = "gqlgetMeQuery";
+      req.on("response", (res) => {
+        res.body.data.me.corpUser.settings.appearance.showThemeV2 = isEnabled;
+      });
     }
   });
 });
 
-Cypress.Commands.add("ignoreResizeObserverLoop", () => {
-  const resizeObserverLoopErrRe = "ResizeObserver loop limit exceeded";
-  cy.on("uncaught:exception", (err) => {
-    if (err.message.includes(resizeObserverLoopErrRe)) {
-      return false;
-    }
-  });
+Cypress.on("uncaught:exception", (err) => {
+  const resizeObserverLoopLimitErrMessage =
+    "ResizeObserver loop limit exceeded";
+  const resizeObserverLoopErrMessage =
+    "ResizeObserver loop completed with undelivered notifications.";
+
+  /* returning false here prevents Cypress from failing the test */
+  if (
+    err.message.includes(resizeObserverLoopLimitErrMessage) ||
+    err.message.includes(resizeObserverLoopErrMessage)
+  ) {
+    return false;
+  }
+
+  // Allow other uncaught exceptions to fail the test
+  return true;
 });
 
 //

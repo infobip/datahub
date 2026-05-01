@@ -1,15 +1,19 @@
+import { Collapse, Form, Input, Modal, Tag, Typography, message } from 'antd';
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { message, Input, Modal, Typography, Form, Collapse, Tag } from 'antd';
+
+import analytics, { EventType } from '@app/analytics';
+import { UpdatedDomain, useDomainsContext as useDomainsContextV2 } from '@app/domainV2/DomainsContext';
+import DomainParentSelect from '@app/entityV2/shared/EntityDropdown/DomainParentSelect';
+import { useModulesContext } from '@app/homeV3/module/context/ModulesContext';
+import { ModalButtonContainer } from '@app/shared/button/styledComponents';
+import { validateCustomUrnId } from '@app/shared/textUtil';
+import { useEnterKeyListener } from '@app/shared/useEnterKeyListener';
+import { useIsNestedDomainsEnabled } from '@app/useAppConfig';
 import { Button } from '@src/alchemy-components';
-import { useCreateDomainMutation } from '../../graphql/domain.generated';
-import { useEnterKeyListener } from '../shared/useEnterKeyListener';
-import { validateCustomUrnId } from '../shared/textUtil';
-import analytics, { EventType } from '../analytics';
-import DomainParentSelect from '../entityV2/shared/EntityDropdown/DomainParentSelect';
-import { useIsNestedDomainsEnabled } from '../useAppConfig';
-import { useDomainsContext as useDomainsContextV2 } from './DomainsContext';
-import { ModalButtonContainer } from '../shared/button/styledComponents';
+
+import { useCreateDomainMutation } from '@graphql/domain.generated';
+import { DataHubPageModuleType, EntityType } from '@types';
 
 const SuggestedNamesGroup = styled.div`
     margin-top: 8px;
@@ -46,7 +50,7 @@ const AdvancedLabel = styled(Typography.Text)`
 
 type Props = {
     onClose: () => void;
-    onCreate: (
+    onCreate?: (
         urn: string,
         id: string | undefined,
         name: string,
@@ -64,12 +68,14 @@ const DESCRIPTION_FIELD_NAME = 'description';
 export default function CreateDomainModal({ onClose, onCreate }: Props) {
     const isNestedDomainsEnabled = useIsNestedDomainsEnabled();
     const [createDomainMutation] = useCreateDomainMutation();
-    const { entityData } = useDomainsContextV2();
+    const { entityData, setNewDomain } = useDomainsContextV2();
     const [selectedParentUrn, setSelectedParentUrn] = useState<string>(
         (isNestedDomainsEnabled && entityData?.urn) || '',
     );
     const [createButtonEnabled, setCreateButtonEnabled] = useState(false);
     const [form] = Form.useForm();
+
+    const { reloadModules } = useModulesContext();
 
     const onCreateDomain = () => {
         createDomainMutation({
@@ -92,14 +98,28 @@ export default function CreateDomainModal({ onClose, onCreate }: Props) {
                         content: `Created domain!`,
                         duration: 3,
                     });
-                    onCreate(
+                    onCreate?.(
                         data?.createDomain || '',
                         form.getFieldValue(ID_FIELD_NAME),
                         form.getFieldValue(NAME_FIELD_NAME),
                         form.getFieldValue(DESCRIPTION_FIELD_NAME),
                         selectedParentUrn || undefined,
                     );
+                    const newDomain: UpdatedDomain = {
+                        urn: data?.createDomain || '',
+                        type: EntityType.Domain,
+                        id: form.getFieldValue(ID_FIELD_NAME),
+                        properties: {
+                            name: form.getFieldValue(NAME_FIELD_NAME),
+                            description: form.getFieldValue(DESCRIPTION_FIELD_NAME),
+                        },
+                        parentDomain: selectedParentUrn || undefined,
+                    };
+                    setNewDomain(newDomain);
                     form.resetFields();
+                    // Reload modules
+                    // ChildHierarchy - to reload shown child domains on asset summary tab
+                    reloadModules([DataHubPageModuleType.ChildHierarchy], 3000);
                 }
             })
             .catch((e) => {
@@ -144,14 +164,6 @@ export default function CreateDomainModal({ onClose, onCreate }: Props) {
                     setCreateButtonEnabled(!form.getFieldsError().some((field) => field.errors.length > 0));
                 }}
             >
-                {isNestedDomainsEnabled && (
-                    <FormItemWithMargin label={<FormItemLabel>Parent (optional)</FormItemLabel>}>
-                        <DomainParentSelect
-                            selectedParentUrn={selectedParentUrn}
-                            setSelectedParentUrn={setSelectedParentUrn}
-                        />
-                    </FormItemWithMargin>
-                )}
                 <FormItemWithMargin label={<FormItemLabel>Name</FormItemLabel>}>
                     <FormItemNoMargin
                         name={NAME_FIELD_NAME}
@@ -200,6 +212,14 @@ export default function CreateDomainModal({ onClose, onCreate }: Props) {
                         />
                     </FormItemNoMargin>
                 </FormItemWithMargin>
+                {isNestedDomainsEnabled && (
+                    <FormItemWithMargin label={<FormItemLabel>Parent (optional)</FormItemLabel>}>
+                        <DomainParentSelect
+                            selectedParentUrn={selectedParentUrn}
+                            setSelectedParentUrn={setSelectedParentUrn}
+                        />
+                    </FormItemWithMargin>
+                )}
                 <Collapse ghost>
                     <Collapse.Panel header={<AdvancedLabel>Advanced Options</AdvancedLabel>} key="1">
                         <FormItemWithMargin

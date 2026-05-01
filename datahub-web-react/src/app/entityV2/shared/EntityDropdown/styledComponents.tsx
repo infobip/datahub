@@ -1,6 +1,7 @@
-import styled from 'styled-components';
 import { Button } from 'antd';
-import { ANTD_GRAY, REDESIGN_COLORS, SEARCH_COLORS } from '../constants';
+import styled from 'styled-components';
+
+import { ANTD_GRAY, REDESIGN_COLORS } from '@app/entityV2/shared/constants';
 
 const MenuItem = styled.div`
     font-size: 12px;
@@ -8,11 +9,11 @@ const MenuItem = styled.div`
     color: #262626;
 `;
 
-export const ActionMenuItem = styled(Button)<{ disabled?: boolean; fontSize?: number; excludeMargin?: boolean }>`
+export const ActionMenuItem = styled(Button)<{ disabled?: boolean; fontSize?: number }>`
+    flex-shrink: 0;
     border-radius: 20px;
     width: ${(props) => (props.fontSize ? `${props.fontSize}px` : '28px')};
     height: ${(props) => (props.fontSize ? `${props.fontSize}px` : '28px')};
-    margin: 0px ${(props) => (props.excludeMargin ? '0px' : '4px')};
     padding: 0px;
     display: flex;
     align-items: center;
@@ -25,8 +26,8 @@ export const ActionMenuItem = styled(Button)<{ disabled?: boolean; fontSize?: nu
     box-shadow: none;
     &&:hover {
         background-color: ${ANTD_GRAY[3]};
-        color: ${SEARCH_COLORS.TITLE_PURPLE};
-        border-color: ${SEARCH_COLORS.TITLE_PURPLE};
+        color: ${(props) => props.theme.styles['primary-color']};
+        border-color: ${(props) => props.theme.styles['primary-color']};
     }
     ${(props) =>
         props.disabled

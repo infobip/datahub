@@ -1,10 +1,10 @@
 import { FolderOutlined } from '@ant-design/icons';
+import { Loader } from '@components';
 import { Typography } from 'antd';
 import React from 'react';
 import styled from 'styled-components';
-import { EntityType } from '../../../types.generated';
-import { formatNumber } from '../../shared/formatNumber';
-import useToggle from '../../shared/useToggle';
+
+import { ANTD_GRAY } from '@app/entity/shared/constants';
 import {
     BrowseProvider,
     useBrowseDisplayName,
@@ -15,13 +15,16 @@ import {
     useMaybeEnvironmentAggregation,
     useOnSelectBrowsePath,
     usePlatformAggregation,
-} from './BrowseContext';
-import EntityLink from './EntityLink';
-import ExpandableNode from './ExpandableNode';
-import SidebarLoadingError from './SidebarLoadingError';
-import useBrowsePagination from './useBrowsePagination';
-import useSidebarAnalytics from './useSidebarAnalytics';
-import { ANTD_GRAY } from '../../entity/shared/constants';
+} from '@app/searchV2/sidebar/BrowseContext';
+import EntityLink from '@app/searchV2/sidebar/EntityLink';
+import ExpandableNode from '@app/searchV2/sidebar/ExpandableNode';
+import SidebarLoadingError from '@app/searchV2/sidebar/SidebarLoadingError';
+import useBrowsePagination from '@app/searchV2/sidebar/useBrowsePagination';
+import useSidebarAnalytics from '@app/searchV2/sidebar/useSidebarAnalytics';
+import { formatNumber } from '@app/shared/formatNumber';
+import useToggle from '@app/shared/useToggle';
+
+import { EntityType } from '@types';
 
 const FolderStyled = styled(FolderOutlined)`
     font-size: 16px;
@@ -69,7 +72,7 @@ const BrowseNode = () => {
         trackSelectNodeEvent(isNowSelected ? 'select' : 'deselect', 'browse');
     };
 
-    const { error, groups, loaded, observable, path, retry } = useBrowsePagination({
+    const { error, groups, loading, loaded, observable, path, retry } = useBrowsePagination({
         skip: !isOpen || !browseResultGroup.hasSubGroups,
     });
 
@@ -116,6 +119,7 @@ const BrowseNode = () => {
                             <BrowseNode />
                         </BrowseProvider>
                     ))}
+                    {loading && <Loader size="sm" />}
                     {error && <SidebarLoadingError onClickRetry={retry} />}
                     {observable}
                 </ExpandableNode.Body>

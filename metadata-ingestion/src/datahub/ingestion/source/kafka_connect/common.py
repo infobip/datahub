@@ -4,7 +4,7 @@ from typing import Dict, Iterable, List, Optional
 
 from pydantic.fields import Field
 
-from datahub.configuration.common import AllowDenyPattern, ConfigModel
+from datahub.configuration.common import AllowDenyPattern, ConfigModel, LaxStr
 from datahub.configuration.source_common import (
     DatasetLineageProviderConfigBase,
     PlatformInstanceConfigMixin,
@@ -29,7 +29,7 @@ CONNECTOR_CLASS = "connector.class"
 class ProvidedConfig(ConfigModel):
     provider: str
     path_key: str
-    value: str
+    value: LaxStr
 
 
 class GenericConnectorConfig(ConfigModel):
@@ -141,12 +141,7 @@ def get_dataset_name(
     database_name: Optional[str],
     source_table: str,
 ) -> str:
-    if database_name:
-        dataset_name = database_name + "." + source_table
-    else:
-        dataset_name = source_table
-
-    return dataset_name
+    return database_name + "." + source_table if database_name else source_table
 
 
 def get_platform_instance(

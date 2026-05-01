@@ -1,17 +1,22 @@
-import React, { useState } from 'react';
-import { message } from 'antd';
-import { Button, Tooltip } from '@components';
-import styled from 'styled-components/macro';
 import { LinkOutlined, PlusOutlined } from '@ant-design/icons';
-import { SearchSelectModal } from '../components/styled/search/SearchSelectModal';
-import { useEntityRegistry } from '../../../useEntityRegistry';
-import { EntityCapabilityType } from '../../Entity';
-import { useBatchAddTermsMutation, useBatchSetDomainMutation } from '../../../../graphql/mutations.generated';
-import { handleBatchError } from '../utils';
-import { useBatchSetDataProductMutation } from '../../../../graphql/dataProduct.generated';
-import { useEntityContext, useEntityData } from '../../../entity/shared/EntityContext';
-import CreateGlossaryEntityModal from '../EntityDropdown/CreateGlossaryEntityModal';
-import { EntityType } from '../../../../types.generated';
+import { Button, Tooltip } from '@components';
+import { message } from 'antd';
+import React, { useState } from 'react';
+import styled from 'styled-components/macro';
+
+import analytics, { EntityActionType, EventType } from '@app/analytics';
+import { useEntityContext, useEntityData } from '@app/entity/shared/EntityContext';
+import { EntityCapabilityType } from '@app/entityV2/Entity';
+import CreateGlossaryEntityModal from '@app/entityV2/shared/EntityDropdown/CreateGlossaryEntityModal';
+import { SearchSelectModal } from '@app/entityV2/shared/components/styled/search/SearchSelectModal';
+import { handleBatchError } from '@app/entityV2/shared/utils';
+import { useModulesContext } from '@app/homeV3/module/context/ModulesContext';
+import { useEntityRegistry } from '@app/useEntityRegistry';
+
+import { useBatchSetApplicationMutation } from '@graphql/application.generated';
+import { useBatchSetDataProductMutation } from '@graphql/dataProduct.generated';
+import { useBatchAddTermsMutation, useBatchSetDomainMutation } from '@graphql/mutations.generated';
+import { DataHubPageModuleType, EntityType } from '@types';
 
 export enum EntityActionItem {
     /**
@@ -34,6 +39,10 @@ export enum EntityActionItem {
      * Add a new Glossary Node as child
      */
     ADD_CHILD_GLOSSARY_NODE,
+    /**
+     * Batch add an Application to a set of assets
+     */
+    BATCH_ADD_APPLICATION,
 }
 
 const ButtonWrapper = styled.div`
@@ -70,9 +79,12 @@ function EntityActions(props: Props) {
     const [isBatchSetDataProductModalVisible, setIsBatchSetDataProductModalVisible] = useState(false);
     const [isCreateTermModalVisible, setIsCreateTermModalVisible] = useState(false);
     const [isCreateNodeModalVisible, setIsCreateNodeModalVisible] = useState(false);
+    const [isBatchSetApplicationModalVisible, setIsBatchSetApplicationModalVisible] = useState(false);
     const [batchAddTermsMutation] = useBatchAddTermsMutation();
     const [batchSetDomainMutation] = useBatchSetDomainMutation();
     const [batchSetDataProductMutation] = useBatchSetDataProductMutation();
+    const [batchSetApplicationMutation] = useBatchSetApplicationMutation();
+    const { reloadModules } = useModulesContext();
 
     // eslint-disable-next-line
     const batchAddGlossaryTerms = (entityUrns: Array<string>) => {
@@ -97,6 +109,9 @@ function EntityActions(props: Props) {
                         });
                         refetchForEntity?.();
                         setShouldRefetchEmbeddedListSearch?.(true);
+                        // Reload modules
+                        // Assets - to reload shown related assets on asset summary tab
+                        reloadModules([DataHubPageModuleType.Assets]);
                     }, 3000);
                 }
             })
@@ -135,7 +150,16 @@ function EntityActions(props: Props) {
                         refetchForEntity?.();
                         setShouldRefetchEmbeddedListSearch?.(true);
                         entityState?.setShouldRefetchContents(true);
+                        // Reload modules
+                        // Assets - to reload shown related assets on asset summary tab
+                        // Domains - to reload Domains module with top domains on home page as list of domains can be changed after adding assets
+                        reloadModules([DataHubPageModuleType.Assets, DataHubPageModuleType.Domains]);
                     }, 3000);
+                    analytics.event({
+                        type: EventType.BatchEntityActionEvent,
+                        actionType: EntityActionType.SetDomain,
+                        entityUrns,
+                    });
                 }
             })
             .catch((e) => {
@@ -170,7 +194,15 @@ function EntityActions(props: Props) {
                         });
                         refetchForEntity?.();
                         setShouldRefetchEmbeddedListSearch?.(true);
+                        // Reload modules
+                        // Assets - to reload shown related assets on asset summary tab
+                        reloadModules([DataHubPageModuleType.Assets]);
                     }, 3000);
+                    analytics.event({
+                        type: EventType.BatchEntityActionEvent,
+                        actionType: EntityActionType.SetDataProduct,
+                        entityUrns,
+                    });
                 }
             })
             .catch((e) => {
@@ -178,6 +210,40 @@ function EntityActions(props: Props) {
                 message.error(
                     handleBatchError(entityUrns, e, {
                         content: `Failed to add assets to Data Product. An unknown error occurred.`,
+                        duration: 3,
+                    }),
+                );
+            });
+    };
+
+    const batchSetApplication = (entityUrns: Array<string>) => {
+        batchSetApplicationMutation({
+            variables: {
+                input: {
+                    applicationUrn: urn,
+                    resourceUrns: entityUrns,
+                },
+            },
+        })
+            .then(({ errors }) => {
+                if (!errors) {
+                    setIsBatchSetApplicationModalVisible(false);
+                    message.loading({ content: 'Updating...', duration: 3 });
+                    setTimeout(() => {
+                        message.success({
+                            content: `Added assets to Application!`,
+                            duration: 3,
+                        });
+                        refetchForEntity?.();
+                        setShouldRefetchEmbeddedListSearch?.(true);
+                    }, 3000);
+                }
+            })
+            .catch((e) => {
+                message.destroy();
+                message.error(
+                    handleBatchError(entityUrns, e, {
+                        content: `Failed to add assets to Application. An unknown error occurred.`,
                         duration: 3,
                     }),
                 );
@@ -196,6 +262,7 @@ function EntityActions(props: Props) {
                             variant="outline"
                             onClick={() => setIsBatchAddGlossaryTermModalVisible(true)}
                             data-testid="glossary-batch-add"
+                            size="sm"
                         >
                             <LinkOutlined /> Add to Assets
                         </Button>
@@ -207,6 +274,7 @@ function EntityActions(props: Props) {
                             variant="outline"
                             onClick={() => setIsBatchSetDomainModalVisible(true)}
                             data-testid="domain-batch-add"
+                            size="sm"
                         >
                             <LinkOutlined /> Add to Assets
                         </Button>
@@ -219,7 +287,7 @@ function EntityActions(props: Props) {
                         placement="bottom"
                         data-testid="data-product-batch-add"
                     >
-                        <Button variant="outline" onClick={() => setIsBatchSetDataProductModalVisible(true)}>
+                        <Button variant="outline" onClick={() => setIsBatchSetDataProductModalVisible(true)} size="sm">
                             <LinkOutlined />
                             Add Assets
                         </Button>
@@ -243,6 +311,13 @@ function EntityActions(props: Props) {
                         </Button>
                     </Tooltip>
                 )}
+                {actionItems.has(EntityActionItem.BATCH_ADD_APPLICATION) && (
+                    <Tooltip title="Add Assets to Application" showArrow={false} placement="bottom">
+                        <Button variant="outline" onClick={() => setIsBatchSetApplicationModalVisible(true)}>
+                            <LinkOutlined /> Add to Assets
+                        </Button>
+                    </Tooltip>
+                )}
             </ButtonWrapper>
             {isBatchAddGlossaryTermModalVisible && (
                 <SearchSelectModal
@@ -263,6 +338,17 @@ function EntityActions(props: Props) {
                     onCancel={() => setIsBatchSetDomainModalVisible(false)}
                     fixedEntityTypes={Array.from(
                         entityRegistry.getTypesWithSupportedCapabilities(EntityCapabilityType.DOMAINS),
+                    )}
+                />
+            )}
+            {isBatchSetApplicationModalVisible && (
+                <SearchSelectModal
+                    titleText="Add assets to Application"
+                    continueText="Add"
+                    onContinue={batchSetApplication}
+                    onCancel={() => setIsBatchSetApplicationModalVisible(false)}
+                    fixedEntityTypes={Array.from(
+                        entityRegistry.getTypesWithSupportedCapabilities(EntityCapabilityType.APPLICATIONS),
                     )}
                 />
             )}

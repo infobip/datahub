@@ -1,13 +1,15 @@
-import { TagOutlined, TagFilled } from '@ant-design/icons';
+import { TagFilled, TagOutlined } from '@ant-design/icons';
 import * as React from 'react';
 import styled from 'styled-components';
-import { Tag, EntityType, SearchResult } from '../../../types.generated';
-import DefaultPreviewCard from '../../previewV2/DefaultPreviewCard';
-import { Entity, EntityCapabilityType, IconStyleType, PreviewType } from '../Entity';
-import { getDataForEntityType } from '../shared/containers/profile/utils';
-import { urlEncodeUrn } from '../shared/utils';
-import TagProfile from './TagProfile';
-import { TYPE_ICON_CLASS_NAME } from '../shared/components/subtypes';
+
+import { Entity, EntityCapabilityType, IconStyleType, PreviewContext, PreviewType } from '@app/entityV2/Entity';
+import { TYPE_ICON_CLASS_NAME } from '@app/entityV2/shared/components/subtypes';
+import { getDataForEntityType } from '@app/entityV2/shared/containers/profile/utils';
+import { urlEncodeUrn } from '@app/entityV2/shared/utils';
+import TagProfile from '@app/entityV2/tag/TagProfile';
+import DefaultPreviewCard from '@app/previewV2/DefaultPreviewCard';
+
+import { EntityType, SearchResult, Tag } from '@types';
 
 const PreviewTagIcon = styled(TagOutlined)`
     font-size: 20px;
@@ -31,10 +33,7 @@ export class TagEntity implements Entity<Tag> {
         return (
             <TagOutlined
                 className={TYPE_ICON_CLASS_NAME}
-                style={{
-                    fontSize,
-                    color: color || '#BFBFBF',
-                }}
+                style={{ fontSize: fontSize || 'inherit', color: color || 'inherit' }}
             />
         );
     };
@@ -57,7 +56,7 @@ export class TagEntity implements Entity<Tag> {
 
     renderProfile: (urn: string) => JSX.Element = (urn) => <TagProfile urn={urn} />;
 
-    renderPreview = (previewType: PreviewType, data: Tag) => {
+    renderPreview = (previewType: PreviewType, data: Tag, _actions, extraContext?: PreviewContext) => {
         const genericProperties = this.getGenericEntityProperties(data);
         return (
             <DefaultPreviewCard
@@ -70,12 +69,13 @@ export class TagEntity implements Entity<Tag> {
                 entityType={EntityType.Tag}
                 typeIcon={this.icon(14, IconStyleType.ACCENT)}
                 previewType={previewType}
+                propagationDetails={extraContext?.propagationDetails}
             />
         );
     };
 
     renderSearch = (result: SearchResult) => {
-        return this.renderPreview(PreviewType.SEARCH, result.entity as Tag);
+        return this.renderPreview(PreviewType.SEARCH, result.entity as Tag, undefined, undefined);
     };
 
     displayName = (data: Tag) => {

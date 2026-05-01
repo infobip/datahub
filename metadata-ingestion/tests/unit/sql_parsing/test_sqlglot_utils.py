@@ -1,3 +1,4 @@
+import re
 import textwrap
 from enum import Enum
 
@@ -8,6 +9,7 @@ from datahub.sql_parsing.query_types import get_query_type_of_sql
 from datahub.sql_parsing.sql_parsing_common import QueryType
 from datahub.sql_parsing.sqlglot_lineage import _UPDATE_ARGS_NOT_SUPPORTED_BY_SELECT
 from datahub.sql_parsing.sqlglot_utils import (
+    PLACEHOLDER_BACKWARD_FINGERPRINT_NORMALIZATION,
     generalize_query,
     generalize_query_fast,
     get_dialect,
@@ -83,19 +85,19 @@ class QueryGeneralizationTestMode(Enum):
         (
             "UPDATE  \"books\" SET page_count = page_count + 1, author_count = author_count + 1 WHERE book_title = 'My New Book'",
             "redshift",
-            'UPDATE "books" SET page_count = page_count + ?, author_count = author_count + ? WHERE book_title = ?',
+            'UPDATE "books" SET page_count = page_count + %s, author_count = author_count + %s WHERE book_title = %s',
             QueryGeneralizationTestMode.BOTH,
         ),
         (
             "SELECT * FROM foo WHERE date = '2021-01-01'",
             "redshift",
-            "SELECT * FROM foo WHERE date = ?",
+            "SELECT * FROM foo WHERE date = %s",
             QueryGeneralizationTestMode.BOTH,
         ),
         (
             "SELECT * FROM books WHERE category IN ('fiction', 'biography', 'fantasy')",
             "redshift",
-            "SELECT * FROM books WHERE category IN (?)",
+            "SELECT * FROM books WHERE category IN (%s)",
             QueryGeneralizationTestMode.BOTH,
         ),
         (
@@ -115,7 +117,7 @@ class QueryGeneralizationTestMode(Enum):
             # Uneven spacing within the IN clause.
             "SELECT * FROM books WHERE zip_code IN (123,345, 423 )",
             "redshift",
-            "SELECT * FROM books WHERE zip_code IN (?)",
+            "SELECT * FROM books WHERE zip_code IN (%s)",
             QueryGeneralizationTestMode.BOTH,
         ),
         # Uneven spacing in the column list.
@@ -172,10 +174,9 @@ def test_query_generalization(
     if mode in {QueryGeneralizationTestMode.FULL, QueryGeneralizationTestMode.BOTH}:
         assert generalize_query(query, dialect=dialect) == expected
     if mode in {QueryGeneralizationTestMode.FAST, QueryGeneralizationTestMode.BOTH}:
-        assert (
-            generalize_query_fast(query, dialect=dialect, change_table_names=True)
-            == expected
-        )
+        assert generalize_query_fast(
+            query, dialect=dialect, change_table_names=True
+        ) == re.sub(PLACEHOLDER_BACKWARD_FINGERPRINT_NORMALIZATION, "?", expected)
 
 
 def test_query_fingerprint():
@@ -197,4 +198,34 @@ def test_redshift_query_fingerprint():
     )
     assert get_query_fingerprint(query1, "redshift", True) != get_query_fingerprint(
         query2, "redshift", True
+    )
+
+
+def test_query_fingerprint_with_secondary_id():
+    query = "SELECT * FROM users WHERE id = 123"
+
+    fingerprint1 = get_query_fingerprint(query, "snowflake")
+
+    fingerprint2 = get_query_fingerprint(
+        query, "snowflake", secondary_id="project_id_123"
+    )
+
+    fingerprint3 = get_query_fingerprint(
+        query, "snowflake", secondary_id="project_id_456"
+    )
+
+    assert fingerprint1 and fingerprint2 and fingerprint3, (
+        "Fingerprint should not be None"
+    )
+    assert fingerprint1 != fingerprint2, "Fingerprint should change with secondary_id"
+    assert fingerprint2 != fingerprint3, (
+        "Different secondary_id should yield different fingerprints"
+    )
+
+    fingerprint4 = get_query_fingerprint(
+        query, "snowflake", secondary_id="project_id_456"
+    )
+
+    assert fingerprint3 == fingerprint4, (
+        "Fingerprints are deterministic for the same secondary_id"
     )

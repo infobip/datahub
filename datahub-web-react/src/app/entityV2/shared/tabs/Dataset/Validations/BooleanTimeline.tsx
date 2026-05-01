@@ -1,10 +1,13 @@
-import React, { useMemo } from 'react';
 import { Popover } from '@components';
-import { Bar } from '@visx/shape';
-import { Group } from '@visx/group';
 import { AxisBottom } from '@visx/axis';
+import { Group } from '@visx/group';
 import { scaleUtc } from '@visx/scale';
-import { ANTD_GRAY } from '../../../constants';
+import { Bar } from '@visx/shape';
+import React, { useMemo } from 'react';
+
+import { FAILURE_COLOR_HEX, SUCCESS_COLOR_HEX } from '@components/theme/foundations/colors';
+
+import { ANTD_GRAY } from '@app/entityV2/shared/constants';
 
 export type BooleanResult = {
     isSuccess: boolean;
@@ -28,9 +31,6 @@ type Props = {
     timeRange: TimeRange;
     width: number;
 };
-
-const SUCCESS_COLOR_HEX = '#52C41A';
-const FAILURE_COLOR_HEX = '#F5222D';
 
 /**
  * True / false results displayed on a horizontal timeline.

@@ -4,13 +4,15 @@ from enum import Enum
 from typing import Dict, List, Literal, Optional, Union
 
 import pydantic
-from pydantic import validator
-from pydantic.class_validators import root_validator
+from pydantic import root_validator, validator
 
 import datahub.emitter.mce_builder as builder
-from datahub.configuration.common import AllowDenyPattern, ConfigModel
+from datahub.configuration.common import AllowDenyPattern, ConfigModel, HiddenFromDocs
 from datahub.configuration.source_common import DatasetSourceConfigMixin, PlatformDetail
 from datahub.configuration.validate_field_deprecation import pydantic_field_deprecated
+from datahub.ingestion.api.incremental_lineage_helper import (
+    IncrementalLineageConfigMixin,
+)
 from datahub.ingestion.source.common.subtypes import BIAssetSubTypes
 from datahub.ingestion.source.state.stale_entity_removal_handler import (
     StaleEntityRemovalSourceReport,
@@ -19,6 +21,7 @@ from datahub.ingestion.source.state.stale_entity_removal_handler import (
 from datahub.ingestion.source.state.stateful_ingestion_base import (
     StatefulIngestionConfigBase,
 )
+from datahub.utilities.global_warning_util import add_global_warning
 from datahub.utilities.lossy_collections import LossyList
 from datahub.utilities.perf_timer import PerfTimer
 
@@ -183,6 +186,16 @@ class SupportedDataPlatform(Enum):
         datahub_data_platform_name="databricks",
     )
 
+    MYSQL = DataPlatformPair(
+        powerbi_data_platform_name="MySQL",
+        datahub_data_platform_name="mysql",
+    )
+
+    ODBC = DataPlatformPair(
+        powerbi_data_platform_name="Odbc",
+        datahub_data_platform_name="odbc",
+    )
+
 
 @dataclass
 class PowerBiDashboardSourceReport(StaleEntityRemovalSourceReport):
@@ -275,44 +288,47 @@ class PowerBiProfilingConfig(ConfigModel):
 
 
 class PowerBiDashboardSourceConfig(
-    StatefulIngestionConfigBase, DatasetSourceConfigMixin
+    StatefulIngestionConfigBase, DatasetSourceConfigMixin, IncrementalLineageConfigMixin
 ):
-    platform_name: str = pydantic.Field(
-        default=Constant.PLATFORM_NAME, hidden_from_docs=True
-    )
+    platform_name: HiddenFromDocs[str] = pydantic.Field(default=Constant.PLATFORM_NAME)
 
-    platform_urn: str = pydantic.Field(
+    platform_urn: HiddenFromDocs[str] = pydantic.Field(
         default=builder.make_data_platform_urn(platform=Constant.PLATFORM_NAME),
-        hidden_from_docs=True,
     )
 
     # Organization Identifier
     tenant_id: str = pydantic.Field(description="PowerBI tenant identifier")
     # PowerBi workspace identifier
-    workspace_id: Optional[str] = pydantic.Field(
+    workspace_id: HiddenFromDocs[Optional[str]] = pydantic.Field(
         default=None,
         description="[deprecated] Use workspace_id_pattern instead",
-        hidden_from_docs=True,
     )
     # PowerBi workspace identifier
     workspace_id_pattern: AllowDenyPattern = pydantic.Field(
         default=AllowDenyPattern.allow_all(),
-        description="Regex patterns to filter PowerBI workspaces in ingestion."
+        description="Regex patterns to filter PowerBI workspaces in ingestion by ID."
+        " By default all IDs are allowed unless they are filtered by name using 'workspace_name_pattern'."
+        " Note: This field works in conjunction with 'workspace_type_filter' and both must be considered when filtering workspaces.",
+    )
+    # PowerBi workspace name
+    workspace_name_pattern: AllowDenyPattern = pydantic.Field(
+        default=AllowDenyPattern.allow_all(),
+        description="Regex patterns to filter PowerBI workspaces in ingestion by name."
+        " By default all names are allowed unless they are filtered by ID using 'workspace_id_pattern'."
         " Note: This field works in conjunction with 'workspace_type_filter' and both must be considered when filtering workspaces.",
     )
 
     # Dataset type mapping PowerBI support many type of data-sources. Here user needs to define what type of PowerBI
     # DataSource needs to be mapped to corresponding DataHub Platform DataSource. For example, PowerBI `Snowflake` is
     # mapped to DataHub `snowflake` PowerBI `PostgreSQL` is mapped to DataHub `postgres` and so on.
-    dataset_type_mapping: Union[Dict[str, str], Dict[str, PlatformDetail]] = (
-        pydantic.Field(
-            default_factory=default_for_dataset_type_mapping,
-            description="[deprecated] Use server_to_platform_instance instead. Mapping of PowerBI datasource type to "
-            "DataHub supported datasources."
-            "You can configured platform instance for dataset lineage. "
-            "See Quickstart Recipe for mapping",
-            hidden_from_docs=True,
-        )
+    dataset_type_mapping: HiddenFromDocs[
+        Union[Dict[str, str], Dict[str, PlatformDetail]]
+    ] = pydantic.Field(
+        default_factory=default_for_dataset_type_mapping,
+        description="[deprecated] Use server_to_platform_instance instead. Mapping of PowerBI datasource type to "
+        "DataHub supported datasources."
+        "You can configured platform instance for dataset lineage. "
+        "See Quickstart Recipe for mapping",
     )
     # PowerBI datasource's server to platform instance mapping
     server_to_platform_instance: Dict[
@@ -323,6 +339,26 @@ class PowerBiDashboardSourceConfig(
         " :port is optional and only needed if your datasource server is running on non-standard port. "
         "For Google BigQuery the datasource's server is google bigquery project name. "
         "For Databricks Unity Catalog the datasource's server is workspace FQDN.",
+    )
+    # ODBC DSN to platform mapping
+    dsn_to_platform_name: Dict[str, str] = pydantic.Field(
+        default={},
+        description="A mapping of ODBC DSN to DataHub data platform name. "
+        "For example with an ODBC connection string 'DSN=database' where the database type "
+        "is 'PostgreSQL' you would configure the mapping as 'database: postgres'.",
+    )
+    # ODBC DSN to database (or database.schema) mapping
+    dsn_to_database_schema: Dict[str, str] = pydantic.Field(
+        default={},
+        description="A mapping of ODBC DSN to database names with optional schema names "
+        "(some database platforms such a MySQL use the table name pattern 'database.table', "
+        "while others use the pattern 'database.schema.table'). "
+        "This mapping is used in conjunction with ODBC SQL query parsing. "
+        "If SQL queries used with ODBC do not reference fully qualified tables names, "
+        "then you should configure mappings for your DSNs. "
+        "For example with an ODBC connection string 'DSN=database' where the database "
+        "is 'prod' you would configure the mapping as 'database: prod'. "
+        "If the database is 'prod' and the schema is 'data' then mapping would be 'database: prod.data'.",
     )
     # deprecated warning
     _dataset_type_mapping = pydantic_field_deprecated(
@@ -373,8 +409,9 @@ class PowerBiDashboardSourceConfig(
     )
     # Enable/Disable extracting dataset schema
     extract_dataset_schema: bool = pydantic.Field(
-        default=False,
-        description="Whether to ingest PBI Dataset Table columns and measures",
+        default=True,
+        description="Whether to ingest PBI Dataset Table columns and measures."
+        " Note: this setting must be `true` for schema extraction and column lineage to be enabled.",
     )
     # Enable/Disable extracting lineage information of PowerBI Dataset
     extract_lineage: bool = pydantic.Field(
@@ -483,7 +520,7 @@ class PowerBiDashboardSourceConfig(
     include_workspace_name_in_dataset_urn: bool = pydantic.Field(
         default=False,
         description="It is recommended to set this to true, as it helps prevent the overwriting of datasets."
-        "Read section #11560 at https://datahubproject.io/docs/how/updating-datahub/ before enabling this option."
+        "Read section #11560 at https://docs.datahub.com/docs/how/updating-datahub/ before enabling this option."
         "To maintain backward compatibility, this is set to False.",
     )
 
@@ -498,10 +535,9 @@ class PowerBiDashboardSourceConfig(
         "Increase this value if you encounter the 'M-Query Parsing Timeout' message in the connector report.",
     )
 
-    metadata_api_timeout: int = pydantic.Field(
+    metadata_api_timeout: HiddenFromDocs[int] = pydantic.Field(
         default=30,
         description="timeout in seconds for Metadata Rest Api.",
-        hidden_from_docs=True,
     )
 
     @root_validator(skip_on_failure=True)
@@ -510,6 +546,7 @@ class PowerBiDashboardSourceConfig(
             "native_query_parsing",
             "enable_advance_lineage_sql_construct",
             "extract_lineage",
+            "extract_dataset_schema",
         ]
 
         if (
@@ -536,7 +573,7 @@ class PowerBiDashboardSourceConfig(
     def map_data_platform(cls, value):
         # For backward compatibility convert input PostgreSql to PostgreSQL
         # PostgreSQL is name of the data-platform in M-Query
-        if "PostgreSql" in value.keys():
+        if "PostgreSql" in value:
             platform_name = value["PostgreSql"]
             del value["PostgreSql"]
             value["PostgreSQL"] = platform_name
@@ -573,5 +610,33 @@ class PowerBiDashboardSourceConfig(
             raise ValueError(
                 "dataset_type_mapping is deprecated. Use server_to_platform_instance only."
             )
+
+        return values
+
+    @root_validator(skip_on_failure=True)
+    def validate_extract_dataset_schema(cls, values: Dict) -> Dict:
+        if values.get("extract_dataset_schema") is False:
+            add_global_warning(
+                "Please use `extract_dataset_schema: true`, otherwise dataset schema extraction will be skipped."
+            )
+        return values
+
+    @root_validator(skip_on_failure=True)
+    def validate_dsn_to_database_schema(cls, values: Dict) -> Dict:
+        if values.get("dsn_to_database_schema") is not None:
+            dsn_mapping = values.get("dsn_to_database_schema")
+            if not isinstance(dsn_mapping, dict):
+                raise ValueError("dsn_to_database_schema must contain key-value pairs")
+
+            for _key, value in dsn_mapping.items():
+                if not isinstance(value, str):
+                    raise ValueError(
+                        "dsn_to_database_schema mapping values must be strings"
+                    )
+                parts = value.split(".")
+                if len(parts) != 1 and len(parts) != 2:
+                    raise ValueError(
+                        f"dsn_to_database_schema invalid mapping value: {value}"
+                    )
 
         return values

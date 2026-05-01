@@ -1,6 +1,7 @@
-import React from 'react';
 import { Typography } from 'antd';
-import { OnboardingStep } from '../OnboardingStep';
+import React from 'react';
+
+import { OnboardingStep } from '@app/onboarding/OnboardingStep';
 
 export const ENTITY_PROFILE_V2_COLUMNS_ID = 'entity-profile-v2-columns';
 export const ENTITY_PROFILE_V2_CONTENTS_ID = 'entity-profile-v2-contents';
@@ -149,7 +150,7 @@ const EntityProfileOnboardingConfig: OnboardingStep[] = [
                     View <strong>Quality</strong> information on this tab.
                 </p>
                 <p>
-                    Quality information includes <strong>data contracts</strong>and data quality test results.
+                    Quality information includes <strong>data contracts</strong> and data quality test results.
                 </p>
             </Typography.Paragraph>
         ),

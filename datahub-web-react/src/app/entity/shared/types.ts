@@ -1,53 +1,58 @@
-import { MutationFunctionOptions, FetchResult } from '@apollo/client';
+import { FetchResult, MutationFunctionOptions } from '@apollo/client';
 import React from 'react';
 
+import { FetchedEntity } from '@app/lineage/types';
+
 import {
+    ApplicationAssociation,
+    AssetSettings,
+    BrowsePathV2,
+    Container,
+    CustomPropertiesEntry,
+    DataJobInputOutput,
     DataPlatform,
+    DataPlatformInstance,
+    DataProcessInstance,
+    DataProcessRunEvent,
     DatasetEditableProperties,
     DatasetEditablePropertiesUpdate,
-    RawAspect,
+    Deprecation,
+    DisplayProperties,
+    Documentation,
+    DomainAssociation,
     EditableSchemaMetadata,
     EditableSchemaMetadataUpdate,
+    Embed,
+    EntityLineageResult,
+    EntityPrivileges,
+    EntityRelationshipsResult,
     EntityType,
+    FabricType,
+    FineGrainedLineage,
+    Forms,
     GlobalTags,
     GlobalTagsUpdate,
     GlossaryTerms,
+    Health,
+    InputFields,
     InstitutionalMemory,
     InstitutionalMemoryUpdate,
     Maybe,
     Ownership,
     OwnershipUpdate,
-    SchemaMetadata,
-    EntityLineageResult,
-    SubTypes,
-    Container,
-    Health,
-    Status,
-    Deprecation,
-    DataPlatformInstance,
     ParentContainersResult,
-    EntityRelationshipsResult,
-    ParentNodesResult,
-    SiblingProperties,
-    CustomPropertiesEntry,
-    DomainAssociation,
-    InputFields,
-    FineGrainedLineage,
-    EntityPrivileges,
-    Embed,
-    FabricType,
-    BrowsePathV2,
-    DataJobInputOutput,
     ParentDomainsResult,
-    StructuredProperties,
-    Forms,
+    ParentNodesResult,
+    RawAspect,
+    ResolvedAuditStamp,
+    SchemaMetadata,
     ScrollResults,
-    Documentation,
-    DisplayProperties,
+    SiblingProperties,
+    Status,
+    StructuredProperties,
+    SubTypes,
     VersionProperties,
-    DataProcessRunEvent,
-} from '../../../types.generated';
-import { FetchedEntity } from '../../lineage/types';
+} from '@types';
 
 export type EntityTab = {
     name: string;
@@ -85,11 +90,13 @@ export type GenericEntityProperties = {
         sourceRef?: Maybe<string>;
         businessAttributeDataType?: Maybe<string>;
         externalUrl?: Maybe<string>;
+        createdOn?: Maybe<ResolvedAuditStamp>;
     }>;
     globalTags?: Maybe<GlobalTags>;
     glossaryTerms?: Maybe<GlossaryTerms>;
     ownership?: Maybe<Ownership>;
     domain?: Maybe<DomainAssociation>;
+    application?: Maybe<ApplicationAssociation>;
     dataProduct?: Maybe<EntityRelationshipsResult>;
     platform?: Maybe<DataPlatform>;
     dataPlatformInstance?: Maybe<DataPlatformInstance>;
@@ -136,8 +143,10 @@ export type GenericEntityProperties = {
     displayProperties?: Maybe<DisplayProperties>;
     notes?: Maybe<EntityRelationshipsResult>;
     versionProperties?: Maybe<VersionProperties>;
+    settings?: Maybe<AssetSettings>;
 
-    // Data process instance
+    // Data job / data process instance
+    lastRun?: Maybe<DataProcessInstance>;
     lastRunEvent?: Maybe<DataProcessRunEvent>;
 };
 

@@ -407,15 +407,6 @@ class LDAPSource(StatefulIngestionSourceBase):
                     custom_props_map[prop] = (attrs[prop][0]).decode()
 
         manager_urn = f"urn:li:corpuser:{manager_ldap}" if manager_ldap else None
-        if self.config.user_attrs_map["memberOf"] in attrs:
-            groups = list(
-                map(
-                    lambda group: f"urn:li:corpGroup:{strip_ldap_group_cn(group)}",
-                    attrs[self.config.user_attrs_map["memberOf"]],
-                )
-            )
-        else:
-            groups = []
 
         make_user_urn = (
             email if email and self.config.use_email_as_username else ldap_user
@@ -524,11 +515,5 @@ def parse_ldap_dn(input_clean: bytes) -> str:
 
 def get_attr_or_none(
     attrs: Dict[str, Any], key: str, default: Optional[str] = None
-) -> str:
+) -> Optional[str]:
     return attrs[key][0].decode() if attrs.get(key) else default
-
-
-def strip_ldap_group_cn(input_clean: bytes) -> str:
-    """Converts a b'CN=group_name,OU=Groups,DC=internal,DC=machines'
-    format to username"""
-    return input_clean.decode().split(",")[0].lstrip("CN=")

@@ -1,3 +1,5 @@
+#import "./incident.graphql"
+
 fragment autoCompleteFields on Entity {
     urn
     type
@@ -107,6 +109,7 @@ fragment autoCompleteFields on Entity {
         }
         editableProperties {
             displayName
+            pictureLink
         }
     }
     ... on CorpGroup {
@@ -170,6 +173,9 @@ fragment autoCompleteFields on Entity {
         parentContainers {
             ...parentContainersFields
         }
+        subTypes {
+            typeNames
+        }
     }
     ... on DataJob {
         dataFlow {
@@ -190,6 +196,9 @@ fragment autoCompleteFields on Entity {
         }
         parentContainers {
             ...parentContainersFields
+        }
+        subTypes {
+            typeNames
         }
     }
     ... on GlossaryTerm {
@@ -216,6 +225,23 @@ fragment autoCompleteFields on Entity {
         }
     }
     ... on DataProduct {
+        properties {
+            name
+        }
+        domain {
+            domain {
+                urn
+                type
+                properties {
+                    name
+                }
+                parentDomains {
+                    ...parentDomainsFields
+                }
+            }
+        }
+    }
+    ... on Application {
         properties {
             name
         }
@@ -261,11 +287,33 @@ fragment autoCompleteFields on Entity {
         dataPlatformInstance {
             ...dataPlatformInstanceFields
         }
+        featureTables: relationships(input: { types: ["Contains"], direction: INCOMING, start: 0, count: 1 }) {
+            relationships {
+                entity {
+                    ... on MLFeatureTable {
+                        platform {
+                            ...platformFields
+                        }
+                    }
+                }
+            }
+        }
     }
     ... on MLPrimaryKey {
         name
         dataPlatformInstance {
             ...dataPlatformInstanceFields
+        }
+        featureTables: relationships(input: { types: ["KeyedBy"], direction: INCOMING, start: 0, count: 1 }) {
+            relationships {
+                entity {
+                    ... on MLFeatureTable {
+                        platform {
+                            ...platformFields
+                        }
+                    }
+                }
+            }
         }
     }
     ... on MLModel {
@@ -294,6 +342,22 @@ fragment autoCompleteFields on Entity {
             name
             description
         }
+    }
+    ... on SchemaFieldEntity {
+        fieldPath
+        parent {
+            ... on Dataset {
+                urn
+                type
+                ...entityDisplayNameFields
+                platform {
+                    ...platformFields
+                }
+            }
+        }
+    }
+    ... on DataPlatformInstance {
+        ...dataPlatformInstanceFields
     }
 }
 
@@ -429,6 +493,9 @@ fragment nonSiblingsDatasetSearchFields on Dataset {
     health {
         ...entityHealth
     }
+    institutionalMemory {
+        ...institutionalMemoryFields
+    }
     ...datasetStatsFields
 }
 
@@ -484,6 +551,9 @@ fragment searchResultsWithoutSchemaField on Entity {
     }
     ... on DataPlatformInstance {
         ...dataPlatformInstanceFields
+        institutionalMemory {
+            ...institutionalMemoryFields
+        }
     }
     ... on Role {
         id
@@ -535,6 +605,7 @@ fragment searchResultsWithoutSchemaField on Entity {
         }
     }
     ... on Dashboard {
+        tool
         dashboardId
         properties {
             name
@@ -605,6 +676,9 @@ fragment searchResultsWithoutSchemaField on Entity {
         }
         browsePathV2 {
             ...browsePathV2Fields
+        }
+        institutionalMemory {
+            ...institutionalMemoryFields
         }
     }
     ... on Chart {
@@ -683,8 +757,12 @@ fragment searchResultsWithoutSchemaField on Entity {
                 ...structuredPropertiesFields
             }
         }
+        institutionalMemory {
+            ...institutionalMemoryFields
+        }
     }
     ... on DataFlow {
+        orchestrator
         flowId
         cluster
         properties {
@@ -731,6 +809,12 @@ fragment searchResultsWithoutSchemaField on Entity {
             properties {
                 ...structuredPropertiesFields
             }
+        }
+        subTypes {
+            typeNames
+        }
+        institutionalMemory {
+            ...institutionalMemoryFields
         }
     }
     ... on DataJob {
@@ -792,6 +876,9 @@ fragment searchResultsWithoutSchemaField on Entity {
                 ...structuredPropertiesFields
             }
         }
+        institutionalMemory {
+            ...institutionalMemoryFields
+        }
     }
     ... on GlossaryTerm {
         name
@@ -806,6 +893,9 @@ fragment searchResultsWithoutSchemaField on Entity {
             customProperties {
                 key
                 value
+            }
+            createdOn {
+                time
             }
         }
         deprecation {
@@ -822,6 +912,9 @@ fragment searchResultsWithoutSchemaField on Entity {
                 ...structuredPropertiesFields
             }
         }
+        institutionalMemory {
+            ...institutionalMemoryFields
+        }
     }
     ... on GlossaryNode {
         ...glossaryNode
@@ -832,6 +925,9 @@ fragment searchResultsWithoutSchemaField on Entity {
             properties {
                 ...structuredPropertiesFields
             }
+        }
+        institutionalMemory {
+            ...institutionalMemoryFields
         }
     }
     ... on Domain {
@@ -853,6 +949,9 @@ fragment searchResultsWithoutSchemaField on Entity {
             properties {
                 ...structuredPropertiesFields
             }
+        }
+        institutionalMemory {
+            ...institutionalMemoryFields
         }
     }
     ... on Container {
@@ -896,6 +995,9 @@ fragment searchResultsWithoutSchemaField on Entity {
                 ...structuredPropertiesFields
             }
         }
+        institutionalMemory {
+            ...institutionalMemoryFields
+        }
     }
     ... on MLFeatureTable {
         name
@@ -925,6 +1027,9 @@ fragment searchResultsWithoutSchemaField on Entity {
             properties {
                 ...structuredPropertiesFields
             }
+        }
+        institutionalMemory {
+            ...institutionalMemoryFields
         }
     }
     ... on MLFeature {
@@ -967,6 +1072,9 @@ fragment searchResultsWithoutSchemaField on Entity {
         properties {
             propertiesName: name
         }
+        institutionalMemory {
+            ...institutionalMemoryFields
+        }
     }
     ... on MLModelGroup {
         name
@@ -992,6 +1100,9 @@ fragment searchResultsWithoutSchemaField on Entity {
         properties {
             propertiesName: name
         }
+        institutionalMemory {
+            ...institutionalMemoryFields
+        }
     }
     ... on Tag {
         name
@@ -1006,6 +1117,17 @@ fragment searchResultsWithoutSchemaField on Entity {
     }
     ... on DataProduct {
         ...dataProductSearchFields
+        structuredProperties {
+            properties {
+                ...structuredPropertiesFields
+            }
+        }
+        institutionalMemory {
+            ...institutionalMemoryFields
+        }
+    }
+    ... on Application {
+        ...applicationSearchFields
     }
     ... on ERModelRelationship {
         urn
@@ -1043,6 +1165,9 @@ fragment searchResultsWithoutSchemaField on Entity {
     }
     ... on DataPlatformInstance {
         ...dataPlatformInstanceFields
+    }
+    ... on Incident {
+        ...incidentFields
     }
 }
 
@@ -1123,6 +1248,11 @@ fragment facetFields on FacetMetadata {
                     ...parentDomainsFields
                 }
             }
+            ... on Dataset {
+                platform {
+                    ...platformFields
+                }
+            }
             ... on Container {
                 platform {
                     ...platformFields
@@ -1152,6 +1282,11 @@ fragment facetFields on FacetMetadata {
                 }
             }
             ... on DataProduct {
+                properties {
+                    name
+                }
+            }
+            ... on Application {
                 properties {
                     name
                 }
@@ -1189,6 +1324,37 @@ fragment searchResults on SearchResults {
         text
         frequency
         score
+    }
+}
+
+fragment scrollResults on ScrollResults {
+    count
+    total
+    nextScrollId
+    searchResults {
+        entity {
+            ...searchResultFields
+        }
+        matchedFields {
+            name
+            value
+            entity {
+                urn
+                type
+                ...entityDisplayNameFields
+            }
+        }
+        insights {
+            text
+            icon
+        }
+        extraProperties {
+            name
+            value
+        }
+    }
+    facets {
+        ...facetFields
     }
 }
 
@@ -1273,6 +1439,7 @@ fragment searchAcrossRelationshipResults on SearchAcrossLineageResults {
     facets {
         ...facetFields
     }
+    lineageSearchPath
 }
 
 query getSearchResults($input: SearchInput!) {
@@ -1284,6 +1451,28 @@ query getSearchResults($input: SearchInput!) {
 query getSearchResultsForMultiple($input: SearchAcrossEntitiesInput!) {
     searchAcrossEntities(input: $input) {
         ...searchResults
+    }
+}
+
+query getSearchResultsForMultipleTrimmed($input: SearchAcrossEntitiesInput!) {
+    searchAcrossEntities(input: $input) {
+        searchResults {
+            entity {
+                ...autoCompleteFields
+            }
+            matchedFields {
+                name
+                value
+                entity {
+                    urn
+                    type
+                    ...entityDisplayNameFields
+                }
+            }
+        }
+        facets {
+            ...facetFields
+        }
     }
 }
 
@@ -1365,5 +1554,11 @@ query aggregateAcrossEntities($input: AggregateAcrossEntitiesInput!) {
 query listDataProductAssets($urn: String!, $input: SearchAcrossEntitiesInput!) {
     listDataProductAssets(urn: $urn, input: $input) {
         ...searchResults
+    }
+}
+
+query scrollAcrossEntities($input: ScrollAcrossEntitiesInput!) {
+    scrollAcrossEntities(input: $input) {
+        ...scrollResults
     }
 }
