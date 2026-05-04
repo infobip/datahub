@@ -2,14 +2,12 @@ import dataclasses
 import json
 import logging
 import re
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
-import dateutil.parser
 import requests
 from packaging import version
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from datahub.configuration.git import GitReference
 from datahub.configuration.validate_field_rename import pydantic_renamed_field
@@ -36,8 +34,14 @@ from datahub.ingestion.source.dbt.dbt_common import (
     DBTNode,
     DBTSourceBase,
     DBTSourceReport,
+    parse_dbt_timestamp,
 )
-from datahub.ingestion.source.dbt.dbt_tests import DBTTest, DBTTestResult
+from datahub.ingestion.source.dbt.dbt_tests import (
+    DBTFreshnessInfo,
+    DBTTest,
+    DBTTestResult,
+    parse_freshness_criteria,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -99,26 +103,24 @@ class DBTCoreConfig(DBTCommonConfig):
 
     _github_info_deprecated = pydantic_renamed_field("github_info", "git_info")
 
-    @validator("aws_connection", always=True)
-    def aws_connection_needed_if_s3_uris_present(
-        cls, aws_connection: Optional[AwsConnectionConfig], values: Dict, **kwargs: Any
-    ) -> Optional[AwsConnectionConfig]:
+    @model_validator(mode="after")
+    def aws_connection_needed_if_s3_uris_present(self) -> "DBTCoreConfig":
         # first check if there are fields that contain s3 uris
         uris = [
-            values.get(f)
+            getattr(self, f, None)
             for f in [
                 "manifest_path",
                 "catalog_path",
                 "sources_path",
             ]
-        ] + values.get("run_results_paths", [])
+        ] + (self.run_results_paths or [])
         s3_uris = [uri for uri in uris if is_s3_uri(uri or "")]
 
-        if s3_uris and aws_connection is None:
+        if s3_uris and self.aws_connection is None:
             raise ValueError(
                 f"Please provide aws_connection configuration, since s3 uris have been provided {s3_uris}"
             )
-        return aws_connection
+        return self
 
 
 def get_columns(
@@ -180,6 +182,7 @@ def extract_dbt_entities(
     only_include_if_in_catalog: bool,
     include_database_name: bool,
     report: DBTSourceReport,
+    sources_invocation_id: Optional[str] = None,
 ) -> List[DBTNode]:
     sources_by_id = {x["unique_id"]: x for x in sources_results}
 
@@ -213,8 +216,8 @@ def extract_dbt_entities(
         catalog_type = None
 
         if catalog_node is None:
-            if materialization in {"test", "ephemeral"}:
-                # Test and ephemeral nodes will never show up in the catalog.
+            if materialization in {"test", "ephemeral", "semantic_view"}:
+                # Test, ephemeral, and semantic_view nodes will never show up in the catalog.
                 missing_from_catalog = False
             else:
                 if all_catalog_entities is not None and not only_include_if_in_catalog:
@@ -251,10 +254,32 @@ def extract_dbt_entities(
         tags = manifest_node.get("tags", [])
         tags = [tag_prefix + tag for tag in tags]
 
-        max_loaded_at_str = sources_by_id.get(key, {}).get("max_loaded_at")
+        source_result = sources_by_id.get(key, {})
+        max_loaded_at_str = source_result.get("max_loaded_at")
         max_loaded_at = None
         if max_loaded_at_str:
             max_loaded_at = parse_dbt_timestamp(max_loaded_at_str)
+
+        freshness_info = None
+        if source_result and source_result.get("status"):
+            snapshotted_at_str = source_result.get("snapshotted_at")
+            snapshotted_at = (
+                parse_dbt_timestamp(snapshotted_at_str) if snapshotted_at_str else None
+            )
+            criteria = source_result.get("criteria", {})
+
+            if max_loaded_at and snapshotted_at:
+                freshness_info = DBTFreshnessInfo(
+                    invocation_id=sources_invocation_id or "unknown",
+                    status=source_result.get("status", ""),
+                    max_loaded_at=max_loaded_at,
+                    snapshotted_at=snapshotted_at,
+                    max_loaded_at_time_ago_in_s=source_result.get(
+                        "max_loaded_at_time_ago_in_s", 0.0
+                    ),
+                    warn_after=parse_freshness_criteria(criteria.get("warn_after")),
+                    error_after=parse_freshness_criteria(criteria.get("error_after")),
+                )
 
         test_info = None
         if manifest_node.get("resource_type") == "test":
@@ -308,12 +333,14 @@ def extract_dbt_entities(
                 "compiled_code", manifest_node.get("compiled_sql")
             ),  # Backward compatibility dbt <=v1.2
             test_info=test_info,
+            freshness_info=freshness_info,
         )
 
         # Load columns from catalog, and override some properties from manifest.
         if dbtNode.materialization not in [
             "ephemeral",
             "test",
+            "semantic_view",  # semantic views have custom column handling
         ]:
             dbtNode.columns = get_columns(
                 dbtNode.dbt_name,
@@ -330,10 +357,6 @@ def extract_dbt_entities(
     return dbt_entities
 
 
-def parse_dbt_timestamp(timestamp: str) -> datetime:
-    return dateutil.parser.parse(timestamp)
-
-
 class DBTRunTiming(BaseModel):
     name: Optional[str] = None
     started_at: Optional[str] = None
@@ -343,8 +366,7 @@ class DBTRunTiming(BaseModel):
 
 
 class DBTRunResult(BaseModel):
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     status: str
     timing: List[DBTRunTiming] = []
@@ -426,13 +448,13 @@ def load_run_results(
         )
         return all_nodes
 
-    dbt_metadata = DBTRunMetadata.parse_obj(test_results_json.get("metadata", {}))
+    dbt_metadata = DBTRunMetadata.model_validate(test_results_json.get("metadata", {}))
 
     all_nodes_map: Dict[str, DBTNode] = {x.dbt_name: x for x in all_nodes}
 
     results = test_results_json.get("results", [])
     for result in results:
-        run_result = DBTRunResult.parse_obj(result)
+        run_result = DBTRunResult.model_validate(result)
         id = run_result.unique_id
 
         if id.startswith("test."):
@@ -477,7 +499,7 @@ class DBTCoreSource(DBTSourceBase, TestableSource):
 
     @classmethod
     def create(cls, config_dict, ctx):
-        config = DBTCoreConfig.parse_obj(config_dict)
+        config = DBTCoreConfig.model_validate(config_dict)
         return cls(config, ctx)
 
     @staticmethod
@@ -554,11 +576,15 @@ class DBTCoreSource(DBTSourceBase, TestableSource):
                 message="Some metadata, particularly schema information, will be missing.",
             )
 
+        sources_invocation_id = None
         if self.config.sources_path is not None:
             dbt_sources_json = self.load_file_as_json(
                 self.config.sources_path, self.config.aws_connection
             )
             sources_results = dbt_sources_json["results"]
+            sources_invocation_id = dbt_sources_json.get("metadata", {}).get(
+                "invocation_id"
+            )
         else:
             sources_results = {}
 
@@ -594,6 +620,7 @@ class DBTCoreSource(DBTSourceBase, TestableSource):
             only_include_if_in_catalog=self.config.only_include_if_in_catalog,
             include_database_name=self.config.include_database_name,
             report=self.report,
+            sources_invocation_id=sources_invocation_id,
         )
 
         return (

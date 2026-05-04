@@ -1,7 +1,6 @@
 import { ModulePositionInput } from '@app/homeV3/template/types';
 
 import { PageModuleFragment } from '@graphql/template.generated';
-import { DataHubPageModuleType } from '@types';
 
 export interface ModuleProps {
     module: PageModuleFragment;
@@ -10,15 +9,15 @@ export interface ModuleProps {
     showViewAll?: boolean;
 }
 
-export interface ModulesContextType {
-    // Modules reloading
-    reloadModules: (moduleTypes: DataHubPageModuleType[], interval?: number) => void;
-    shouldModuleBeReloaded: (moduleType: DataHubPageModuleType, moduleUrn: string) => boolean;
-    markModulesAsReloaded: (moduleType: DataHubPageModuleType, moduleUrn: string) => void;
+export enum ModuleSize {
+    FULL = 'full',
+    HALF = 'half',
+    THIRD = 'third',
 }
 
 export interface ModuleContextType {
     // Reloading
     isReloading: boolean;
     onReloadingFinished: () => void;
+    size?: ModuleSize;
 }

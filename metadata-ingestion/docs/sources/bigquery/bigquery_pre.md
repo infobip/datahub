@@ -47,8 +47,19 @@ If you have multiple projects in your BigQuery setup, the role should be granted
 | `bigquery.jobs.listAll` | List all jobs (queries) submitted by any user. Needs for Lineage extraction. | Lineage Extraction/Usage Extraction | [roles/bigquery.resourceViewer](https://cloud.google.com/bigquery/docs/access-control#bigquery.resourceViewer) |
 | `logging.logEntries.list` | Fetch log entries for lineage/usage data. Not required if `use_exported_bigquery_audit_metadata` is enabled. | Lineage Extraction/Usage Extraction | [roles/logging.privateLogViewer](https://cloud.google.com/logging/docs/access-control#logging.privateLogViewer) |
 | `logging.privateLogEntries.list` | Fetch log entries for lineage/usage data. Not required if `use_exported_bigquery_audit_metadata` is enabled. | Lineage Extraction/Usage Extraction | [roles/logging.privateLogViewer](https://cloud.google.com/logging/docs/access-control#logging.privateLogViewer) |
-| `bigquery.tables.getData` | Access table data to extract storage size, last updated at, data profiles etc. | Profiling | |
+| `bigquery.tables.getData` | Access table data to extract storage size, last updated at, partition information, data profiles etc. **Required when profiling is enabled or when `use_tables_list_query_v2` is enabled.** This permission is needed to query BigQuery's `__TABLES__` pseudo-table. | Profiling/Enhanced Table Metadata | |
 | `datacatalog.policyTags.get` | _Optional_ Get policy tags for columns with associated policy tags. This permission is required only if `extract_policy_tags_from_catalog` is enabled. | Policy Tag Extraction | [roles/datacatalog.viewer](https://cloud.google.com/data-catalog/docs/access-control#permissions-and-roles) |
+
+:::warning Important: bigquery.tables.getData Permission
+
+The `bigquery.tables.getData` permission is **required** in the following scenarios:
+
+- When **profiling is enabled** (`profiling.enabled: true`)
+- When **`use_tables_list_query_v2` is enabled** (for enhanced table metadata extraction)
+
+Without this permission, you'll encounter errors when the connector tries to access BigQuery's `__TABLES__` pseudo-table for detailed table information including partition data, row counts, and storage metrics.
+
+:::
 
 #### Create a service account in the Extractor Project
 
@@ -112,6 +123,7 @@ DataHub's BigQuery connector supports two approaches for extracting lineage and 
   - Query popularity statistics and rankings
   - Multi-region support via `region_qualifiers`
   - Table and column-level usage statistics
+  - User filtering pushdown for performance (see [User Email Filtering Pushdown](#user-email-filtering-pushdown-performance-optimization) section below)
 - **Requirements**:
   - `bigquery.jobs.listAll` permission on target projects
   - No additional Cloud Logging permissions needed
@@ -127,6 +139,47 @@ source:
     include_query_usage_statistics: true # Query popularity stats
     region_qualifiers: ["region-us", "region-eu"] # Multi-region support
 ```
+
+##### User Email Filtering Pushdown (Performance Optimization)
+
+The `pushdown_deny_usernames` and `pushdown_allow_usernames` options push user filtering directly to BigQuery's SQL query, reducing data transfer and improving performance for large query volumes.
+
+**When to Use:**
+
+- You have large query volumes (>10k queries in your time window)
+- You want to exclude high-volume service accounts or bots
+- You want to reduce BigQuery data transfer costs
+- You want to reduce overall DataHub ingestion time
+
+**Example Configuration:**
+
+```yaml
+source:
+  type: bigquery
+  config:
+    use_queries_v2: true # Required for pushdown
+    pushdown_deny_usernames:
+      - "bot_%"
+      - "%@%.iam.gserviceaccount.com" # Exclude service accounts
+    pushdown_allow_usernames:
+      - "analyst_%@example.com"
+      - "data_%@example.com"
+```
+
+**Behavior:**
+
+- When patterns are configured: Filtering happens server-side with BigQuery SQL using case-insensitive `LIKE`
+- When empty (default): No server-side filtering; use `usage.user_email_pattern` for client-side filtering
+- Patterns use SQL LIKE syntax (`%` = any characters, `_` = single character)
+- Matching is case-insensitive (e.g., `bot_%` matches `Bot_User@example.com`)
+- If a user matches both allow AND deny patterns, deny takes precedence (user is excluded)
+
+**Prerequisites:**
+
+- `use_queries_v2: true` must be enabled (default)
+- Patterns must be valid SQL LIKE patterns
+
+**Note:** These configs are independent from `usage.user_email_pattern`. The pushdown filters are applied at the SQL query level for performance, while `user_email_pattern` is applied client-side during processing.
 
 #### Legacy Approach: `use_queries_v2: false`
 
@@ -175,6 +228,12 @@ source:
 - **Note**: The `bigquery_audit_metadata_datasets` parameter accepts datasets in `$PROJECT.$DATASET` format, allowing lineage computation from multiple projects.
 
 ### Profiling Details
+
+:::note Profiling Permission Requirement
+
+When profiling is enabled, the `bigquery.tables.getData` permission is **required**. This is needed to access detailed table metadata including partition information. See the permissions section above for details.
+
+:::
 
 For performance reasons, we only profile the latest partition for partitioned tables and the latest shard for sharded tables.
 You can set partition explicitly with `partition.partition_datetime` property if you want, though note that partition config will be applied to all partitioned tables.

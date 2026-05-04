@@ -151,6 +151,33 @@ AS
     )
 
 
+def test_snowflake_create_view_with_tag() -> None:
+    assert_sql_result(
+        """
+CREATE OR REPLACE VIEW my_db.my_schema.my_view
+WITH TAG (cost_center = 'engineering', classification = 'internal')
+AS
+SELECT id, name FROM my_db.my_schema.my_table
+""",
+        dialect="snowflake",
+        expected_file=RESOURCE_DIR / "test_snowflake_create_view_with_tag.json",
+    )
+
+
+def test_snowflake_create_table_as_select_with_tag() -> None:
+    assert_sql_result(
+        """
+CREATE OR REPLACE TABLE my_db.my_schema.target_table
+WITH TAG (cost_center = 'engineering')
+AS
+SELECT id, name FROM my_db.my_schema.source_table
+""",
+        dialect="snowflake",
+        expected_file=RESOURCE_DIR
+        / "test_snowflake_create_table_as_select_with_tag.json",
+    )
+
+
 def test_insert_as_select() -> None:
     # Note: this also tests lineage with case statements.
     # The join extraction on this is going to be poor quality because
@@ -211,6 +238,20 @@ SELECT id, name, value FROM temp_cte
 """,
         dialect="tsql",
         expected_file=RESOURCE_DIR / "test_insert_with_cte.json",
+    )
+
+
+def test_mssql_insert_column_name_mapping() -> None:
+    # MSSQL-specific: INSERT column names differ from SELECT column names
+    # Tests that column mapping works correctly (INSERT cols != SELECT cols)
+    assert_sql_result(
+        """
+INSERT INTO target_db.dbo.target_table (target_col_a, target_col_b)
+SELECT source_col_x, source_col_y
+FROM source_db.dbo.source_table
+""",
+        dialect="tsql",
+        expected_file=RESOURCE_DIR / "test_mssql_insert_column_name_mapping.json",
     )
 
 
@@ -857,7 +898,7 @@ FROM my_db.my_schema.my_table
 # TODO: Add a test for setting platform_instance or env
 
 
-def test_teradata_default_normalization() -> None:
+def test_default_schema_normalization() -> None:
     assert_sql_result(
         """
 create table demo_user.test_lineage2 as
@@ -895,12 +936,12 @@ create table demo_user.test_lineage2 as
                 "PatientId": "INTEGER()",
             },
         },
-        expected_file=RESOURCE_DIR / "test_teradata_default_normalization.json",
+        expected_file=RESOURCE_DIR / "test_default_schema_normalization.json",
     )
 
 
-def test_teradata_strange_operators() -> None:
-    # This is a test for the following operators:
+def test_dialect_specific_operators() -> None:
+    # This is a test for the following Teradata-specific operators:
     # - `SEL` (select)
     # - `EQ` (equals)
     # - `MINUS` (except)
@@ -913,7 +954,7 @@ select col1, col2 from dbc.table2
 """,
         dialect="teradata",
         default_schema="dbc",
-        expected_file=RESOURCE_DIR / "test_teradata_strange_operators.json",
+        expected_file=RESOURCE_DIR / "test_dialect_specific_operators.json",
     )
 
 
@@ -1248,6 +1289,17 @@ INSERT INTO my_table (id, month, total_cost, area)
     )
 
 
+def test_teradata_insert_into_values() -> None:
+    # Test INSERT VALUES with complex values including strings and timestamps
+    assert_sql_result(
+        """\
+INSERT INTO operations_temp.loss_backup (val_name, amount_type, field_number, amount_status, col_status, duration, time_code) 
+VALUES (9, '2011-04-17', 42, 42.34, '1980-12-29 15:11:17', '1994-08-19 21:28:09', 'garden')""",
+        dialect="teradata",
+        expected_file=RESOURCE_DIR / "test_insert_into_values.json",
+    )
+
+
 def test_bigquery_information_schema_query() -> None:
     # Special case - the BigQuery INFORMATION_SCHEMA views are prefixed with a
     # project + possibly a dataset/region, so sometimes are 4 parts instead of 3.
@@ -1573,4 +1625,109 @@ NATURAL JOIN my_table2 t2
             },
         },
         expected_file=RESOURCE_DIR / "test_natural_join.json",
+    )
+
+
+def test_dremio_quoted_identifiers() -> None:
+    # Test that Dremio SQL with quoted identifiers parses correctly.
+    # This is a regression test for the issue where Dremio was mapped to the
+    # "drill" dialect, which didn't support quoted identifiers properly.
+    assert_sql_result(
+        """\
+WITH "cte_orders" AS (
+    SELECT * FROM "MySource"."sales"."orders"
+    WHERE "status" = 'completed'
+)
+SELECT "cte_orders"."order_id", "customers"."customer_name"
+FROM "cte_orders"
+JOIN "MySource"."sales"."customers" ON "cte_orders"."customer_id" = "customers"."customer_id"
+""",
+        dialect="dremio",
+        expected_file=RESOURCE_DIR / "test_dremio_quoted_identifiers.json",
+    )
+
+
+def test_clickhouse_dictget_not_treated_as_table() -> None:
+    """Test that ClickHouse DICTGET function arguments are not treated as table references.
+
+    DICTGET(dict_name, attr_name, key) takes a dictionary name as the first argument,
+    which sqlglot parses as a Table node but should NOT appear in lineage.
+
+    Expected lineage:
+        analytics.events
+              |
+              v
+          [output]
+
+    NOT included (dictionary reference, not a table):
+        default.subscriptions
+    """
+    assert_sql_result(
+        """\
+SELECT
+    subscription_id,
+    DICTGET(default.subscriptions, 'type', subscription_id) AS subscription_type,
+    DICTGET(default.subscriptions, 'domain', subscription_id) AS subscription_domain
+FROM analytics.events
+""",
+        dialect="clickhouse",
+        expected_file=RESOURCE_DIR / "test_clickhouse_dictget.json",
+    )
+
+
+def test_clickhouse_dictget_with_multiple_tables() -> None:
+    """Test DICTGET with actual table joins.
+
+    Dictionary refs should be excluded, but real table refs should be included.
+
+    Expected lineage:
+        analytics.events    analytics.users
+                    \           /
+                     \         /
+                      v       v
+                      [output]
+
+    NOT included (dictionary reference, not a table):
+        default.categories
+    """
+    assert_sql_result(
+        """\
+SELECT
+    e.event_id,
+    u.user_name,
+    DICTGETORDEFAULT(default.categories, 'name', e.category_id, 'Unknown') AS category_name
+FROM analytics.events e
+JOIN analytics.users u ON e.user_id = u.id
+""",
+        dialect="clickhouse",
+        expected_file=RESOURCE_DIR / "test_clickhouse_dictget_with_joins.json",
+    )
+
+
+def test_clickhouse_materialized_view_to_table() -> None:
+    """Test ClickHouse CREATE MATERIALIZED VIEW ... TO target_table syntax.
+
+    The TO table is the storage target (downstream), not a data source (upstream).
+    The MV acts as a trigger that inserts into the target table.
+
+    Expected lineage:
+        analytics.events
+              |
+              v
+        analytics.agg_daily_stats  (target table from TO clause)
+
+    The MV name (analytics.mv_daily_stats) is NOT the downstream - the TO table is.
+    """
+    assert_sql_result(
+        """\
+CREATE MATERIALIZED VIEW analytics.mv_daily_stats TO analytics.agg_daily_stats
+(date Date, total_events UInt64)
+AS SELECT
+    toDate(timestamp) AS date,
+    count(*) AS total_events
+FROM analytics.events
+GROUP BY date
+""",
+        dialect="clickhouse",
+        expected_file=RESOURCE_DIR / "test_clickhouse_materialized_view_to.json",
     )

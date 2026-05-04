@@ -67,6 +67,7 @@ const ViewAllButton = styled(Button)`
 interface Props extends ModuleProps {
     loading?: boolean;
     onClickViewAll?: () => void;
+    viewAllText?: string;
     dataTestId?: string;
 }
 
@@ -76,6 +77,7 @@ function LargeModule({
     position,
     loading,
     onClickViewAll,
+    viewAllText,
     dataTestId,
 }: React.PropsWithChildren<Props>) {
     const { name } = module.properties;
@@ -102,7 +104,7 @@ function LargeModule({
     }, [onClickViewAll, module.properties.type, templateType]);
 
     return (
-        <ModuleContainer $height="316px" ref={setNodeRef} data-testId={dataTestId}>
+        <ModuleContainer $height="316px" ref={setNodeRef} data-testid={dataTestId}>
             <ModuleHeader>
                 <DragHandle
                     {...(isTemplateEditable ? listeners : {})}
@@ -131,7 +133,7 @@ function LargeModule({
                     </FloatingRightHeaderSection>
                 )}
             </ModuleHeader>
-            <Content $hasViewAll={hasViewAll}>
+            <Content $hasViewAll={hasViewAll} data-testid="module-content">
                 {loading ? (
                     <LoaderContainer>
                         <Loader />
@@ -148,7 +150,7 @@ function LargeModule({
                     onClick={onClickViewAllHandler}
                     data-testid="view-all"
                 >
-                    View all
+                    {viewAllText || 'View all'}
                 </ViewAllButton>
             )}
         </ModuleContainer>

@@ -89,6 +89,7 @@ import play.test.WithBrowser;
 @SetEnvironmentVariable(key = "AUTH_OIDC_HTTP_RETRY_ATTEMPTS", value = "5")
 @SetEnvironmentVariable(key = "AUTH_OIDC_HTTP_RETRY_DELAY", value = "500")
 @SetEnvironmentVariable(key = "AUTH_VERBOSE_LOGGING", value = "true")
+@SetEnvironmentVariable(key = "MFE_CONFIG_FILE_PATH", value = "mfe.config.local.yaml")
 public class ApplicationTest extends WithBrowser {
   private static final Logger logger = LoggerFactory.getLogger(ApplicationTest.class);
   private static final String ISSUER_ID = "testIssuer";
@@ -621,6 +622,64 @@ public class ApplicationTest extends WithBrowser {
   }
 
   @Test
+  public void testRedirectTrailingSlashNestedPath() {
+    Http.RequestBuilder request =
+        fakeRequest(routes.Application.redirectTrailingSlash("foo/bar/baz"));
+
+    Result result = route(app, request);
+    assertEquals(MOVED_PERMANENTLY, result.status());
+    assertEquals("/foo/bar/baz", result.redirectLocation().orElse(""));
+  }
+
+  @Test
+  public void testRedirectTrailingSlashDirectWithLeadingSlash() {
+    controllers.Application controller = app.injector().instanceOf(controllers.Application.class);
+    Result result = controller.redirectTrailingSlash("/evil.com");
+    assertEquals(MOVED_PERMANENTLY, result.status());
+    assertEquals("/evil.com", result.redirectLocation().orElse(""));
+  }
+
+  @Test
+  public void testRedirectTrailingSlashDirectWithMultipleLeadingSlashes() {
+    controllers.Application controller = app.injector().instanceOf(controllers.Application.class);
+    Result result = controller.redirectTrailingSlash("///evil.com/path");
+    assertEquals(MOVED_PERMANENTLY, result.status());
+    assertEquals("/evil.com/path", result.redirectLocation().orElse(""));
+  }
+
+  @Test
+  public void testRedirectTrailingSlashDirectWithNull() {
+    controllers.Application controller = app.injector().instanceOf(controllers.Application.class);
+    Result result = controller.redirectTrailingSlash(null);
+    assertEquals(MOVED_PERMANENTLY, result.status());
+    assertEquals("/", result.redirectLocation().orElse(""));
+  }
+
+  @Test
+  public void testRedirectTrailingSlashDirectWithEmpty() {
+    controllers.Application controller = app.injector().instanceOf(controllers.Application.class);
+    Result result = controller.redirectTrailingSlash("");
+    assertEquals(MOVED_PERMANENTLY, result.status());
+    assertEquals("/", result.redirectLocation().orElse(""));
+  }
+
+  @Test
+  public void testRedirectTrailingSlashDirectWithOnlySlashes() {
+    controllers.Application controller = app.injector().instanceOf(controllers.Application.class);
+    Result result = controller.redirectTrailingSlash("////");
+    assertEquals(MOVED_PERMANENTLY, result.status());
+    assertEquals("/", result.redirectLocation().orElse(""));
+  }
+
+  @Test
+  public void testRedirectTrailingSlashDirectWithNormalPath() {
+    controllers.Application controller = app.injector().instanceOf(controllers.Application.class);
+    Result result = controller.redirectTrailingSlash("dataset/urn:li:dataset:1");
+    assertEquals(MOVED_PERMANENTLY, result.status());
+    assertEquals("/dataset/urn:li:dataset:1", result.redirectLocation().orElse(""));
+  }
+
+  @Test
   public void testAppConfigWithEmptyBasePath() {
     // Create a new application with empty basePath
     Application customApp =
@@ -940,12 +999,12 @@ public class ApplicationTest extends WithBrowser {
     assertEquals(TEST_USER, data.get("actor"));
     // Default expiration is 24h, so should always be less than current time + 1 day since it stamps
     // the time before this executes. Use a more generous tolerance to account for timezone
-    // differences
-    // and test execution time variations.
+    // differences, DST transitions, and test execution time variations.
+    // Increased tolerance to 22-26 hours to handle DST transitions (which can cause 1-hour shifts)
     Date maxExpectedExpiration =
-        new Date(System.currentTimeMillis() + (25 * 60 * 60 * 1000)); // 25 hours
+        new Date(System.currentTimeMillis() + (26 * 60 * 60 * 1000)); // 26 hours
     Date minExpectedExpiration =
-        new Date(System.currentTimeMillis() + (23 * 60 * 60 * 1000)); // 23 hours
+        new Date(System.currentTimeMillis() + (22 * 60 * 60 * 1000)); // 22 hours
     Date actualExpiration = claims.getExpirationTime();
 
     assertTrue(

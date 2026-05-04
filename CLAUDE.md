@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 ./gradlew build           # Build entire project
 ./gradlew check           # Run all tests and linting
+./gradlew format          # Format all code (Java, Markdown, GraphQL, YAML)
 
 # Note that each directory typically has a build.gradle file, but the available tasks follow similar conventions.
 
@@ -19,7 +20,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew :metadata-ingestion:testQuick     # Fast Python unit tests
 ./gradlew :metadata-ingestion:lint          # Python linting (ruff, mypy)
 ./gradlew :metadata-ingestion:lintFix       # Python linting auto-fix (ruff only)
+
+# Markdown, GraphQL, YAML formatting
+./gradlew :datahub-web-react:mdPrettierWrite        # Format markdown files
+./gradlew :datahub-web-react:graphqlPrettierWrite   # Format GraphQL schemas
+./gradlew :datahub-web-react:githubActionsPrettierWrite # Format GitHub Actions
 ```
+
+If you are using git worktrees then exclude this as that might cause git related failures when running any gradle command.
+
+```
+./gradlew ... -x generateGitPropertiesGlobal
+```
+
+**IMPORTANT: Verifying Python code changes:**
+
+- **ALWAYS use `./gradlew :metadata-ingestion:lintFix`** to verify Python code changes
+- **NEVER use `python3 -m py_compile`** - it doesn't catch style issues or type errors
+- **NEVER use `ruff` or `mypy` commands directly** - use the Gradle task instead
+- lintFix runs ruff formatting and fixing automatically, ensuring code quality
+- For smoke-test changes, the lintFix command will also check those files
 
 **Development setup:**
 
@@ -28,6 +48,77 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew quickstartDebug                              # Start full DataHub stack
 cd datahub-web-react && yarn start                     # Frontend dev server
 ```
+
+## Code Formatting and Linting
+
+**CRITICAL: Always use Gradle tasks for formatting and linting. Never use npm/yarn/npx commands directly.**
+
+### Available Formatting Tasks
+
+**Format everything:**
+
+```bash
+./gradlew format              # Format all code (Java, Markdown, GraphQL, YAML)
+./gradlew formatChanged       # Format only changed files (faster)
+```
+
+**Format specific file types:**
+
+```bash
+# Markdown files
+./gradlew :datahub-web-react:mdPrettierWrite        # Format all markdown
+./gradlew :datahub-web-react:mdPrettierCheck        # Check markdown formatting
+
+# GraphQL schemas
+./gradlew :datahub-web-react:graphqlPrettierWrite   # Format GraphQL files
+./gradlew :datahub-web-react:graphqlPrettierCheck   # Check GraphQL formatting
+
+# GitHub Actions YAML
+./gradlew :datahub-web-react:githubActionsPrettierWrite   # Format workflow files
+./gradlew :datahub-web-react:githubActionsPrettierCheck   # Check workflow files
+
+# Java code
+./gradlew spotlessApply       # Format Java code
+
+# Python code
+./gradlew :metadata-ingestion:lintFix      # Format and fix Python code
+./gradlew :metadata-ingestion:lint         # Check Python formatting
+```
+
+### When CI Formatting Checks Fail
+
+If you see CI failures like:
+
+- `markdown_format / markdown_format_check (pull_request)` - Use `./gradlew :datahub-web-react:mdPrettierWrite`
+- `graphql_prettier_check` - Use `./gradlew :datahub-web-react:graphqlPrettierWrite`
+- `spotlessJavaCheck` - Use `./gradlew spotlessApply`
+- Python linting failures - Use `./gradlew :metadata-ingestion:lintFix`
+
+**❌ NEVER do this:**
+
+```bash
+npx prettier --write "docs/**/*.md"    # WRONG - bypasses Gradle
+yarn prettier --write                   # WRONG - bypasses Gradle
+npm run format                          # WRONG - bypasses Gradle
+```
+
+**✅ ALWAYS do this:**
+
+```bash
+./gradlew :datahub-web-react:mdPrettierWrite      # CORRECT - uses Gradle
+./gradlew format                                   # CORRECT - formats everything
+```
+
+### Why Use Gradle Tasks?
+
+1. **Consistent configuration**: Gradle tasks use the project's Prettier config
+2. **Pre-commit hook integration**: Gradle tasks match what CI runs
+3. **Dependency management**: Ensures correct tool versions
+4. **Cross-platform**: Works reliably across all environments
+
+**Java SDK v2 integration tests:**
+
+See [metadata-integration/java/datahub-client/CLAUDE.md](metadata-integration/java/datahub-client/CLAUDE.md) for detailed integration test documentation.
 
 ## Architecture Overview
 
@@ -66,6 +157,15 @@ Each Python module has a gradle setup similar to `metadata-ingestion/` (document
 - **URNs**: Unique identifiers (`urn:li:dataset:(urn:li:dataPlatform:mysql,db.table,PROD)`)
 - **MCE/MCL**: Metadata Change Events/Logs for updates
 - **Entity Registry**: YAML config defining entity-aspect relationships (`metadata-models/src/main/resources/entity-registry.yml`)
+
+### Validation Architecture
+
+**IMPORTANT**: Validation must work across all APIs (GraphQL, OpenAPI, RestLI).
+
+- **Never add validation in API-specific layers** (GraphQL resolvers, REST controllers) - this only protects one API
+- **Always implement AspectPayloadValidators** in `metadata-io/src/main/java/com/linkedin/metadata/aspect/validation/`
+- **Register as Spring beans** in `SpringStandardPluginConfiguration.java`
+- **Follow existing patterns**: See `SystemPolicyValidator.java` and `PolicyFieldTypeValidator.java` as examples
 
 ## Development Flow
 
@@ -133,6 +233,104 @@ connection_timeout = 30
 - Frontend: Tests in `__tests__/` or `.test.tsx` files
 - Smoke tests go in the `smoke-test/` directory
 
+#### Testing Principles: Focus on Value Over Coverage
+
+**IMPORTANT**: Quality over quantity. Avoid AI-generated test anti-patterns that create maintenance burden without providing real value.
+
+**Focus on behavior, not implementation**:
+
+- ✅ Test what the code does (business logic, edge cases that occur in production)
+- ❌ Don't test how it does it (implementation details, private fields via reflection)
+- ❌ Don't test third-party libraries work correctly (Spring, Micrometer, Kafka clients, etc.)
+- ❌ Don't test Java/Python language features (`synchronized` methods are thread-safe, `@Nonnull` parameters reject nulls)
+
+**Avoid these specific anti-patterns**:
+
+- ❌ Testing null inputs on `@Nonnull`/`@NonNull` annotated parameters
+- ❌ Verifying exact error message wording (creates brittleness during refactoring)
+- ❌ Testing every possible input variation (case sensitivity × whitespace × special chars = maintenance nightmare)
+- ❌ Using reflection to verify private implementation details
+- ❌ Redundant concurrency testing on `synchronized` methods
+- ❌ Testing obvious getter/setter behavior without business logic
+- ❌ Testing Lombok-generated code (`@Data`, `@Builder`, `@Value` classes) - you're testing Lombok's code generator, not your logic
+- ❌ Testing that annotations exist on classes - if required annotations are missing, the framework/compiler will fail at startup, not in your tests
+
+**Appropriate test scope**:
+
+- **Simple utilities** (enums, string parsing, formatters): ~50-100 lines of focused tests
+  - Happy path for each method
+  - One example of invalid input per method
+  - Edge cases likely to occur in production
+- **Complex business logic**: Test proportional to risk and complexity
+  - Integration points and system boundaries
+  - Security-critical operations
+  - Error handling for realistic failure scenarios
+- **Warning sign**: If tests are 5x+ the size of implementation, reconsider scope
+
+**Examples of low-value tests to avoid**:
+
+```java
+// ❌ BAD: Testing @Nonnull contract (framework's job)
+@Test
+public void testNullParameterThrowsException() {
+    assertThrows(NullPointerException.class,
+        () -> service.process(null)); // parameter is @Nonnull
+}
+
+// ❌ BAD: Testing Lombok-generated code
+@Test
+public void testBuilderSetsAllFields() {
+    MyConfig config = MyConfig.builder()
+        .field1("value1")
+        .field2("value2")
+        .build();
+    assertEquals(config.getField1(), "value1");
+    assertEquals(config.getField2(), "value2");
+}
+
+// ❌ BAD: Testing that annotations exist
+@Test
+public void testConfigurationAnnotations() {
+    assertNotNull(MyConfig.class.getAnnotation(Configuration.class));
+    assertNotNull(MyConfig.class.getAnnotation(ComponentScan.class));
+}
+// If @Configuration is missing, Spring won't load the context - you don't need a test for this
+
+// ❌ BAD: Exact error message (brittle)
+assertEquals(exception.getMessage(),
+    "Unsupported database type 'oracle'. Only PostgreSQL and MySQL variants are supported.");
+
+// ❌ BAD: Redundant variations
+assertEquals(DatabaseType.fromString("postgresql"), DatabaseType.POSTGRES);
+assertEquals(DatabaseType.fromString("PostgreSQL"), DatabaseType.POSTGRES);
+assertEquals(DatabaseType.fromString("POSTGRESQL"), DatabaseType.POSTGRES);
+assertEquals(DatabaseType.fromString("  postgresql  "), DatabaseType.POSTGRES);
+// ... 10 more case/whitespace variations
+
+// ✅ GOOD: Focused behavioral test
+@Test
+public void testFromString_ValidInputsCaseInsensitive() {
+    assertEquals(DatabaseType.fromString("postgresql"), DatabaseType.POSTGRES);
+    assertEquals(DatabaseType.fromString("POSTGRESQL"), DatabaseType.POSTGRES);
+    assertEquals(DatabaseType.fromString("  postgresql  "), DatabaseType.POSTGRES);
+}
+
+@Test
+public void testFromString_InvalidInputThrows() {
+    assertThrows(IllegalArgumentException.class,
+        () -> DatabaseType.fromString("oracle"));
+}
+
+// ✅ GOOD: Testing YOUR custom validation logic on a Lombok class
+@Test
+public void testCustomValidation() {
+    assertThrows(IllegalArgumentException.class,
+        () -> MyConfig.builder().field1("invalid").build().validate());
+}
+```
+
+**When in doubt**: Ask "Does this test protect against a realistic regression?" If not, skip it.
+
 #### Security Testing: Configuration Property Classification
 
 **Critical test**: `metadata-io/src/test/java/com/linkedin/metadata/system_info/collectors/PropertiesCollectorConfigurationTest.java`
@@ -147,6 +345,28 @@ This is a mandatory security guardrail - never disable or skip this test.
 
 - Follow Conventional Commits format for commit messages
 - Breaking Changes: Always update `docs/how/updating-datahub.md` for breaking changes. Write entries for non-technical audiences, reference the PR number, and focus on what users need to change rather than internal implementation details
+
+### Pull Requests
+
+When creating PRs, follow the template in `.github/pull_request_template.md`:
+
+**PR Title Format** (from [Contributing Guide](docs/CONTRIBUTING.md#pr-title-format)):
+
+```
+<type>[optional scope]: <description>
+```
+
+Types: `feat`, `fix`, `refactor`, `docs`, `test`, `perf`, `style`, `build`, `ci`
+
+Example: `feat(parser): add ability to parse arrays`
+
+**Checklist** (verify before submitting):
+
+- [ ] PR conforms to the Contributing Guideline (especially PR Title Format)
+- [ ] Links to related issues (if applicable)
+- [ ] Tests added/updated (if applicable)
+- [ ] Docs added/updated (if applicable)
+- [ ] Breaking changes documented in `docs/how/updating-datahub.md`
 
 ## Key Documentation
 

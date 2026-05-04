@@ -1,4 +1,4 @@
-FROM python:3.9.19-slim-bullseye
+FROM python:3.11-slim-bookworm
 
 USER root
 ARG version
@@ -14,7 +14,7 @@ RUN python3 -m pip install --upgrade pip wheel setuptools acryl-datahub
 COPY . /datahub-src
 RUN cd /datahub-src && \
     ./gradlew :metadata-ingestion:install --stacktrace && \
-    metadata-ingestion/venv/bin/pip install setuptools flatdict==4.0.1 && \
+    metadata-ingestion/venv/bin/pip install --no-build-isolation flatdict==4.0.1 && \
     ./gradlew :metadata-ingestion:installDev --stacktrace
 
 ENTRYPOINT ["python", "/datahub-src/docker/infobip-ingestion/start.py"]

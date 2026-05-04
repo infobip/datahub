@@ -154,17 +154,44 @@ def rewrite_markdown(file_contents: str, path: str, relocated_path: str) -> str:
     return new_content
 
 
-def load_capability_data(capability_summary_path: str) -> Dict:
-    """Load capability data from the capability summary JSON file."""
-    try:
-        with open(capability_summary_path, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        logger.error(f"Capability summary file not found: {capability_summary_path}")
-        raise
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse capability summary JSON: {e}")
-        raise
+def load_connector_registry(connector_registry_dir: str) -> Dict:
+    """Load connector registry data from all package JSON files in directory."""
+    registry_dir = pathlib.Path(connector_registry_dir) / "connector_registry"
+
+    merged_data = {
+        "generated_by": "metadata-ingestion/scripts/connector_registry.py",
+        "plugin_details": {},
+    }
+
+    if not registry_dir.exists():
+        raise FileNotFoundError(
+            f"Connector registry directory not found: {registry_dir}"
+        )
+
+    # Load all JSON files from directory
+    json_files = sorted(registry_dir.glob("*.json"))
+    json_files = [f for f in json_files if f.stem != "manifest"]
+
+    if not json_files:
+        raise FileNotFoundError(f"No connector registry files found in {registry_dir}")
+
+    for json_file in json_files:
+        try:
+            with open(json_file) as f:
+                package_data = json.load(f)
+                package_name = json_file.stem
+                plugin_count = len(package_data.get("plugin_details", {}))
+                merged_data["plugin_details"].update(
+                    package_data.get("plugin_details", {})
+                )
+                logger.info(
+                    f"Loaded {plugin_count} connectors from package '{package_name}'"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to load {json_file}: {e}")
+
+    logger.info(f"Total connectors loaded: {len(merged_data['plugin_details'])}")
+    return merged_data
 
 
 def create_plugin_from_capability_data(
@@ -243,7 +270,9 @@ def create_plugin_from_capability_data(
         if hasattr(source_type, "get_config_class"):
             source_config_class: ConfigModel = source_type.get_config_class()
 
-            plugin.config_json_schema = source_config_class.schema_json(indent=2)
+            plugin.config_json_schema = json.dumps(
+                source_config_class.model_json_schema(), indent=2
+            )
             plugin.config_md = gen_md_table_from_pydantic(
                 source_config_class, current_source=plugin_name
             )
@@ -279,16 +308,16 @@ class PlatformMetrics:
 @click.command()
 @click.option("--out-dir", type=str, required=True)
 @click.option(
-    "--capability-summary",
+    "--connector-registry-dir",
     type=str,
     required=True,
-    help="Path to capability summary JSON file",
+    help="Directory containing connector_registry/ with package JSON files",
 )
 @click.option("--extra-docs", type=str, required=False)
 @click.option("--source", type=str, required=False)
 def generate(  # noqa: C901
     out_dir: str,
-    capability_summary: str,
+    connector_registry_dir: str,
     extra_docs: Optional[str] = None,
     source: Optional[str] = None,
 ) -> None:
@@ -297,12 +326,12 @@ def generate(  # noqa: C901
 
     platforms: Dict[str, Platform] = {}
 
-    # Load capability data
+    # Load connector registry data
     try:
-        capability_data = load_capability_data(capability_summary)
-        logger.info(f"Loaded capability data from {capability_summary}")
+        capability_data = load_connector_registry(connector_registry_dir)
+        logger.info(f"Loaded connector registry from {connector_registry_dir}")
     except Exception as e:
-        logger.error(f"Failed to load capability data: {e}")
+        logger.error(f"Failed to load connector registry: {e}")
         sys.exit(1)
 
     for plugin_name in sorted(source_registry.mapping.keys()):
@@ -585,7 +614,7 @@ For data tools with limited native lineage tracking, [**DataHub's SQL Parser**](
 
 Types of lineage connections supported in DataHub and the example codes are as follows.
 
-* [Dataset to Dataset](../../../metadata-ingestion/examples/library/add_lineage_dataset_to_dataset.py)
+* [Dataset to Dataset](../../../metadata-ingestion/examples/library/lineage_dataset_add.py)
 * [DataJob to DataFlow](../../../metadata-ingestion/examples/library/lineage_job_dataflow.py)
 * [DataJob to Dataset](../../../metadata-ingestion/examples/library/lineage_dataset_job_dataset.py)
 * [Chart to Dashboard](../../../metadata-ingestion/examples/library/lineage_chart_dashboard.py)
