@@ -22,7 +22,8 @@ COPY . /datahub-src
 RUN cd /datahub-src && \
     ./gradlew :metadata-ingestion:install --stacktrace && \
     metadata-ingestion/venv/bin/pip install --no-build-isolation flatdict==4.0.1 && \
-    ./gradlew :metadata-ingestion:installDev --stacktrace
+    ./gradlew :metadata-ingestion:installDev --stacktrace && \
+    metadata-ingestion/venv/bin/pip install -e .[fabric-onelake]
 
 ENTRYPOINT ["python", "/datahub-src/docker/infobip-ingestion/start.py"]
 CMD ["--help"]
