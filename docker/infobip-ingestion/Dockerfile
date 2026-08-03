@@ -3,7 +3,12 @@ FROM python:3.11-slim-bookworm
 USER root
 ARG version
 
-RUN apt-get -y update && \
+RUN curl -sSL https://packages.microsoft.com/keys/microsoft.asc | \
+      tee /etc/apt/trusted.gpg.d/microsoft.asc && \
+    curl -sSL https://packages.microsoft.com/config/debian/12/prod.list | \
+      tee /etc/apt/sources.list.d/mssql-release.list && \
+    apt-get -y update && \
+    ACCEPT_EULA=Y apt-get -y install msodbcsql18 && \
     apt-get -y install git openjdk-17-jdk jq gcc python3-dev libldap2-dev libsasl2-dev \
       libssl-dev build-essential unixodbc-dev libkrb5-dev ant && \
     apt-get clean && \
