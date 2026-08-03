@@ -3,7 +3,9 @@ FROM python:3.11-slim-bookworm
 USER root
 ARG version
 
-RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | \
+RUN apt-get -y update && \
+    apt-get -y install curl ca-certificates gnupg && \
+    curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | \
       gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg && \
     curl -fsSL https://packages.microsoft.com/config/debian/12/prod.list | \
       tee /etc/apt/sources.list.d/mssql-release.list && \
