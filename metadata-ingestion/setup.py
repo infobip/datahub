@@ -370,7 +370,8 @@ threading_timeout_common = {
     "stopit==1.1.2",
     # stopit uses pkg_resources internally, which means there's an implied
     # dependency on setuptools.
-    "setuptools",
+    # setuptools 82 removed pkg_resources.
+    "setuptools<82",
 }
 
 abs_base = {

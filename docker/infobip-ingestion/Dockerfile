@@ -9,7 +9,7 @@ RUN apt-get -y update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN python3 -m pip install --upgrade pip wheel setuptools acryl-datahub
+RUN python3 -m pip install --upgrade pip wheel "setuptools<82" acryl-datahub
 
 COPY . /datahub-src
 RUN cd /datahub-src && \
